@@ -1,222 +1,285 @@
-**DEPRECATED: Content is outdated and innacurate**
-
 # AGENTS.md
 
 This file provides guidance to AI coding agents working in the AutoBuilder repository.
 
 ## Project Overview
 
-AutoBuilder is an autonomous agentic workflow system built on Google ADK that orchestrates multi-agent teams alongside deterministic tooling in structured, resumable pipelines. It supports pluggable workflow composition (auto-code, auto-design, auto-research, etc.), dynamic LLM routing across providers via LiteLLM, six-level progressive memory architecture, skill-based knowledge injection, and git worktree isolation for parallel execution. The system runs continuously from specification to verified output with optional human-in-the-loop intervention points. Built as a Python engine with TypeScript UI.
+AutoBuilder is an autonomous agentic workflow system built on Google ADK that orchestrates multi-agent teams alongside deterministic tooling in structured, resumable pipelines. It supports pluggable workflow composition (auto-code, auto-design, auto-research, etc.), dynamic LLM routing across providers via LiteLLM, six-level progressive memory architecture, skill-based knowledge injection, and git worktree isolation for parallel execution. The system runs continuously from specification to verified output with optional human-in-the-loop intervention points.
 
-Architecture planning docs live in `.dev/.discussion/` — read `260114_plan-shaping.md` for full context on decisions and architecture.
+- **Engine**: Python 3.11+
+- **Framework**: Google ADK (Agent Development Kit)
+- **Multi-model**: LiteLLM for provider-agnostic model routing
+- **UI** (future): TypeScript web dashboard (separate concern from engine)
 
-## Monorepo Structure
+Architecture planning docs live in `.dev/.discussion/` — read `260211_plan-shaping.md` for the consolidated planning document.
+
+---
+
+## Project Structure (Planned)
 
 ```
 AutoBuilder/
-├── core/
-│   ├── providers/          # AI provider implementations (Claude, OpenAI, Ollama)
-│   ├── workflows/          # Workflow types (auto-code, auto-design, auto-market)
-│   └── tools/              # Agent tool definitions (file, shell, workflow-specific)
-├── apps/
-│   ├── cli/                # CLI application (primary interface)
-│   └── dashboard/          # Optional web UI (Express + WebSocket + React)
-├── libs/                   # Shared utility packages (@autobuilder/*)
-│   ├── types/              # Core TypeScript definitions (no dependencies)
-│   ├── utils/              # Logging, errors, utilities
-│   ├── platform/           # Path management, security
-│   ├── git-utils/          # Git operations & worktree management
-│   ├── dependency-resolver/# Feature dependency ordering (topological sort)
-│   ├── model-resolver/     # Model alias resolution
-│   └── prompts/            # AI prompt templates
-└── .dev/                   # Planning docs and notes (not shipped)
+├── autobuilder/                  # Python engine (main package)
+│   ├── app.py                    # ADK App container (entry point)
+│   ├── agents/                   # Agent definitions
+│   │   ├── deterministic/        # CustomAgent subclasses (linter, test runner, skill loader, etc.)
+│   │   └── llm/                  # LlmAgent definitions (planner, coder, reviewer)
+│   ├── tools/                    # FunctionTool wrappers (filesystem, bash, git, web, todo)
+│   ├── skills/                   # Global skill files (Markdown + YAML frontmatter)
+│   │   ├── code/
+│   │   ├── review/
+│   │   ├── test/
+│   │   └── planning/
+│   ├── workflows/                # Pluggable workflow definitions
+│   │   ├── auto-code/
+│   │   │   ├── WORKFLOW.yaml     # Manifest: triggers, tools, models, pipeline type
+│   │   │   ├── pipeline.py       # ADK agent composition
+│   │   │   └── agents/           # Workflow-specific agent definitions
+│   │   ├── auto-design/          # Future
+│   │   └── auto-market/          # Future
+│   ├── router/                   # LLM Router (task_type to model mapping)
+│   ├── memory/                   # SqliteFtsMemoryService (BaseMemoryService implementation)
+│   ├── orchestrator/             # BatchOrchestrator (outer loop CustomAgent)
+│   └── config/                   # Configuration loading and validation
+├── tests/                        # Test suite (mirrors autobuilder/ structure)
+├── .dev/                         # Planning docs and standards (not shipped)
+│   ├── .architect.md             # Architect agent instructions
+│   ├── .standards.md             # Engineering standards
+│   ├── 09-DELIVERY.md            # Phased delivery plan
+│   ├── .discussion/              # Planning discussion documents
+│   └── .notes/                   # Working notes
+├── AGENTS.md                     # This file
+├── pyproject.toml                # Project config (uv/pip, ruff, pyright)
+└── README.md                     # TBD
 ```
+
+---
+
+## Framework: Google ADK
+
+AutoBuilder uses Google ADK (Agent Development Kit) as its orchestration framework. ADK was selected because it treats deterministic tools (`CustomAgent`) and LLM agents (`LlmAgent`) as equal workflow participants in the same event stream, state system, and tracing infrastructure.
+
+### Key Primitives
+
+| Primitive | Role in AutoBuilder |
+|-----------|-------------------|
+| `LlmAgent` | Planning, coding, reviewing — probabilistic steps requiring LLM judgment |
+| `CustomAgent` (BaseAgent) | Linter, test runner, formatter, skill loader, orchestrator — deterministic steps |
+| `SequentialAgent` | Inner feature pipeline (plan, code, lint, test, review) |
+| `ParallelAgent` | Concurrent feature execution within a batch |
+| `LoopAgent` | Review/fix cycles with max iteration bounds |
+| `Session State` | Inter-agent communication (4 scopes: session, user, app, temp) |
+| `Event Stream` | Unified observability for all agent types |
+| `FunctionTool` | Wrap Python functions as LLM-callable tools (auto-schema from type hints) |
+| `InstructionProvider` | Dynamic context/knowledge loading per invocation |
+| `before_model_callback` | Context injection, token budget monitoring |
+| `DatabaseSessionService` | State persistence to SQLite or Postgres |
+
+### Multi-Model via LiteLLM
+
+LiteLLM provides the model abstraction layer. Model strings use the LiteLLM format (e.g., `anthropic/claude-sonnet-4-5-20250929`). The LLM Router selects models per task based on routing configuration.
+
+---
 
 ## Build & Dev Commands
 
 ```bash
-# Install dependencies
-npm install
+# Package management (uv)
+uv sync                           # Install dependencies from pyproject.toml
+uv add <package>                  # Add a dependency
+uv add --dev <package>            # Add a dev dependency
 
-# Build all shared packages (required before app builds)
-npm run build:packages      # Builds libs in dependency order
+# Running
+uv run python -m autobuilder      # Run AutoBuilder (TBD — entry point)
+uv run adk web                    # ADK Dev UI for local debugging
 
-# Development
-npm run dev                 # Interactive dev launcher
-npm run dev:server          # Server with hot reload (tsx watch)
-npm run dev:web             # Web UI dev server
+# Testing
+uv run pytest                     # Run all tests
+uv run pytest tests/path/to/test_file.py  # Run a single test file
+uv run pytest -k "pattern"        # Run tests matching a name pattern
+uv run pytest --cov=autobuilder   # Run with coverage report
 
-# Full build
-npm run build               # Build packages + apps
+# Linting & Formatting
+uv run ruff check .               # Lint
+uv run ruff check --fix .         # Lint with auto-fix
+uv run ruff format .              # Format
+uv run ruff format --check .      # Format check (CI)
 
-# Formatting
-npm run format              # Prettier write
-npm run format:check        # Prettier check (CI)
+# Type Checking
+uv run pyright                    # Type check (strict mode)
 ```
+
+---
 
 ## Testing
 
-Test framework: **Vitest** with `globals: true` (no need to import describe/it/expect).
+- **Framework**: `pytest` with `pytest-asyncio` for async tests
+- **Factory patterns** for test data: `create_feature()`, `create_session()`, `create_skill_entry()`
+- **Coverage target**: >80% line coverage
+- **Test files**: `test_<module>.py` inside `tests/` directory mirroring source structure
+- **Mocking**: Mock external services (LLM calls, filesystem) — never call real APIs in unit tests
+- **Integration tests**: May use real ADK primitives with `InMemorySessionService`
 
-```bash
-# Run all tests
-npm run test:all
-
-# Run package tests only (libs)
-npm run test:packages
-
-# Run server tests only
-npm run test:server
-
-# Run a single test file
-npx vitest run path/to/file.test.ts
-
-# Run tests matching a name pattern
-npx vitest run -t "pattern"
-
-# Watch mode
-npm run test:unit:watch
-```
-
-## Linting
-
-```bash
-npm run lint                # ESLint (UI app)
-npm run format:check        # Prettier check
-```
-
-Pre-commit hook (Husky + lint-staged) auto-runs `prettier --write` on staged files.
+---
 
 ## Code Style Guidelines
 
-### Language & Module System
+### Language
 
-- **TypeScript** with `strict: true` everywhere
-- **ES Modules** — every `package.json` has `"type": "module"`
-- **NodeNext** module resolution for libs/server; **Bundler** for UI
-- **Node.js >= 22**
+- **Python 3.11+** with full type hints on all function signatures
+- **asyncio** for all I/O operations
 
-### Formatting (Prettier)
+### Formatting (ruff)
 
-- Semicolons: **yes**
-- Quotes: **single**
-- Tab width: **2 spaces**
-- Trailing commas: **es5**
-- Print width: **100**
-- Arrow parens: **always**
-- End of line: **lf**
+- Line length: **100**
+- Quote style: **TBD** (double or single — decide before first commit)
+- Import sorting: isort-compatible rules via ruff
+- Enforced via pre-commit hooks
 
 ### Imports
 
-- **Type-only imports** when importing only types: `import type { Feature } from '@autobuilder/types';`
-- **Package imports** for shared code: `import { createLogger } from '@autobuilder/utils';`
-- **`.js` extension** on relative imports (required by NodeNext): `import { helper } from './helper.js';`
-- **No default exports** — use named exports exclusively
-- **Import order**: Node built-ins, external packages, `@autobuilder/*` packages, relative imports
-- **Never import from internal paths** of another package — always use the barrel export
+Import order (enforced by ruff):
 
-```typescript
-// Correct
-import type { Feature, ExecuteOptions } from '@autobuilder/types';
-import { createLogger, classifyError } from '@autobuilder/utils';
-import { resolveModelString } from '@autobuilder/model-resolver';
+1. Standard library (`os`, `pathlib`, `asyncio`)
+2. Third-party (`google.adk`, `pydantic`, `litellm`)
+3. Local (`autobuilder.agents`, `autobuilder.tools`)
 
-// Wrong — don't reach into another package's internals
-import { Feature } from '../services/feature-loader';
+```python
+import asyncio
+from pathlib import Path
+
+from google.adk.agents import LlmAgent, SequentialAgent
+from pydantic import BaseModel
+
+from autobuilder.agents.deterministic.skill_loader import SkillLoaderAgent
+from autobuilder.tools.filesystem import file_read, file_write
 ```
 
 ### Naming Conventions
 
-| Kind              | Convention           | Example                          |
-|-------------------|----------------------|----------------------------------|
-| Files             | `kebab-case.ts`      | `execution-engine.ts`            |
-| Functions         | `camelCase`          | `resolveModelString()`           |
-| Classes           | `PascalCase`         | `ExecutionEngine`                |
-| Interfaces/Types  | `PascalCase`         | `AgentProvider`, `WorkflowType`  |
-| Constants         | `SCREAMING_SNAKE`    | `MAX_CONCURRENCY`, `ANSI`        |
-| Enums             | `PascalCase`         | `LogLevel.ERROR`                 |
-| Custom errors     | `PascalCase + Error` | `PathNotAllowedError`            |
+| Kind | Convention | Example |
+|------|-----------|---------|
+| Files | `snake_case.py` | `skill_loader.py` |
+| Functions | `snake_case` | `resolve_model_string()` |
+| Classes | `PascalCase` | `BatchOrchestrator` |
+| Protocols | `PascalCase` | `MemoryService` |
+| Constants | `SCREAMING_SNAKE` | `MAX_CONCURRENCY`, `DEFAULT_MODEL` |
+| Pydantic models | `PascalCase` | `RoutingConfig`, `FeatureSpec` |
+| State keys | `snake_case` | `current_feature_spec`, `app:coding_standards` |
+| Test files | `test_<module>.py` | `test_skill_loader.py` |
 
 ### Type Patterns
 
-- Use `interface` for object shapes and contracts (e.g., `AgentProvider`, `Workflow`)
-- Use `type` for unions, intersections, and aliases (e.g., `type ErrorType = 'auth' | 'rate-limit'`)
-- Use `export type` in barrel `index.ts` files for type-only re-exports
-- Use optional properties (`prop?: Type`) rather than `prop: Type | undefined`
-- Use `unknown` over `any` — lint warns on `@typescript-eslint/no-explicit-any`
+- **Pydantic `BaseModel`** for structured outputs from LLM agents and external boundaries
+- **`Protocol`** for interfaces with multiple implementations (e.g., `MemoryService`)
+- **`dataclass`** or **`TypedDict`** for internal DTOs
+- **`Enum`** for fixed sets of values
+- **No `Any`** — use `object` for truly dynamic data, explicit types everywhere
+- **pyright strict mode** enforced
 
 ### Error Handling
 
-- Catch blocks use `unknown` type: `catch (error: unknown)`
-- Narrow with `instanceof Error` or guard functions (`isAbortError()`, `isRateLimitError()`)
-- Create custom error classes extending `Error` with a `.name` property
-- Classify errors via typed utility: `classifyError()` returning `ErrorInfo`
+- Catch `Exception`, narrow with `isinstance`
 - Return sensible defaults rather than throwing where possible
-- Always handle async errors — no unhandled promise rejections
+- Custom exception classes for domain errors
+- Always handle async errors
 
-```typescript
-class ProviderError extends Error {
-  name = 'ProviderError';
-  constructor(message: string, public readonly provider: string) {
-    super(message);
-  }
-}
-
-try {
-  await provider.execute(options);
-} catch (error: unknown) {
-  const info = classifyError(error);
-  logger.error(`Provider failed: ${info.message}`);
-}
+```python
+try:
+    result = await tool.execute(params)
+except Exception as e:
+    if isinstance(e, RateLimitError):
+        await backoff_and_retry(e)
+    elif isinstance(e, ToolExecutionError):
+        logger.error(f"Tool failed: {e.tool_name} — {e.message}")
+        return ToolResult(success=False, error=str(e))
+    else:
+        raise
 ```
 
-### Documentation
+### Module Size
 
-- JSDoc with `@param`, `@returns`, `@example` on all public API functions
-- Keep comments focused on **why**, not **what**
+Max **~300 lines** per module. If a file grows past this, split it. Exceptions are rare and must be documented.
 
-### Module & Export Patterns
+---
 
-- Barrel `index.ts` files re-export public API from implementation files
-- Separate type-only exports: `export type { Feature } from './feature.js';`
-- Mixed re-exports: `export { CLAUDE_MODEL_MAP, type ModelAlias } from './model.js';`
+## Architecture Overview
 
-### Testing Conventions
+### Agent Types
 
-- Test files: `<source-file>.test.ts` inside a `tests/` directory
-- Use `describe`/`it`/`expect` (globals from vitest config)
-- Use `vi.mock()` and `vi.resetModules()` for module mocking
-- Create factory helpers for test data: `createFeature()`, `createProvider()`
-- Cover edge cases: null, undefined, empty arrays, boundary conditions
-- Coverage thresholds: 90%+ lines, 95%+ functions, 75%+ branches
+**Deterministic agents** (`CustomAgent` subclasses) — guaranteed workflow steps:
+- `SkillLoaderAgent` — resolve and load relevant skills into state
+- `LinterAgent` — run project linter, write results to state
+- `TestRunnerAgent` — run test suite, write results to state
+- `FormatterAgent` — run code formatter
+- `DependencyResolverAgent` — topological sort of features
+- `RegressionTestAgent` — run cross-feature regression suite
+- `ContextBudgetAgent` — check token usage, trigger compression if needed
 
-### Package Dependency Chain
+**LLM agents** (`LlmAgent`) — probabilistic steps requiring judgment:
+- `plan_agent` — generate implementation plan from feature spec
+- `code_agent` — write code from plan
+- `review_agent` — review code quality against standards
+- `fix_agent` — fix issues identified by review
 
-Packages may only depend on packages above them in this list:
+### State Scopes
+
+| Prefix | Scope | Lifetime | Use |
+|--------|-------|----------|-----|
+| *(none)* | Session | Per-run (persistent via DB) | Feature statuses, loaded skills, test results |
+| `user:` | User | Cross-session | Preferences, model selections |
+| `app:` | App | Cross-user, cross-session | Project config, conventions, skill index |
+| `temp:` | Temp | Current invocation only | Scratch data, intermediate LLM outputs |
+
+Plus `MemoryService` for cross-session searchable knowledge archive.
+
+### Pipeline Structure
 
 ```
-@autobuilder/types          (no dependencies)
-    ↓
-@autobuilder/utils, @autobuilder/platform, @autobuilder/model-resolver,
-@autobuilder/dependency-resolver, @autobuilder/prompts
-    ↓
-@autobuilder/git-utils
-    ↓
-apps (cli, dashboard)
+Outer loop (BatchOrchestrator — CustomAgent):
+  While incomplete features exist:
+    Select next batch (dependency-aware)
+    ParallelAgent(batch):
+      For each feature — SequentialAgent:
+        SkillLoaderAgent (deterministic)
+        plan_agent (LLM)
+        code_agent (LLM)
+        LinterAgent (deterministic)
+        TestRunnerAgent (deterministic)
+        LoopAgent(review cycle, max N):
+          review_agent (LLM)
+          fix_agent (LLM)
+          LinterAgent (deterministic)
+          TestRunnerAgent (deterministic)
+    Run regression tests
+    Checkpoint
 ```
 
-### Key Architectural Patterns
+---
 
-- **Provider Abstraction**: `AgentProvider` interface with per-model implementations; capability-based routing via `ProviderRouter`
-- **Async Generators**: Providers yield `AgentEvent` via `AsyncGenerator` for streaming
-- **Parallel Execution**: `Promise.all` over batches, isolated via git worktrees
-- **Event-Driven**: Server operations emit events streamed to UI via WebSocket
-- **CLI-First**: Primary interface is CLI (`auto-builder` command); dashboard is optional
+## Key Files Reference
 
-### Environment Variables
+| File | Purpose |
+|------|---------|
+| `.dev/.architect.md` | Architect agent instructions — principles, constraints, quality checklist |
+| `.dev/.standards.md` | Engineering standards — coding rules, naming, patterns |
+| `.dev/09-DELIVERY.md` | Phased delivery plan — MVP scope, phases, risks |
+| `.dev/.discussion/260211_plan-shaping.md` | Consolidated planning document — full architecture decisions |
+| `.dev/.discussion/260211_technical-spike-adk-vs-pydantic.md` | ADK vs Pydantic AI evaluation |
 
-- `ANTHROPIC_API_KEY` — Anthropic API key (or use Claude OAuth)
-- `OPENAI_API_KEY` — OpenAI API key
-- `PORT` — Server port (default: 3008)
-- `DATA_DIR` — Data storage directory
-- `ALLOWED_ROOT_DIRECTORY` — Restrict file operations to a directory
+---
+
+## Environment Variables
+
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude models | Yes (if using Claude) |
+| `OPENAI_API_KEY` | OpenAI API key | No (if using OpenAI models) |
+| `GOOGLE_API_KEY` | Google API key for Gemini models | No (if using Gemini) |
+| `LITELLM_LOG` | LiteLLM logging level | No |
+| `AUTOBUILDER_DB_URL` | Database URL for session persistence (default: `sqlite+aiosqlite:///./autobuilder_sessions.db`) | No |
+| `AUTOBUILDER_LOG_LEVEL` | Logging level (default: `INFO`) | No |
+
+---
+
+*Document version: 1.0.0 | Last updated: 2026-02-11*
