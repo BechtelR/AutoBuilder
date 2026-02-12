@@ -117,7 +117,7 @@ State is passed between agents via `output_key` (agent writes to state) and `{ke
 @dataclass
 class FeatureDeps:
     project_path: str
-    feature_spec: FeatureSpec
+    deliverable_spec: DeliverableSpec
     db: DatabaseConnection
 
 agent = Agent('claude-sonnet-4-5-20250929', deps_type=FeatureDeps)
@@ -126,7 +126,7 @@ result = await agent.run("implement this feature", deps=deps)
 # result.data is a typed Pydantic model
 ```
 
-**Assessment:** For AutoBuilder's multi-agent coordination, ADK's shared state with scoping is a better fit. AutoBuilder agents need to read/write shared context (feature status, project state, test results). PAI's dependency injection is cleaner for single-agent scenarios but requires more manual plumbing for multi-agent state sharing.
+**Assessment:** For AutoBuilder's multi-agent coordination, ADK's shared state with scoping is a better fit. AutoBuilder agents need to read/write shared context (deliverable status, project state, validation results). PAI's dependency injection is cleaner for single-agent scenarios but requires more manual plumbing for multi-agent state sharing.
 
 ### 2c. Model Agnosticism (The Google Trust Question)
 
@@ -217,16 +217,16 @@ Your instinct about Google is valid but nuanced: the code is genuinely open, but
 **The Autonomous Execution Loop** (AutoBuilder's defining feature):
 
 ```
-1. Load spec → generate features
+1. Load spec → generate deliverables
 2. Resolve dependencies (topological sort)
-3. While incomplete features exist:
+3. While incomplete deliverables exist:
    a. Select next batch (respecting deps + concurrency)
-   b. For each feature in batch (parallel):
+   b. For each deliverable in batch (parallel):
       i.  Plan agent produces implementation plan
       ii. Execute agent implements the plan
       iii. Review agent validates
       iv. Loop if review fails (max N iterations)
-   c. Merge completed features
+   c. Merge completed deliverables
    d. Run regression tests
    e. Optional: pause for human review
 4. Report completion
@@ -235,8 +235,8 @@ Your instinct about Google is valid but nuanced: the code is genuinely open, but
 **In Google ADK:**
 ```python
 # ADK maps naturally to this — each step is a workflow agent
-feature_pipeline = SequentialAgent(
-    name="FeaturePipeline",
+deliverable_pipeline = SequentialAgent(
+    name="DeliverablePipeline",
     sub_agents=[
         plan_agent,           # LlmAgent: produces plan
         execute_agent,        # LlmAgent: implements plan
@@ -252,43 +252,43 @@ feature_pipeline = SequentialAgent(
 # Parallel batch execution
 batch_runner = ParallelAgent(
     name="BatchRunner",
-    sub_agents=[feature_pipeline_1, feature_pipeline_2, feature_pipeline_3]
+    sub_agents=[deliverable_pipeline_1, deliverable_pipeline_2, deliverable_pipeline_3]
 )
 
 # The outer loop would be a CustomAgent managing the batch lifecycle
 ```
 
-**Challenge:** The outer "while incomplete features exist" loop with dynamic batch selection doesn't map cleanly to ADK's static agent composition. You'd need a CustomAgent for the top-level orchestrator that dynamically creates ParallelAgent instances per batch. This is doable but not as clean as the declarative sub-workflows.
+**Challenge:** The outer "while incomplete deliverables exist" loop with dynamic batch selection doesn't map cleanly to ADK's static agent composition. You'd need a CustomAgent for the top-level orchestrator that dynamically creates ParallelAgent instances per batch. This is doable but not as clean as the declarative sub-workflows.
 
 **In Pydantic AI:**
 ```python
 # PAI maps via code — you own the loop
 async def run_until_complete(spec_path: str, max_concurrency: int = 3):
-    features = await generate_features(spec_path)
-    ordered = topological_sort(features)
+    deliverables = await generate_deliverables(spec_path)
+    ordered = topological_sort(deliverables)
 
     while incomplete := [f for f in ordered if f.status != "complete"]:
         batch = get_next_batch(incomplete, max_concurrency)
 
         results = await asyncio.gather(*[
-            process_feature(f) for f in batch
+            process_deliverable(d) for d in batch
         ])
 
         for result in results:
             if result.needs_regression:
                 await run_regression_tests()
 
-async def process_feature(feature: Feature) -> FeatureResult:
-    plan = await plan_agent.run(f"Plan: {feature.spec}", deps=project_deps)
+async def process_deliverable(deliverable: Deliverable) -> DeliverableResult:
+    plan = await plan_agent.run(f"Plan: {deliverable.spec}", deps=project_deps)
 
     for attempt in range(3):
         code = await execute_agent.run(plan.data, deps=project_deps)
         review = await review_agent.run(code.data, deps=project_deps)
         if review.data.approved:
-            return FeatureResult(feature=feature, code=code.data)
+            return DeliverableResult(deliverable=deliverable, output=code.data)
         plan = await fix_agent.run(review.data.feedback, deps=project_deps)
 
-    return FeatureResult(feature=feature, status="failed_review")
+    return DeliverableResult(deliverable=deliverable, status="failed_review")
 ```
 
 **This is more natural for AutoBuilder's dynamic loop.** The outer orchestration is just Python — no framework gymnastics needed for dynamic batch sizing, dependency-aware scheduling, or conditional continuation.
@@ -326,7 +326,7 @@ The initial evaluation (Section 5-original below) recommended Pydantic AI. After
 AutoBuilder needs two fundamentally different types of tool execution:
 
 1. **LLM-discretionary tools**: "Use search if you need info" — the LLM decides when/how to use these
-2. **Deterministic tools**: Run linter, run tests, format code, merge branch — these MUST execute at specific workflow points regardless of LLM judgment
+2. **Deterministic tools**: Run validator, run tests, check constraints, merge branch — these MUST execute at specific workflow points regardless of LLM judgment
 
 ### How Each Framework Handles This
 
@@ -334,7 +334,7 @@ AutoBuilder needs two fundamentally different types of tool execution:
 
 ```python
 # PAI: Deterministic steps live in a "shadow world"
-code = await code_agent.run("implement feature", deps=deps)
+code = await execute_agent.run("implement deliverable", deps=deps)
 lint_result = run_linter(code.data)        # Outside framework — invisible to tracing/state
 test_result = run_tests(code.data)          # Outside framework — invisible to tracing/state
 format_result = format_code(code.data)      # Outside framework — invisible to tracing/state
@@ -375,7 +375,7 @@ Deterministic tools in ADK:
 
 ### Why This Maps to AutoBuilder's Core Architecture
 
-AutoBuilder is fundamentally an **orchestration problem** where LLM agents are one component alongside deterministic tooling. The feature pipeline isn't "an LLM that sometimes uses tools" — it's a structured workflow where some steps are probabilistic (planning, coding, reviewing) and others are deterministic (linting, testing, formatting, merging).
+AutoBuilder is fundamentally an **orchestration problem** where LLM agents are one component alongside deterministic tooling. The deliverable pipeline isn't "an LLM that sometimes uses tools" — it's a structured workflow where some steps are probabilistic (planning, execution, reviewing) and others are deterministic (validation, testing, formatting, merging).
 
 Requirement #8 states: "balance of deterministic tools + LLM discretionary behavior; not relying solely on LLM probabilistic execution."
 
@@ -399,9 +399,9 @@ That's a substantial amount of orchestration infrastructure — exactly the kind
 
 2. **Unified composition model.** `BaseAgent` is the common ancestor for both LLM agents and deterministic agents. Workflow agents (Sequential, Parallel, Loop) accept any `BaseAgent` subclass without knowing or caring whether it uses an LLM. This is one composition model, one state system, one event stream, one observability layer.
 
-3. **AutoBuilder's dynamic outer loop is solvable.** The initial concern was that ADK's declarative composition couldn't handle AutoBuilder's dynamic batch selection. This is addressed by using a `CustomAgent` as the top-level orchestrator that programmatically constructs `ParallelAgent` instances per batch. The inner feature pipelines remain clean declarative compositions.
+3. **AutoBuilder's dynamic outer loop is solvable.** The initial concern was that ADK's declarative composition couldn't handle AutoBuilder's dynamic batch selection. This is addressed by using a `CustomAgent` as the top-level orchestrator that programmatically constructs `ParallelAgent` instances per batch. The inner deliverable pipelines remain clean declarative compositions.
 
-4. **State management is better suited.** ADK's four-scope state system (session/user/app/temp) with automatic persistence maps directly to AutoBuilder's needs: feature status in session state, user preferences in user state, project config in app state, intermediate results in temp state.
+4. **State management is better suited.** ADK's four-scope state system (session/user/app/temp) with automatic persistence maps directly to AutoBuilder's needs: deliverable status in session state, user preferences in user state, project config in app state, intermediate results in temp state.
 
 5. **Observability comes for free.** Every agent — LLM or deterministic — emits events into the same stream. No custom bridging needed between "framework world" and "shadow world" of deterministic functions.
 
@@ -683,7 +683,7 @@ def code_agent_instructions(context: ReadonlyContext) -> str:
 
 {skills_text}
 
-Current feature: {context.state.get('current_feature_spec')}
+Current deliverable: {context.state.get('current_deliverable_spec')}
 """
 
 code_agent = LlmAgent(
@@ -726,8 +726,8 @@ class SkillLoaderAgent(BaseAgent):
         )
 
 # Usage in pipeline — skill loading is a visible, deterministic workflow step
-feature_pipeline = SequentialAgent(
-    name="FeaturePipeline",
+deliverable_pipeline = SequentialAgent(
+    name="DeliverablePipeline",
     sub_agents=[
         SkillLoaderAgent(name="LoadSkills"),   # Deterministic: resolve skills
         plan_agent,                             # LLM: plan using loaded skills

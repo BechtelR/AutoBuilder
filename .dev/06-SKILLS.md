@@ -20,13 +20,13 @@
 
 ## The Problem
 
-Agents need specialized knowledge to produce project-appropriate output: coding conventions, framework patterns, test strategies, API design rules, compliance requirements. But loading everything into every prompt wastes tokens and degrades focus.
+Agents need specialized knowledge to produce project-appropriate output: conventions, patterns, strategies, design rules, compliance requirements. But loading everything into every prompt wastes tokens and degrades focus.
 
-The naive approach is "give the agent all the context." This fails at scale: a code agent implementing a database migration does not need the API endpoint conventions, the security review checklist, or the design system guidelines. Injecting all of these burns tokens, dilutes attention, and produces worse results.
+The naive approach is "give the agent all the context." This fails at scale: an agent implementing a database migration does not need the API endpoint conventions, the security review checklist, or the design system guidelines. An agent writing a research report does not need coding standards. Injecting irrelevant skills burns tokens, dilutes attention, and produces worse results.
 
 The solution is **progressive disclosure**: agents see a lightweight index of available skills and load full content only when relevant to the current task. The skill system is the mechanism for this.
 
-Skills are a Phase 1 component (Architecture Decision #14) because agents without skills are generic. Skills produce project-appropriate output from day one.
+Skills are a Phase 1 component (Architecture Decision #14) because agents without skills are generic. Skills produce workflow-appropriate and project-appropriate output from day one.
 
 ---
 
@@ -46,7 +46,7 @@ The skill index is visible to the system. Full skill content loads into agent co
 
 ### 4. Two-Tier Library
 
-Global skills ship with AutoBuilder (framework-agnostic best practices). Project-local skills live in the user's repo and override globals with project-specific conventions. A project-local `api-endpoint.md` replaces the global `api-endpoint.md` entirely.
+Global skills ship with AutoBuilder (workflow-agnostic best practices). Project-local skills live in the user's repo and override globals with project-specific conventions. A project-local `api-endpoint.md` replaces the global `api-endpoint.md` entirely.
 
 ### 5. Composable
 
@@ -67,7 +67,7 @@ Each skill is a single Markdown file with YAML frontmatter:
 name: fastapi-endpoint
 description: How to implement a REST API endpoint following project conventions
 triggers:
-  - feature_type: api_endpoint
+  - deliverable_type: api_endpoint
   - file_pattern: "*/routes/*.py"
 tags: [api, http, routing, fastapi]
 applies_to: [code_agent, review_agent]
@@ -131,23 +131,23 @@ Every endpoint requires:
 
 | Trigger Type | Matches Against | Match Logic |
 |---|---|---|
-| `feature_type` | `state["current_feature_type"]` | Exact string match |
+| `deliverable_type` | `state["current_deliverable_type"]` | Exact string match |
 | `file_pattern` | Any file in `state["target_files"]` | Glob pattern match |
-| `tag_match` | Any tag in `state["feature_tags"]` | Set intersection (any overlap) |
+| `tag_match` | Any tag in `state["deliverable_tags"]` | Set intersection (any overlap) |
 | `explicit` | `state["requested_skills"]` | Named request (agent or user requested this skill by name) |
 | `always` | Always matches for specified agents | Unconditional — the skill loads on every invocation for the agents listed in `applies_to` |
 
 ### OR Logic
 
-A skill matches if **any** of its triggers match. This is intentional: triggers describe the different contexts where a skill is relevant. An API endpoint skill might trigger on both `feature_type: api_endpoint` AND `file_pattern: "*/routes/*.py"` because either condition means the skill is relevant.
+A skill matches if **any** of its triggers match. This is intentional: triggers describe the different contexts where a skill is relevant. An API endpoint skill might trigger on both `deliverable_type: api_endpoint` AND `file_pattern: "*/routes/*.py"` because either condition means the skill is relevant.
 
 ```yaml
 triggers:
-  - feature_type: api_endpoint       # Matches if feature type is "api_endpoint"
-  - file_pattern: "*/routes/*.py"    # OR if any target file is in a routes directory
+  - deliverable_type: api_endpoint       # Matches if deliverable type is "api_endpoint"
+  - file_pattern: "*/routes/*.py"        # OR if any target file is in a routes directory
 ```
 
-If the feature type is `api_endpoint` but no target files exist yet (initial generation), the skill still matches via the first trigger. If the feature type is `refactor` but the target files are in `routes/`, the skill still matches via the second trigger.
+If the deliverable type is `api_endpoint` but no target files exist yet (initial generation), the skill still matches via the first trigger. If the deliverable type is `refactor` but the target files are in `routes/`, the skill still matches via the second trigger.
 
 ### Override Rules
 
@@ -157,7 +157,7 @@ Project-local skills with the same `name` as a global skill replace the global s
 
 ## ADK Integration
 
-Skills integrate into the feature pipeline via `SkillLoaderAgent`, a deterministic `CustomAgent` that runs as the first step before any LLM agent.
+Skills integrate into the feature pipeline via `SkillLoaderAgent`, a deterministic `CustomAgent` that runs as the first step before any LLM agent. The entire skill loading process runs inside worker processes as part of the ADK pipeline.
 
 ### SkillLoaderAgent Implementation
 
@@ -227,24 +227,27 @@ The `applies_to` field in skill frontmatter controls which agents receive the sk
 ### Global Skills (Ship with AutoBuilder)
 
 ```
-autobuilder/skills/
+app/skills/
 ├── code/
 │   ├── api-endpoint.md
 │   ├── data-model.md
 │   └── database-migration.md
+├── research/
+│   ├── source-evaluation.md
+│   └── citation-standards.md
 ├── review/
 │   ├── security-review.md
 │   └── performance-review.md
 ├── test/
 │   └── unit-test-patterns.md
 └── planning/
-    └── feature-decomposition.md
+    └── task-decomposition.md
 ```
 
 ### Project-Local Skills (Live in the User's Repo)
 
 ```
-user-project/.autobuilder/skills/
+user-project/.app/skills/
 ├── code/
 │   ├── api-endpoint.md            # Overrides global with project conventions
 │   └── auth-middleware.md         # Project-specific, no global equivalent
@@ -267,13 +270,15 @@ Ships with AutoBuilder. Contains framework-agnostic best practices and common pa
 - How to structure a REST API endpoint (general principles)
 - How to write effective unit tests (general patterns)
 - How to handle errors consistently (common strategies)
-- How to decompose a feature specification (planning guidance)
+- How to decompose a specification into tasks (planning guidance)
+- How to evaluate source quality (research guidance)
+- How to structure a deliverable for review (general review patterns)
 
 Global skills are useful out of the box but intentionally generic. They provide a baseline that most projects benefit from.
 
 ### Project-Local Tier
 
-Lives in the user's repository at `.autobuilder/skills/`. Contains project-specific conventions:
+Lives in the user's repository at `.app/skills/`. Contains project-specific conventions:
 
 - "Our API endpoints use FastAPI with async SQLAlchemy and return Pydantic v2 response models"
 - "Our tests use pytest with the `conftest.py` fixtures defined in `tests/conftest.py`"
@@ -304,6 +309,10 @@ class SkillLibrary:
             self._scan(project_dir)          # Project-local skills override
 ```
 
+### Caching
+
+The skill index is cached in Redis for fast access across worker invocations. Cache is invalidated when skill files change (detected via file modification timestamps during periodic rescans or explicit cache invalidation via the gateway API).
+
 ---
 
 ## Scope Estimate
@@ -320,10 +329,10 @@ The core skills implementation is approximately 300-400 lines of Python:
 | `InstructionProvider integration` | ~40 | Filter loaded skills by `applies_to` per agent |
 | **Total** | **~320** | |
 
-This is disproportionate value for the effort. Skills transform agents from generic LLM wrappers into project-aware specialists. Without skills, feature 47 gets the same generic instructions as feature 1. With skills, feature 47 gets the API endpoint conventions, the project's error handling patterns, and the testing requirements specific to route handlers.
+This is disproportionate value for the effort. Skills transform agents from generic LLM wrappers into project-aware specialists. Without skills, deliverable 47 gets the same generic instructions as deliverable 1. With skills, deliverable 47 gets the domain-specific conventions, patterns, and requirements relevant to its type — whether that's API endpoint conventions for code, citation standards for research, or brand guidelines for marketing.
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Last Updated:** 2026-02-11
 **Status:** Framework Validated -- Prototyping Phase

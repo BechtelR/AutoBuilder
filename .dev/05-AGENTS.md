@@ -8,12 +8,13 @@
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [LLM Agents](#llm-agents)
-3. [Deterministic Agents (CustomAgents)](#deterministic-agents-customagents)
-4. [Plan/Execute Separation](#planexecute-separation)
-5. [Agent Tool Restrictions](#agent-tool-restrictions)
-6. [LLM Router](#llm-router)
-7. [Agent Communication via Session State](#agent-communication-via-session-state)
+2. [Execution Environment](#execution-environment)
+3. [LLM Agents](#llm-agents)
+4. [Deterministic Agents (CustomAgents)](#deterministic-agents-customagents)
+5. [Plan/Execute Separation](#planexecute-separation)
+6. [Agent Tool Restrictions](#agent-tool-restrictions)
+7. [LLM Router](#llm-router)
+8. [Agent Communication via Session State](#agent-communication-via-session-state)
 
 ---
 
@@ -23,17 +24,19 @@ AutoBuilder uses two fundamentally different types of agents as equal workflow p
 
 | Agent Type | ADK Primitive | Execution Model | Examples |
 |------------|---------------|-----------------|----------|
-| **LLM Agents** | `LlmAgent` | Probabilistic — LLM decides approach | `plan_agent`, `code_agent`, `review_agent`, `fix_agent` |
-| **Deterministic Agents** | `CustomAgent` (inherits `BaseAgent`) | Guaranteed — runs exactly as coded | `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`, `FormatterAgent` |
+| **LLM Agents** | `LlmAgent` | Probabilistic — LLM decides approach | `plan_agent`, `execute_agent`, `review_agent`, `fix_agent` |
+| **Deterministic Agents** | `CustomAgent` (inherits `BaseAgent`) | Guaranteed — runs exactly as coded | `SkillLoaderAgent`, plus workflow-specific validators (e.g., `LinterAgent`, `TestRunnerAgent` for auto-code) |
 
 Both types participate in the same state system, emit events into the same unified event stream, and compose naturally with ADK's `SequentialAgent`, `ParallelAgent`, and `LoopAgent` workflow primitives. This is the decisive architectural advantage of Google ADK over alternatives: deterministic tools are first-class workflow citizens, not shadow functions called outside the framework.
+
+Note: The examples below use auto-code agents (plan/code/lint/test/review). Other workflows define their own agent sets with the same patterns. The architecture is workflow-agnostic; the agent *roles* are workflow-specific.
 
 ### How They Compose
 
 ```python
-# Inner feature pipeline — declarative composition
-feature_pipeline = SequentialAgent(
-    name="FeaturePipeline",
+# Inner deliverable pipeline — declarative composition
+deliverable_pipeline = SequentialAgent(
+    name="DeliverablePipeline",
     sub_agents=[
         SkillLoaderAgent(name="LoadSkills"),     # Deterministic
         plan_agent,                                # LLM
@@ -56,23 +59,59 @@ feature_pipeline = SequentialAgent(
 
 ---
 
+## Execution Environment
+
+**Agents run inside ARQ worker processes, not the FastAPI gateway.**
+
+The gateway is responsible for API routes, job enqueueing, and SSE streaming. Workers are responsible for ADK pipeline execution. This separation means:
+
+- **All agent code executes in worker context.** LLM agents, deterministic agents, and the FunctionTools they invoke all run inside worker processes. The gateway never instantiates or runs agents directly.
+- **Agents have filesystem access in the worker environment.** Tools like `file_write`, `bash_exec`, and `git_commit` operate on the worker's filesystem (git worktrees for parallel isolation).
+- **State flows through the database.** Workers read/write session state via `DatabaseSessionService` backed by the shared database (SQLAlchemy 2.0 async).
+- **Events flow through Redis Streams.** Agent events are published to Redis Streams for consumption by SSE endpoints, webhook dispatchers, and audit loggers.
+- **The gateway enqueues workflow jobs.** A client request to run a workflow results in an ARQ job being enqueued. A worker picks up the job and executes the ADK pipeline.
+
+```
+Client --> Gateway (FastAPI)
+             |
+             | enqueue job
+             v
+           Redis (ARQ queue)
+             |
+             | dequeue + execute
+             v
+           Worker (ARQ)
+             |
+             | runs ADK pipeline
+             v
+           Agents + Tools
+             |
+             | publish events
+             v
+           Redis Streams --> SSE / Webhooks / Audit
+```
+
+This architecture means agents are unaware of the gateway. They interact with state (database), events (Redis Streams), and the filesystem — all accessible from the worker process. The anti-corruption layer between the gateway and ADK ensures that ADK is a swappable internal engine, not an exposed surface.
+
+---
+
 ## LLM Agents
 
 LLM Agents handle tasks that require reasoning, creativity, and judgment. Each agent has a distinct role, instruction set, tool subset, and model assignment.
 
-### plan_agent
+### plan_agent (auto-code example)
 
 | Property | Value |
 |----------|-------|
 | **Role** | Decompose a feature specification into a structured implementation plan |
-| **Input** | `{current_feature_spec}`, `{loaded_skills}`, `{memory_context}`, `{app:coding_standards}` |
+| **Input** | `{current_deliverable_spec}`, `{loaded_skills}`, `{memory_context}`, `{app:coding_standards}` |
 | **Output** | `output_key: "implementation_plan"` |
 | **Model** | `anthropic/claude-opus-4-6` (planning benefits from strongest reasoning) |
 | **Tool Access** | Read-only — filesystem read, directory list, search. No write tools. |
 
 The plan agent reads the feature specification, loaded skills, cross-session memory context, and project coding standards from session state. It produces a structured implementation plan that the code agent consumes. It never writes code or modifies files.
 
-### code_agent
+### code_agent (auto-code example)
 
 | Property | Value |
 |----------|-------|
@@ -84,7 +123,7 @@ The plan agent reads the feature specification, loaded skills, cross-session mem
 
 The code agent consumes the structured plan and writes implementation code. Model selection is handled dynamically by the LLM Router based on task complexity. The code agent has full write access to the filesystem within its git worktree.
 
-### review_agent
+### review_agent (auto-code example)
 
 | Property | Value |
 |----------|-------|
@@ -96,7 +135,7 @@ The code agent consumes the structured plan and writes implementation code. Mode
 
 The review agent reads the code output alongside lint and test results written to state by deterministic agents. It evaluates quality and either approves the feature or produces structured feedback for the fix agent. If the review fails, the `LoopAgent` wrapper triggers another fix/lint/test/review cycle (up to `max_iterations`).
 
-### fix_agent
+### fix_agent (auto-code example)
 
 | Property | Value |
 |----------|-------|
@@ -124,6 +163,10 @@ All LLM agents receive instructions through a layered mechanism:
 ## Deterministic Agents (CustomAgents)
 
 Deterministic agents inherit from ADK's `BaseAgent` and implement `_run_async_impl`. They execute guaranteed workflow steps that must not be skippable by LLM judgment. Each emits events into the unified event stream and writes results to session state.
+
+The SkillLoaderAgent is shared across all workflows. Other deterministic agents are workflow-specific — auto-code uses LinterAgent and TestRunnerAgent; other workflows define their own validators appropriate to their output type.
+
+Like all agents, deterministic agents execute inside worker processes. Their subprocess calls (linter, test runner, formatter) have access to the worker's filesystem and environment.
 
 ### SkillLoaderAgent
 
@@ -239,6 +282,8 @@ Not all agents should have access to all tools. AutoBuilder enforces role-based 
 
 ADK supports this through `BaseToolset.get_tools()`, which returns different tool sets based on the agent or feature type. This keeps tool restriction logic centralized rather than scattered across agent definitions.
 
+All tool access is within the worker's filesystem context, scoped to the appropriate git worktree for the feature being executed.
+
 ---
 
 ## LLM Router
@@ -343,7 +388,7 @@ Agent instructions reference state values via template injection. ADK auto-resol
 plan_agent = LlmAgent(
     name="plan_agent",
     instruction="""
-    Implement the following feature: {current_feature_spec}
+    Implement the following deliverable: {current_deliverable_spec}
 
     Project coding standards: {app:coding_standards}
 
@@ -402,7 +447,7 @@ SkillLoaderAgent --> state["loaded_skills"], state["loaded_skill_names"]
 PreloadMemoryTool --> state["memory_context"]
   |
   v
-plan_agent reads: {current_feature_spec}, {loaded_skills}, {memory_context}, {app:coding_standards}
+plan_agent reads: {current_deliverable_spec}, {loaded_skills}, {memory_context}, {app:coding_standards}
 plan_agent writes: state["implementation_plan"]
   |
   v
@@ -424,6 +469,6 @@ review_agent writes: state["review_result"]
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Last Updated:** 2026-02-11
 **Status:** Framework Validated -- Prototyping Phase

@@ -14,6 +14,7 @@
 5. [What Is Shared vs. Workflow-Specific](#what-is-shared-vs-workflow-specific)
 6. [Compound Workflows](#compound-workflows)
 7. [auto-code: The First Workflow](#auto-code-the-first-workflow)
+8. [Workflow Execution Model](#workflow-execution-model)
 
 ---
 
@@ -25,7 +26,8 @@ If the auto-code pipeline structure is hardcoded and other workflows are bolted 
 
 - **Tool registries coupled to coding tools** — an auto-design workflow needs design tools (Figma export, image generation), not `file_edit` and `bash_exec`
 - **State keys assuming code artifacts** — `code_output`, `lint_results`, `test_results` are meaningless in an auto-market workflow that produces campaign copy and channel strategies
-- **Pipeline stages assuming lint/test/review** — an auto-research workflow produces reports, not code. It has no lint step.
+- **Pipeline stages assuming lint/test/review** — an auto-research workflow produces reports, not code. Its quality gates are source verification and citation checking, not linting
+- **Quality gates assuming code validation** — every workflow needs deterministic quality gates, but the *type* of gate varies: lint/test for code, source verification for research, constraint validation for design
 
 The cost of making workflows pluggable from the start is low (a manifest format, a registry, a discovery pattern). The cost of retrofitting pluggability after hardcoding auto-code assumptions is high (ripping out baked-in assumptions across the entire codebase).
 
@@ -38,7 +40,7 @@ A workflow follows the same discovery pattern as skills: a directory with a mani
 ### Directory Structure
 
 ```
-autobuilder/workflows/
+app/workflows/
 ├── auto-code/
 │   ├── WORKFLOW.yaml          # Manifest: name, description, triggers, tools, config
 │   ├── pipeline.py            # ADK agent composition (SequentialAgent, etc.)
@@ -72,7 +74,7 @@ Every workflow directory contains a `WORKFLOW.yaml` manifest that declares the w
 ### Full Example: auto-code
 
 ```yaml
-# autobuilder/workflows/auto-code/WORKFLOW.yaml
+# app/workflows/auto-code/WORKFLOW.yaml
 name: auto-code
 description: Autonomous software development from specification
 triggers:
@@ -93,7 +95,7 @@ supports_parallel: true           # Can run features in parallel?
 
 | Field | Type | Required | Description |
 |---|---|----------|-------------|
-| `name` | string | Yes | Unique workflow identifier. Used in CLI invocation and WorkflowRegistry. |
+| `name` | string | Yes | Unique workflow identifier. Used in API requests, CLI invocation, and WorkflowRegistry. |
 | `description` | string | Yes | Human-readable summary of what the workflow does. |
 | `triggers` | list | Yes | Conditions that match user requests to this workflow. |
 | `required_tools` | list of strings | Yes | FunctionTools that must be available. Pipeline creation fails if any are missing. |
@@ -108,7 +110,7 @@ supports_parallel: true           # Can run features in parallel?
 Workflow triggers use deterministic keyword matching (same principle as skills: no LLM in matching).
 
 - `keywords` — if the user request contains any of these words, the workflow matches
-- `explicit` — if the user explicitly names the workflow (e.g., `autobuilder run auto-code`)
+- `explicit` — if the user explicitly names the workflow (e.g., via CLI `autobuilder run auto-code` or API `POST /workflows/run {"workflow": "auto-code"}`)
 
 If multiple workflows match, the explicit trigger takes precedence. If ambiguous, the system prompts the user to clarify.
 
@@ -170,10 +172,13 @@ class WorkflowRegistry:
 
 All workflows operate on the same platform foundation:
 
+- **Gateway API** — FastAPI REST + SSE endpoints. Clients interact with workflows through the gateway, not directly.
+- **Worker execution** — ARQ workers execute ADK pipelines. Workflows run in worker processes.
 - **Tool registry** — FunctionTools available to all workflows (filesystem, bash, git, web, todo)
 - **Skill library** — global + project-local skills, loaded by SkillLoaderAgent
 - **LLM Router** — dynamic model selection based on task type and routing rules
-- **State management** — session/user/app/temp state scopes via ADK's session system
+- **State management** — session/user/app/temp state scopes via ADK's session system, persisted to single database
+- **Event bus** — Redis Streams for event distribution (SSE, webhooks, audit)
 - **Observability** — unified event stream, OpenTelemetry tracing, ADK Dev UI
 - **Outer loop** — BatchOrchestrator (if workflow supports `batch_parallel` pipeline type)
 - **App container** — ADK `App` class providing lifecycle management, context compression, resumability
@@ -186,9 +191,9 @@ Each workflow defines its own domain-specific concerns:
 - **Pipeline composition** — which agents run, in what order, with what loops and parallelism
 - **Agent definitions** — instructions, tool subsets, model preferences per agent role
 - **Workflow-specific skills** — auto-code has `api-endpoint.md` and `database-migration.md`; auto-design would have `design-system.md` and `accessibility-review.md`
-- **Feature decomposition strategy** — auto-code decomposes a spec into implementable code features; auto-market decomposes into content pieces and channel strategies
-- **Quality gates** — auto-code gates on lint/test/review; auto-design might gate on accessibility audit and visual consistency check
-- **Artifact types** — auto-code produces source files and tests; auto-design produces wireframes and prototypes; auto-market produces copy and media assets
+- **Deliverable decomposition strategy** — auto-code decomposes a spec into implementable code deliverables; auto-market decomposes into content pieces and channel strategies
+- **Quality gates** — auto-code gates on lint/test/review; auto-design might gate on accessibility audit and visual consistency check; auto-research might gate on source verification and citation completeness
+- **Artifact types** — auto-code produces source files and tests; auto-design produces wireframes and prototypes; auto-research produces reports and citations; auto-market produces copy and media assets
 
 ---
 
@@ -217,6 +222,7 @@ Compound workflows are a Phase 2 capability, but the architecture supports them 
 - The WorkflowRegistry can instantiate multiple workflows in sequence
 - Session state persists between workflow executions within the same session
 - No workflow makes assumptions about being the only workflow in a session
+- The gateway can orchestrate multi-workflow jobs via sequential ARQ job enqueueing
 
 ### Phase 2 Implementation Sketch
 
@@ -224,16 +230,25 @@ Compound workflows are a Phase 2 capability, but the architecture supports them 
 User request: "Design and build a marketing campaign for product X"
   |
   v
-Planning agent decomposes into:
+Gateway receives request, planning agent decomposes into:
   1. auto-design: Create visual assets (logo, banners, social templates)
   2. auto-market: Develop campaign strategy, copy, channel adaptation
   |
   v
-WorkflowRegistry.create_pipeline("auto-design", config) --> runs to completion
-  |  writes: state["design_assets"], state["brand_guidelines"]
+Gateway enqueues job 1: auto-design workflow
+  |
   v
-WorkflowRegistry.create_pipeline("auto-market", config) --> reads design outputs
-  |  reads: state["design_assets"], state["brand_guidelines"]
+Worker executes auto-design pipeline
+  writes: state["design_assets"], state["brand_guidelines"]
+  publishes: completion event to Redis Streams
+  |
+  v
+Gateway receives completion event, enqueues job 2: auto-market workflow
+  |
+  v
+Worker executes auto-market pipeline
+  reads: state["design_assets"], state["brand_guidelines"]
+  |
   v
 Combined output: visual assets + campaign strategy + adapted content
 ```
@@ -268,9 +283,9 @@ auto-code is the first workflow shipped with AutoBuilder. It implements autonomo
 ### ADK Composition
 
 ```python
-# auto-code inner feature pipeline
-feature_pipeline = SequentialAgent(
-    name="FeaturePipeline",
+# auto-code inner deliverable pipeline
+deliverable_pipeline = SequentialAgent(
+    name="DeliverablePipeline",
     sub_agents=[
         SkillLoaderAgent(name="LoadSkills"),
         plan_agent,
@@ -294,11 +309,11 @@ feature_pipeline = SequentialAgent(
 class BatchOrchestrator(BaseAgent):
     """Dynamically constructs ParallelAgent batches per iteration."""
     async def _run_async_impl(self, ctx):
-        while incomplete_features_exist(ctx):
+        while incomplete_deliverables_exist(ctx):
             batch = select_next_batch(ctx)  # Dependency-aware, respects concurrency
             parallel = ParallelAgent(
                 name=f"Batch_{batch.id}",
-                sub_agents=[create_pipeline(f) for f in batch.features]
+                sub_agents=[create_pipeline(d) for d in batch.deliverables]
             )
             async for event in parallel.run_async(ctx):
                 yield event
@@ -326,7 +341,7 @@ class BatchOrchestrator(BaseAgent):
 The auto-code workflow includes workflow-specific skills in its `skills/` subdirectory. These extend the global skill library with code-generation-specific knowledge:
 
 ```
-autobuilder/workflows/auto-code/skills/
+app/workflows/auto-code/skills/
 └── code/
     ├── api-endpoint.md
     ├── data-model.md
@@ -351,13 +366,37 @@ It does not define:
 - How tools work (shared FunctionTools from the tool registry)
 - How skills load (shared SkillLoaderAgent + SkillLibrary)
 - How models are selected (shared LLM Router)
-- How state persists (shared DatabaseSessionService)
+- How state persists (shared database via DatabaseSessionService)
 - How events are traced (shared ADK event stream + OpenTelemetry)
+- How events are distributed (shared Redis Streams event bus)
+- How jobs are executed (shared ARQ worker infrastructure)
 
 This separation means a second workflow (auto-design, auto-market, auto-research) can reuse all shared infrastructure and provide only its domain-specific pipeline, agents, and skills.
 
 ---
 
-**Document Version:** 1.0
+## Workflow Execution Model
+
+Workflows execute inside ARQ worker processes, not the gateway. The execution lifecycle is:
+
+1. **Client request** — CLI or dashboard sends `POST /workflows/run` with spec and workflow name
+2. **Gateway validation** — validates request, resolves workflow via WorkflowRegistry, creates job record in database
+3. **Job enqueueing** — gateway enqueues ARQ job with workflow name, spec, and session ID
+4. **Worker pickup** — ARQ worker dequeues job, instantiates ADK pipeline via `WorkflowRegistry.create_pipeline()`
+5. **Pipeline execution** — ADK agents execute in worker process. State flows through database. Events publish to Redis Streams.
+6. **Event streaming** — Redis Stream consumers push events to SSE endpoints, webhook dispatchers, audit loggers
+7. **Completion** — worker marks job complete in database, publishes completion event
+8. **Client notification** — client receives completion via SSE stream or polls status endpoint
+
+The gateway never runs ADK pipelines. It is a job broker and event proxy. This means:
+
+- Workers can scale independently (add more workers for higher throughput)
+- A crashed worker does not take down the gateway
+- Pipeline execution is isolated from API request handling
+- ADK is an internal engine behind the anti-corruption layer
+
+---
+
+**Document Version:** 2.0
 **Last Updated:** 2026-02-11
 **Status:** Framework Validated -- Prototyping Phase

@@ -14,14 +14,14 @@ AutoBuilder is an autonomous agentic workflow system built on Google ADK that or
 
 1. **Autonomous completion** — "run until done" loop, not session-based human interaction
 2. **Deterministic + probabilistic composition** — LLM agents and deterministic tools are equal workflow participants
-3. **Spec-to-software pipeline** — specification → feature decomposition → parallel implementation → verified output
+3. **Spec-to-deliverable pipeline** — specification → deliverable decomposition → parallel execution → verified output
 4. **Multi-model orchestration** — route tasks to optimal models by capability
-5. **Structured quality gates** — linting, testing, review cycles are guaranteed workflow steps, not LLM suggestions
+5. **Structured quality gates** — validation, verification, and review cycles are guaranteed workflow steps, not LLM suggestions
 
 ### What AutoBuilder Is Not
 
 - Not a plugin for an existing editor/CLI (standalone orchestrator)
-- Not a chat-based coding assistant (autonomous executor)
+- Not a chat-based assistant (autonomous executor)
 - Not a single-agent harness (multi-agent team coordination)
 
 ---
@@ -47,7 +47,7 @@ AutoBuilder is an autonomous agentic workflow system built on Google ADK that or
 
 | Framework | Key Strength | Key Weakness | Lesson for AutoBuilder |
 |-----------|-------------|--------------|----------------------|
-| **Autocoder** | Autonomous execution, spec→150-400+ features, regression testing | Single agent, no parallelism, Claude-only | Spec-to-feature pipeline pattern; auto-continuation loop |
+| **Autocoder** | Autonomous execution, spec→150-400+ deliverables, regression testing | Single agent, no parallelism, Claude-only | Spec-to-deliverable pipeline pattern; auto-continuation loop |
 | **Automaker** | Git worktree isolation, dependency resolution, concurrent execution | Bloated (19 views, 32 themes, 150+ routes), no auto-continuation | Topological sorting; worktree isolation for parallel work |
 | **SpecDevLoop** | Fresh context per iteration via ledger handoff | Subprocess overhead, Claude-only, single workflow | Ledger/handoff pattern (achievable without subprocess overhead) |
 | **oh-my-opencode** | 11 specialized agents, multi-model fallback chains, plan/execute separation | 117k LOC, plugin coupling, no autonomous loop, no spec pipeline | Agent role restrictions; provider fallback chains; plan/execute boundary |
@@ -58,13 +58,13 @@ AutoBuilder is an autonomous agentic workflow system built on Google ADK that or
 - **Plan/Execute separation** (oh-my-opencode) — planning agents never write code; execution agents consume structured plans
 - **Agent tool restrictions** (oh-my-opencode) — read-only agents for exploration prevent scope creep
 - **Git worktree isolation** (Automaker) — true filesystem isolation for parallel code generation
-- **Topological dependency sorting** (Automaker) — features execute in dependency order
-- **Spec-to-feature generation** (Autocoder) — specification decomposed into 150-400+ implementable features
-- **Auto-continuation loop** (Autocoder) — run until all features complete, no human prompting needed
+- **Topological dependency sorting** (Automaker) — deliverables execute in dependency order
+- **Spec-to-deliverable generation** (Autocoder) — specification decomposed into 150-400+ implementable deliverables
+- **Auto-continuation loop** (Autocoder) — run until all deliverables complete, no human prompting needed
 
 ### Patterns Explicitly Avoided
 
-- **Monolithic files** — max ~300 lines per module
+- **Monolithic files** — max ~500 lines per module
 - **Hook/plugin systems as primary extension** — prefer explicit workflow phases
 - **Magic keyword triggers** — structured config, not prompt keyword detection
 - **Platform-specific binaries** — pure Python, no native dependencies
@@ -90,13 +90,13 @@ AutoBuilder is an autonomous agentic workflow system built on Google ADK that or
 | 10 | **No custom provider abstraction** | Both Pydantic AI and Google ADK handle multi-model natively; building our own is unnecessary | 2026-02-11 |
 | 11 | **Claude Agent SDK rejected** | It's an agent harness (single Claude agent), not a workflow orchestrator; Claude-only, TS-only | 2026-02-11 |
 | 12 | **Google ADK selected as framework** | Unified composition of LLM agents + deterministic tools; first-class workflow primitives | 2026-02-11 |
-| 13 | **Phased MVP delivery** | Targeting all 15+ features simultaneously risks bloat; MVP focuses on 6 core capabilities | 2026-02-11 |
+| 13 | **Phased MVP delivery** | Targeting all 15+ capabilities simultaneously risks bloat; MVP focuses on 6 core capabilities | 2026-02-11 |
 | 14 | **Skills system as Phase 1 component** | Agents without skills are generic; skills produce project-appropriate output from day one | 2026-02-11 |
 | 15 | **Workflow composition system as Phase 1** | Workflows must be pluggable from day one; hardcoding auto-code then bolting on others later would require ripping out assumptions | 2026-02-11 |
 | 16 | **MCP used sparingly** | MCPs add significant context bloat; prefer lightweight FunctionTools; use agent-browser for browser automation | 2026-02-11 |
 | 17 | **LLM Router for dynamic model selection** | Different tasks benefit from different models; route by capability/cost/speed, not hardcoded model strings | 2026-02-11 |
 | 18 | **ADK App class as application container** | App provides lifecycle management, context compression, resumability, plugin registration — use as the top-level container | 2026-02-11 |
-| 19 | **Multi-level memory as Phase 1** | Agents must accumulate learnings across features and sessions; without memory, feature 47 can't know what patterns features 1-10 established | 2026-02-11 |
+| 19 | **Multi-level memory as Phase 1** | Agents must accumulate learnings across deliverables and sessions; without memory, deliverable 47 can't know what patterns deliverables 1-10 established | 2026-02-11 |
 
 ---
 
@@ -126,16 +126,16 @@ AutoBuilder is fundamentally an **orchestration problem** where LLM agents are o
 
 | Primitive | Role in AutoBuilder |
 |-----------|-------------------|
-| `LlmAgent` | Planning, coding, reviewing — probabilistic steps |
-| `CustomAgent` (BaseAgent) | Linter, test runner, formatter, skill loader, outer loop orchestrator — deterministic steps |
-| `SequentialAgent` | Inner feature pipeline (plan → code → lint → test → review) |
-| `ParallelAgent` | Concurrent feature execution within a batch |
+| `LlmAgent` | Planning, execution, reviewing — probabilistic steps |
+| `CustomAgent` (BaseAgent) | Validators, test runners, formatters, skill loader, outer loop orchestrator — deterministic steps (workflow-specific) |
+| `SequentialAgent` | Inner deliverable pipeline (plan → execute → validate → verify → review) |
+| `ParallelAgent` | Concurrent deliverable execution within a batch |
 | `LoopAgent` | Review/fix cycles with max iteration bounds |
 | `Session State` | Inter-agent communication (4 scopes: session/user/app/temp) |
 | `Event Stream` | Unified observability for all agent types |
 | `InstructionProvider` | Dynamic context/knowledge loading per invocation |
 | `before_model_callback` | Context injection, token budget monitoring |
-| `BaseToolset` | Dynamic tool selection based on feature type |
+| `BaseToolset` | Dynamic tool selection based on deliverable type |
 | `DatabaseSessionService` | State persistence to SQLite/Postgres |
 
 ### Acknowledged Tradeoffs
@@ -160,20 +160,20 @@ If AutoBuilder were primarily an LLM-centric application where agents were the m
 ### The Autonomous Execution Loop
 
 ```
-1. Load spec → generate features (spec-to-feature pipeline)
+1. Load spec → generate deliverables (spec-to-deliverable pipeline)
 2. Resolve dependencies (topological sort)
-3. While incomplete features exist:
+3. While incomplete deliverables exist:
    a. Select next batch (respecting deps + concurrency limits)
-   b. For each feature in batch (parallel):
+   b. For each deliverable in batch (parallel):
       i.   Load relevant skills (deterministic: SkillLoaderAgent)
       ii.  Plan implementation (LLM: plan_agent)
-      iii. Write code (LLM: code_agent)
-      iv.  Lint code (deterministic: LinterAgent)
-      v.   Run tests (deterministic: TestRunnerAgent)
+      iii. Execute plan (LLM: execute_agent)
+      iv.  Validate output (deterministic: workflow-specific ValidatorAgent)
+      v.   Verify output (deterministic: workflow-specific VerifyAgent)
       vi.  Review quality (LLM: review_agent)
       vii. Loop steps iii-vi if review fails (max N iterations)
-   c. Merge completed features
-   d. Run regression tests
+   c. Merge completed deliverables
+   d. Run regression checks
    e. Optional: pause for human review
 4. Report completion
 ```
@@ -184,26 +184,26 @@ If AutoBuilder were primarily an LLM-centric application where agents were the m
 
 **Inner pipeline**: `SequentialAgent` with nested `LoopAgent` for review cycles.
 
-**Deterministic steps**: `CustomAgent` subclasses (LinterAgent, TestRunnerAgent, SkillLoaderAgent, FormatterAgent) as equal workflow participants.
+**Deterministic steps**: `CustomAgent` subclasses as equal workflow participants. The specific validators are workflow-specific (LinterAgent + TestRunnerAgent for auto-code, SourceVerifierAgent + CitationCheckerAgent for auto-research, etc.).
 
 ```python
-# Inner feature pipeline — declarative composition
-feature_pipeline = SequentialAgent(
-    name="FeaturePipeline",
+# Inner deliverable pipeline — declarative composition (auto-code example)
+deliverable_pipeline = SequentialAgent(
+    name="DeliverablePipeline",
     sub_agents=[
-        SkillLoaderAgent(name="LoadSkills"),     # Deterministic
-        plan_agent,                                # LLM
-        code_agent,                                # LLM
-        LinterAgent(name="Lint"),                  # Deterministic
-        TestRunnerAgent(name="Test"),               # Deterministic
+        SkillLoaderAgent(name="LoadSkills"),     # Deterministic: shared
+        plan_agent,                                # LLM: workflow-specific
+        execute_agent,                             # LLM: workflow-specific
+        LinterAgent(name="Lint"),                  # Deterministic: auto-code
+        TestRunnerAgent(name="Test"),               # Deterministic: auto-code
         LoopAgent(
             name="ReviewCycle",
             max_iterations=3,
             sub_agents=[
                 review_agent,                      # LLM
                 fix_agent,                         # LLM
-                LinterAgent(name="ReLint"),        # Deterministic
-                TestRunnerAgent(name="ReTest"),     # Deterministic
+                LinterAgent(name="ReLint"),        # Deterministic: auto-code
+                TestRunnerAgent(name="ReTest"),     # Deterministic: auto-code
             ]
         )
     ]
@@ -213,15 +213,15 @@ feature_pipeline = SequentialAgent(
 class BatchOrchestrator(BaseAgent):
     """Dynamically constructs ParallelAgent batches per iteration."""
     async def _run_async_impl(self, ctx):
-        while incomplete_features_exist(ctx):
+        while incomplete_deliverables_exist(ctx):
             batch = select_next_batch(ctx)  # Dependency-aware, respects concurrency
             parallel = ParallelAgent(
                 name=f"Batch_{batch.id}",
-                sub_agents=[create_pipeline(f) for f in batch.features]
+                sub_agents=[create_pipeline(d) for d in batch.deliverables]
             )
             async for event in parallel.run_async(ctx):
                 yield event
-            await run_regression_tests(ctx)
+            await run_regression_checks(ctx)
             await checkpoint(ctx)
 ```
 
@@ -229,7 +229,7 @@ class BatchOrchestrator(BaseAgent):
 
 | Scope | Contents | Persistence |
 |-------|----------|-------------|
-| **Session** (no prefix) | Current batch, feature statuses, loaded skills, test results, lint results | Per-run (persistent via `DatabaseSessionService`) |
+| **Session** (no prefix) | Current batch, deliverable statuses, loaded skills, validation results, verification results | Per-run (persistent via `DatabaseSessionService`) |
 | **User** (`user:` prefix) | Preferences, model selections, intervention settings | Cross-session per user |
 | **App** (`app:` prefix) | Project config, global conventions, skill index | Cross-user, cross-session |
 | **Temp** (`temp:` prefix) | Intermediate LLM outputs, scratch data | Discarded after invocation |
@@ -277,9 +277,9 @@ ADK provides injection hooks but no built-in knowledge management system. AutoBu
 | Layer | Mechanism | What It Loads |
 |-------|-----------|---------------|
 | 1 | Static instruction string | Base agent personality/role |
-| 2 | `InstructionProvider` function | Project conventions, patterns, feature spec (at invocation time) |
+| 2 | `InstructionProvider` function | Project conventions, patterns, deliverable spec (at invocation time) |
 | 3 | `before_model_callback` | File context, codebase analysis, test results (right before LLM call) |
-| 4 | `BaseToolset.get_tools()` | Different tools per feature type |
+| 4 | `BaseToolset.get_tools()` | Different tools per deliverable type |
 | 5 | Artifacts (`save_artifact`/`load_artifact`) | Large data (full file contents, generated code) |
 | 6 | Context compression | Sliding window summarization for long autonomous runs |
 
@@ -309,7 +309,7 @@ Agents need specialized knowledge (project conventions, framework patterns, test
 name: fastapi-endpoint
 description: How to implement a REST API endpoint following project conventions
 triggers:
-  - feature_type: api_endpoint
+  - deliverable_type: api_endpoint
   - file_pattern: "*/routes/*.py"
 tags: [api, http, routing, fastapi]
 applies_to: [code_agent, review_agent]
@@ -324,9 +324,9 @@ priority: 10
 
 | Trigger Type | Matches Against | Logic |
 |---|---|---|
-| `feature_type` | `state["current_feature_type"]` | Exact match |
+| `deliverable_type` | `state["current_deliverable_type"]` | Exact match |
 | `file_pattern` | Any file in `state["target_files"]` | Glob match |
-| `tag_match` | Any tag in `state["feature_tags"]` | Set intersection |
+| `tag_match` | Any tag in `state["deliverable_tags"]` | Set intersection |
 | `explicit` | `state["requested_skills"]` | Named request |
 | `always` | Always matches for specified agents | Unconditional |
 
@@ -334,7 +334,7 @@ A skill matches if **any** of its triggers match (OR logic). Project-local skill
 
 ### ADK Integration
 
-Skills integrate via `SkillLoaderAgent` — a deterministic `CustomAgent` that runs as the first step in the feature pipeline:
+Skills integrate via `SkillLoaderAgent` — a deterministic `CustomAgent` that runs as the first step in the deliverable pipeline:
 
 ```python
 class SkillLoaderAgent(BaseAgent):
@@ -354,7 +354,7 @@ This approach is preferred because:
 - Skill resolution appears in the event stream (observable, debuggable)
 - Skills load into state once, available to all subsequent agents in the pipeline
 - It's a deterministic step — cannot be skipped by LLM judgment
-- You can see exactly which skills were loaded for any given feature execution
+- You can see exactly which skills were loaded for any given deliverable execution
 
 ### Directory Layout
 
@@ -554,8 +554,8 @@ default_models:
   implementation: anthropic/claude-sonnet-4-5-20250929
   review: anthropic/claude-sonnet-4-5-20250929
 pipeline_type: batch_parallel    # batch_parallel | sequential | single_pass
-supports_features: true           # Can decompose spec into features?
-supports_parallel: true           # Can run features in parallel?
+supports_decomposition: true      # Can decompose spec into deliverables?
+supports_parallel: true           # Can run deliverables in parallel?
 ```
 
 ### Workflow Registry
@@ -607,7 +607,7 @@ class WorkflowRegistry:
 - Pipeline composition (which agents, in what order, with what loops)
 - Agent definitions (instructions, tools subset, model preferences)
 - Workflow-specific skills (e.g., auto-code has `api-endpoint.md`, auto-design has `design-system.md`)
-- Feature decomposition strategy (auto-code decomposes into implementable features; auto-market decomposes into content pieces)
+- Deliverable decomposition strategy (auto-code decomposes into implementable code deliverables; auto-market decomposes into content pieces)
 
 ### Compound Workflows
 
@@ -666,7 +666,7 @@ app = App(
     
     # Global plugins
     plugins=[
-        TokenTrackingPlugin(),       # Track cost/tokens per agent per feature
+        TokenTrackingPlugin(),       # Track cost/tokens per agent per deliverable
         LoggingPlugin(),             # Structured event logging
     ],
 )
@@ -723,7 +723,7 @@ ADK has a complete three-tier context management system that maps closely to Aut
 
 | Prefix | Scope | Lifetime | AutoBuilder Use |
 |--------|-------|----------|----------------|
-| *(none)* | This session only | Persists with session (via `DatabaseSessionService`) | Current batch, feature statuses, loaded skills, test/lint results, intermediate pipeline data |
+| *(none)* | This session only | Persists with session (via `DatabaseSessionService`) | Current batch, deliverable statuses, loaded skills, validation/verification results, intermediate pipeline data |
 | `user:` | All sessions for this user (within same app) | Persistent | User preferences, model selections, intervention settings, notification preferences |
 | `app:` | All users and sessions for this app | Persistent | Project config, global conventions, skill index, workflow registry, shared templates |
 | `temp:` | Current invocation only | Discarded after invocation completes | Intermediate LLM outputs, scratch calculations, data passed between tool calls within one invocation |
@@ -767,7 +767,7 @@ AutoBuilder needs a local, persistent, semantically-searchable memory service. O
 2. **Local embedding + vector store** — Embed session content locally (via a small embedding model or API call), store in ChromaDB/FAISS/SQLite-VSS. True semantic search. More complex but more powerful.
 3. **Hybrid** — SQLite FTS5 for structured lookups + vector store for semantic similarity. Best of both worlds but more moving parts.
 
-**Phase 1 recommendation:** Implement `BaseMemoryService` backed by SQLite FTS5. It's zero-dependency (SQLite is already our session store), provides useful full-text search, and is sufficient for "what architectural patterns did we establish in features 1-10?" type queries. Evaluate upgrading to vector-backed semantic search in Phase 2 if FTS5 proves insufficient.
+**Phase 1 recommendation:** Implement `BaseMemoryService` backed by SQLite FTS5. It's zero-dependency (SQLite is already our session store), provides useful full-text search, and is sufficient for "what patterns did we establish in deliverables 1-10?" type queries. Evaluate upgrading to vector-backed semantic search in Phase 2 if FTS5 proves insufficient.
 
 ### AutoBuilder's Multi-Level Memory Architecture
 
@@ -776,11 +776,11 @@ Mapping our original "multi-level memory" requirement (Problem #7) to ADK's nati
 | Memory Level | ADK Mechanism | What It Stores | Loaded How |
 |---|---|---|---|
 | **Invocation context** | `temp:` state | Scratch data for current tool chain | Auto-available, discarded after |
-| **Pipeline context** | Session state (no prefix) | Feature spec, plan, code output, test results, lint results | Written by agents via `state_delta`, read via `{key}` templates |
-| **Project conventions** | `app:` state + Skills | Coding standards, architecture decisions, framework patterns | SkillLoaderAgent + `InstructionProvider` |
+| **Pipeline context** | Session state (no prefix) | Deliverable spec, plan, execution output, validation results, verification results | Written by agents via `state_delta`, read via `{key}` templates |
+| **Project conventions** | `app:` state + Skills | Standards, architecture decisions, workflow patterns | SkillLoaderAgent + `InstructionProvider` |
 | **User preferences** | `user:` state | Model preferences, notification settings, review strictness | Auto-merged into session at load |
 | **Cross-session learnings** | `MemoryService` | Patterns discovered, mistakes made, architectural decisions from past runs | `PreloadMemoryTool` or `LoadMemory` tool |
-| **Business knowledge** | Skills files (global + project-local) | Domain rules, compliance requirements, API conventions | SkillLoaderAgent (deterministic matching) |
+| **Business knowledge** | Skills files (global + project-local) | Domain rules, compliance requirements, workflow conventions | SkillLoaderAgent (deterministic matching) |
 
 This is six levels of progressively broader context, all using ADK-native mechanisms. No custom memory framework needed — just proper use of state scopes + MemoryService + Skills.
 
@@ -797,14 +797,14 @@ SkillLoaderAgent → loads relevant skills into session state
   ↓
 PreloadMemoryTool → searches MemoryService for relevant cross-session context
   ↓  
-plan_agent reads: {current_feature_spec}, {loaded_skills}, {memory_context}, {app:coding_standards}
+plan_agent reads: {current_deliverable_spec}, {loaded_skills}, {memory_context}, {app:standards}
   ↓
-code_agent reads: {implementation_plan}, {loaded_skills}, {app:coding_standards}
+execute_agent reads: {implementation_plan}, {loaded_skills}, {app:standards}
   ↓
-LinterAgent writes: lint_results to session state
-TestRunnerAgent writes: test_results to session state  
+ValidatorAgent writes: validation_results to session state
+VerifyAgent writes: verification_results to session state  
   ↓
-review_agent reads: {code_output}, {lint_results}, {test_results}, {loaded_skills}
+review_agent reads: {execution_output}, {validation_results}, {verification_results}, {loaded_skills}
   ↓
 Session complete → add_session_to_memory() ingests learnings for future runs
 ```
@@ -813,13 +813,13 @@ Session complete → add_session_to_memory() ingests learnings for future runs
 
 **State updates are event-sourced.** Never mutate `session.state` directly. Always write via `EventActions(state_delta={...})`. This ensures all changes are captured in the event stream and are rewind-safe.
 
-**Memory ingestion is explicit.** Call `memory_service.add_session_to_memory(session)` at appropriate points — after feature completion, after batch completion, at session end. Not every invocation needs to be ingested.
+**Memory ingestion is explicit.** Call `memory_service.add_session_to_memory(session)` at appropriate points — after deliverable completion, after batch completion, at session end. Not every invocation needs to be ingested.
 
 **Rewind limitations matter for us.** Session rewind restores session-level state and artifacts but NOT `app:` or `user:` state. Since our project conventions live in `app:` state and skills, a rewind doesn't accidentally erase global learnings. This is the right behavior.
 
 **Multiple memory services are supported.** ADK allows agents to access more than one `MemoryService`. This could be useful if we later want separate stores for different knowledge types (e.g., code patterns vs. project decisions).
 
-Estimated scope: ~200-300 lines for `SqliteFtsMemoryService` implementing `BaseMemoryService`. The rest (state scopes, session management, event-sourced updates) is native ADK — we just use it correctly.
+Estimated scope: ~200-500 lines for `SqliteFtsMemoryService` implementing `BaseMemoryService`. The rest (state scopes, session management, event-sourced updates) is native ADK — we just use it correctly.
 
 ---
 
@@ -836,13 +836,13 @@ Estimated scope: ~200-300 lines for `SqliteFtsMemoryService` implementing `BaseM
 7. Plan/Execute agent separation
 8. Autonomous continuation loop ("run until done")
 9. Git worktree isolation for parallel execution
-10. Spec-to-feature pipeline (adapted from Autocoder patterns)
+10. Spec-to-deliverable pipeline (adapted from Autocoder patterns)
 11. Basic CLI interface
 
 ### Phase 2: Production Hardening
 
 12. CustomAgent resume implementation (BaseAgentState + checkpoint steps)
-13. Cost/token tracking per feature and agent (TokenTrackingPlugin)
+13. Cost/token tracking per deliverable and agent (TokenTrackingPlugin)
 14. Agent role-based tool restrictions
 15. Context budget management (reactive context-window awareness)
 16. Adaptive LLM Router (cost-aware, latency-aware model selection)
@@ -880,8 +880,8 @@ Before full commitment to ADK, validate with four focused prototypes:
 
 ### Prototype 4: Dynamic Outer Loop (CustomAgent Orchestrator)
 - Build `CustomAgent` that dynamically constructs `ParallelAgent` batches
-- Implement "while incomplete features exist" loop with dependency ordering
-- Test with 5 simple features
+- Implement "while incomplete deliverables exist" loop with dependency ordering
+- Test with 5 simple deliverables
 - **Validate**: dynamic workflow construction, execution order, failure handling, continuation
 
 **Success criteria**: If all 4 prototypes work cleanly (especially Claude via LiteLLM in P1 and dynamic orchestration in P4), commit to ADK. If Claude integration proves unreliable or the CustomAgent outer loop is too clunky, re-evaluate PAI.
@@ -892,8 +892,8 @@ Before full commitment to ADK, validate with four focused prototypes:
 
 | # | Question | Status | Target Phase |
 |---|----------|--------|-------------|
-| 1 | Feature file format (JSON, SQLite, other?) | Open | Phase 1 |
-| 2 | Spec parsing — how sophisticated should generation be? | Open | Phase 1 |
+| 1 | Deliverable file format (JSON, SQLite, other?) | Open | Phase 1 |
+| 2 | Spec parsing — how sophisticated should deliverable decomposition be? | Open | Phase 1 |
 | 3 | Regression strategy — random sampling or dependency-aware? | Open | Phase 1 |
 | 4 | Reuse Automaker TS libs or rewrite in Python? | Open — language change affects reuse | Phase 1 |
 | 5 | Agent role system granularity | Open | Phase 2 |
@@ -901,7 +901,7 @@ Before full commitment to ADK, validate with four focused prototypes:
 | 7 | Web search provider selection (SearXNG vs Brave vs Tavily) | Open | Phase 1 |
 | 8 | Agent-browser integration approach for UI testing | Open | Phase 1 |
 | 9 | Durable execution — native ADK resume sufficient or need Temporal? | Likely sufficient — evaluate in Phase 2 | Phase 2 |
-| 10 | Memory ingestion strategy — after each feature, each batch, or session end? | Open | Phase 1 |
+| 10 | Memory ingestion strategy — after each deliverable, each batch, or session end? | Open | Phase 1 |
 | 11 | SQLite FTS5 vs vector store for MemoryService — is FTS5 sufficient? | Start with FTS5, evaluate in Phase 2 | Phase 1/2 |
 
 ---
@@ -922,7 +922,7 @@ Before full commitment to ADK, validate with four focused prototypes:
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| Feature scope creep toward 117k LOC | High | Phased delivery; MVP ruthlessness; max 300 lines per module |
+| Scope creep toward 117k LOC | High | Phased delivery; MVP ruthlessness; max ~500 lines per module |
 | Skills system becomes too rigid | Low | OR-logic triggers keep matching simple; project overrides add flexibility |
 | Google ecosystem gravity (Vertex AI pull) | Medium | Strict discipline: local SQLite/Postgres only; document boundaries; no GCP services |
 

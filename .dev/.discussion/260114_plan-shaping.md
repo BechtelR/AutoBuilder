@@ -12,7 +12,7 @@ We're designing AutoBuilder, an autonomous Agentic workflow tool with dynamic hu
 - **Support multiple workflow types** - auto-code, auto-design, auto-market, auto-research, and future workflows
 - **Support multiple AI providers** - Claude (with OAuth), OpenAI, Ollama, etc. via provider abstraction
 - **Work with greenfield or brownfield projects** - Not just new apps, but existing codebases
-- **Plan features and full apps** - Generate comprehensive feature sets from specifications using multi-agents + human-in-loop interviews
+- **Plan deliverables and full projects** - Generate comprehensive deliverable sets from specifications using multi-agents + human-in-loop interviews
 - **Run autonomously and continuously** - Execute until all jobs are complete and co-verified by agent team, zero intervention required
 - **Run multiple agents in parallel** - Concurrent execution with proper isolation
 - **Utilize general and skilled agents** - General agents do the heavy lifting and boilerplate, specialist agents to complex work
@@ -50,7 +50,7 @@ We're designing AutoBuilder, an autonomous Agentic workflow tool with dynamic hu
 
 **Strengths**:
 - Autonomous execution with auto-continuation (3-second delay between sessions)
-- Comprehensive test generation (150-400+ features from spec)
+- Comprehensive test generation (150-400+ deliverables from spec)
 - Two-agent pattern (Initializer + Coding Agent)
 - Built-in regression testing
 - YOLO mode for rapid prototyping
@@ -78,7 +78,7 @@ We're designing AutoBuilder, an autonomous Agentic workflow tool with dynamic hu
 **Weaknesses**:
 - Heavy/bloated (19+ views, 32 themes, Electron, 150+ routes)
 - No auto-continuation until complete
-- No bulk feature generation from spec
+- No bulk deliverable generation from spec
 - No built-in regression testing
 - More manual intervention expected
 - No OAuth support for Claude usage plans
@@ -123,7 +123,7 @@ We're designing AutoBuilder, an autonomous Agentic workflow tool with dynamic hu
 - Tightly coupled to OpenCode plugin API — requires OpenCode >= 1.0.150, breaks if OpenCode breaks
 - High token cost — "Ultrawork" mode runs multiple Opus 4.6 agents in parallel
 - Not a standalone orchestrator — it's a plugin enhancing an existing agentic CLI, not an independent system
-- No feature-generation-from-spec pipeline — agents work on user-directed tasks, not spec-driven feature queues
+- No deliverable-generation-from-spec pipeline — agents work on user-directed tasks, not spec-driven deliverable queues
 - No git worktree isolation for parallel work — relies on tmux visual separation, not filesystem isolation
 - No dependency resolution between tasks — task system tracks blockers but no topological ordering
 - No autonomous "run until all complete" loop — requires ongoing user interaction via OpenCode sessions
@@ -226,12 +226,12 @@ AutoBuilder/
 │       │   ├── index.ts
 │       │   ├── services/
 │       │   │   ├── execution-engine.ts    # Core autonomous loop
-│       │   │   ├── feature-generator.ts   # Spec → features
+│       │   │   ├── deliverable-generator.ts # Spec → deliverables
 │       │   │   ├── agent-runner.ts        # Claude SDK wrapper
 │       │   │   └── worktree-manager.ts    # Git isolation
 │       │   └── routes/
 │       │       ├── projects.ts
-│       │       ├── features.ts
+│       │       ├── deliverables.ts
 │       │       ├── execution.ts
 │       │       └── events.ts              # WebSocket
 │       └── ui/                  # Minimal React (NO Electron)
@@ -255,20 +255,20 @@ AutoBuilder/
 ```typescript
 class ExecutionEngine {
   async runUntilComplete(projectPath: string, options: RunOptions) {
-    // 1. Load or generate features from spec
-    const features = await this.loadOrGenerateFeatures(projectPath);
+    // 1. Load or generate deliverables from spec
+    const deliverables = await this.loadOrGenerateDeliverables(projectPath);
 
     // 2. Resolve dependencies (topological sort)
-    const ordered = resolveDependencies(features);
+    const ordered = resolveDependencies(deliverables);
 
     // 3. Execute until all complete
-    while (hasIncompleteFeatures(ordered)) {
+    while (hasIncompleteDeliverables(ordered)) {
       // Get next batch respecting concurrency limit
       const batch = getNextExecutableBatch(ordered, options.maxConcurrency);
 
       // Run in parallel with worktree isolation
-      await Promise.all(batch.map(feature =>
-        this.executeFeature(feature, {
+      await Promise.all(batch.map(deliverable =>
+        this.executeDeliverable(deliverable, {
           worktree: true,
           requireApproval: options.interventionPoints,
           runRegression: options.regressionTest,
@@ -294,7 +294,7 @@ auto-builder init --spec ./requirements.md --project ./my-app
 auto-builder run --concurrency 3 --regression --no-approval
 
 # Run with intervention points
-auto-builder run --pause-between-features
+auto-builder run --pause-between-deliverables
 
 # Optional web dashboard
 auto-builder dashboard --port 3000
@@ -465,17 +465,17 @@ AutoBuilder/
 
 ### What oh-my-opencode Gets Wrong (For Our Use Case)
 
-1. **Plugin, not orchestrator** — oh-my-opencode enhances a human-driven CLI session. It doesn't run autonomously until all features are complete. AutoBuilder's core differentiator is the autonomous "run until done" loop that oh-my-opencode lacks entirely.
+1. **Plugin, not orchestrator** — oh-my-opencode enhances a human-driven CLI session. It doesn't run autonomously until all deliverables are complete. AutoBuilder's core differentiator is the autonomous "run until done" loop that oh-my-opencode lacks entirely.
 
-2. **No spec-to-feature pipeline** — oh-my-opencode has no mechanism to take a specification and generate 150-400+ implementable features. This is a key gap that Autocoder fills and AutoBuilder must have.
+2. **No spec-to-deliverable pipeline** — oh-my-opencode has no mechanism to take a specification and generate 150-400+ implementable deliverables. This is a key gap that Autocoder fills and AutoBuilder must have.
 
 3. **No git worktree isolation** — Despite parallel agents, oh-my-opencode doesn't isolate work in separate worktrees. This limits true parallel code generation to non-conflicting changes. Our git isolation (from Automaker) remains essential.
 
-4. **No topological dependency resolution** — oh-my-opencode tracks `blockedBy` on tasks but has no automated dependency graph or execution ordering. AutoBuilder needs Automaker's topological sorting for proper feature sequencing.
+4. **No topological dependency resolution** — oh-my-opencode tracks `blockedBy` on tasks but has no automated dependency graph or execution ordering. AutoBuilder needs Automaker's topological sorting for proper deliverable sequencing.
 
 5. **Complexity explosion** — 117k lines, 41 hooks, 2000+ line files. This validates our decision to build lean. oh-my-opencode's feature richness came at the cost of maintainability. AutoBuilder should resist this trajectory.
 
-6. **Token cost opacity** — "Ultrawork" mode runs multiple expensive agents without cost visibility. AutoBuilder should track and expose token/cost metrics per feature and per agent.
+6. **Token cost opacity** — "Ultrawork" mode runs multiple expensive agents without cost visibility. AutoBuilder should track and expose token/cost metrics per deliverable and per agent.
 
 ### Patterns to Adopt
 
@@ -487,13 +487,13 @@ AutoBuilder/
 | **Category routing** | 7 categories route to optimal models | Merge with capability-based routing |
 | **Task lifecycle** | BackgroundManager with states + concurrency | Adopt in ExecutionEngine task runner |
 | **Context window management** | Dynamic pruning, truncation, recovery hooks | Implement context budget per agent session |
-| **Boulder state (plan continuity)** | JSON state persisted across sessions | Adapt for feature-level checkpoint/resume |
+| **Boulder state (plan continuity)** | JSON state persisted across sessions | Adapt for deliverable-level checkpoint/resume |
 
 ### Patterns to Avoid
 
 | Pattern | oh-my-opencode Issue | AutoBuilder Approach |
 |---------|---------------------|---------------------|
-| **Monolithic files** | 2000+ line hook/agent files | Max ~300 lines per module, extract strategies |
+| **Monolithic files** | 2000+ line hook/agent files | Max ~500 lines per module, extract strategies |
 | **41 hooks for everything** | Hook system became a crutch for all behavior | Use hooks sparingly; prefer explicit workflow phases |
 | **Keyword-based triggers** | "ultrawork", "ulw" as magic words in prompts | Structured config, not prompt keyword detection |
 | **Platform-specific binaries** | 7 platform packages for CLI | Pure TypeScript/Node, no native dependencies |
@@ -505,13 +505,13 @@ AutoBuilder/
 
 1. **Lib sharing strategy**: Copy libs from Automaker or set up shared monorepo?
 2. **Feature file format**: Adopt Automaker's JSON or Autocoder's SQLite or something else?
-3. **Spec parsing**: How sophisticated should spec → features generation be?
+3. **Spec parsing**: How sophisticated should spec → deliverable decomposition be?
 4. **Regression strategy**: Random sampling (Autocoder) or dependency-aware?
 5. **UI priority**: CLI-first with optional dashboard, or dashboard-first?
 6. **Workflow packaging**: How are workflows defined and distributed? Built-in vs plugins?
 7. **Agent role system**: How granular should tool permissions be per agent role? (Informed by oh-my-opencode's read-only agents pattern)
 8. **Context budget strategy**: Per-agent context limits with pruning, or fresh context per task? (Informed by oh-my-opencode's dynamic pruning/recovery)
-9. **Cost tracking**: Should AutoBuilder expose per-feature and per-agent token/cost metrics? (Informed by oh-my-opencode's token cost opacity problem)
+9. **Cost tracking**: Should AutoBuilder expose per-deliverable and per-agent token/cost metrics? (Informed by oh-my-opencode's token cost opacity problem)
 
 ---
 
@@ -541,7 +541,7 @@ AutoBuilder/
 7. [ ] Build execution engine with task lifecycle manager (not just Promise.all)
 8. [ ] Create minimal CLI
 9. [ ] Optional: Add web dashboard
-10. [ ] Optional: Add cost/token tracking per feature and agent
+10. [ ] Optional: Add cost/token tracking per deliverable and agent
 
 ---
 

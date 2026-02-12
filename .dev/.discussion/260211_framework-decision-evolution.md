@@ -55,19 +55,19 @@ See `260211_technical-spike-adk-vs-pydantic.md` for the full comparison.
 
 ### 1d. MVP Scope Must Be Ruthless
 
-The feature comparison table (Section 8) targets ✅ on 15+ major capabilities simultaneously. oh-my-opencode attempted similar breadth and hit 117k LOC. AutoBuilder's < 100k LOC target requires phased delivery.
+The capability comparison table (Section 8) targets ✅ on 15+ major capabilities simultaneously. oh-my-opencode attempted similar breadth and hit 117k LOC. AutoBuilder's < 100k LOC target requires phased delivery.
 
 **MVP (Phase 1) — Core Loop:**
 1. Framework integration (chosen SDK) with multi-model support
 2. Plan/Execute agent separation
 3. Autonomous continuation loop ("run until done")
 4. Git worktree isolation for parallel execution
-5. Spec-to-feature pipeline (from Autocoder patterns)
+5. Spec-to-deliverable pipeline (from Autocoder patterns)
 6. Basic CLI interface
 
 **Phase 2 — Production Hardening:**
 7. Durable execution / checkpointing
-8. Cost/token tracking per feature and agent
+8. Cost/token tracking per deliverable and agent
 9. Agent role-based tool restrictions
 10. Context budget management
 
@@ -88,7 +88,7 @@ Appended to Section 11 of the original document:
 | 9 | Python for core engine, TS for UI only | Agent ecosystem is Python-first; all candidate frameworks are Python-native | 2026-02-11 |
 | 10 | Use framework-native multi-model support, not custom provider abstraction | Both Pydantic AI and Google ADK handle this natively; building our own is unnecessary engineering | 2026-02-11 |
 | 11 | Claude Agent SDK rejected as primary framework | It's an agent harness, not a workflow orchestrator; Claude-only, TS-only, no workflow primitives | 2026-02-11 |
-| 12 | Phased MVP delivery required | Targeting all 15+ features simultaneously risks bloat; MVP focuses on 6 core capabilities | 2026-02-11 |
+| 12 | Phased MVP delivery required | Targeting all 15+ capabilities simultaneously risks bloat; MVP focuses on 6 core capabilities | 2026-02-11 |
 | 13 | Final framework choice: Pydantic AI vs Google ADK (pending spike) | Both are model-agnostic, Python-first, code-first; need head-to-head evaluation | 2026-02-11 |
 
 ---
@@ -125,7 +125,7 @@ Supersedes Section 12:
 4. [ ] Prototype: basic agent loop with chosen framework + Claude model
 5. [ ] Prototype: parallel agent execution with git worktree isolation
 6. [ ] Prototype: plan/execute agent separation
-7. [ ] Design spec-to-feature pipeline (adapt Autocoder patterns to Python)
+7. [ ] Design spec-to-deliverable pipeline (adapt Autocoder patterns to Python)
 8. [ ] Build MVP CLI
 9. [ ] Evaluate Automaker lib reuse vs Python rewrite for git-utils, dependency-resolver
 

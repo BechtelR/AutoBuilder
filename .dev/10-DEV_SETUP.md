@@ -14,6 +14,7 @@ This guide walks you through setting up a local development environment for Auto
 |----------|---------|---------|
 | Python | 3.11+ | Core engine runtime |
 | uv | Latest | Python package manager (fast, replaces pip) |
+| Redis | 7.0+ | Task queue (ARQ), event bus (Streams), cache, cron |
 | Git | 2.40+ | Version control + worktree isolation |
 | SQLite | 3.35+ (with FTS5) | Session persistence + memory service |
 
@@ -39,60 +40,9 @@ At least one LLM provider API key is required:
 
 ## 2. Project Structure
 
-Planned directory layout based on the consolidated architecture:
+See [03-STRUCTURE.md](./03-STRUCTURE.md) for the full project scaffold.
 
-```
-autobuilder/
-├── src/autobuilder/
-│   ├── agents/              # LLM + deterministic agent definitions
-│   │   ├── plan_agent.py
-│   │   ├── code_agent.py
-│   │   ├── review_agent.py
-│   │   ├── fix_agent.py
-│   │   ├── skill_loader.py  # SkillLoaderAgent (deterministic)
-│   │   ├── linter.py        # LinterAgent (deterministic)
-│   │   ├── test_runner.py   # TestRunnerAgent (deterministic)
-│   │   ├── formatter.py     # FormatterAgent (deterministic)
-│   │   ├── dependency_resolver.py  # DependencyResolverAgent (deterministic)
-│   │   ├── regression_test.py      # RegressionTestAgent (deterministic)
-│   │   └── context_budget.py       # ContextBudgetAgent (deterministic)
-│   ├── tools/               # FunctionTool implementations
-│   │   ├── filesystem.py    # file_read, file_write, file_edit, file_search, directory_list
-│   │   ├── execution.py     # bash_exec
-│   │   ├── web.py           # web_search, web_fetch
-│   │   ├── task.py          # todo_read, todo_write, todo_list
-│   │   └── git.py           # git_status, git_commit, git_branch, git_diff
-│   ├── skills/              # Global skills library
-│   │   ├── code/
-│   │   ├── review/
-│   │   ├── test/
-│   │   └── planning/
-│   ├── workflows/           # Pluggable workflow definitions
-│   │   └── auto-code/       # First workflow
-│   │       ├── WORKFLOW.yaml
-│   │       ├── pipeline.py
-│   │       ├── agents/
-│   │       └── skills/
-│   ├── memory/              # SqliteFtsMemoryService
-│   │   └── sqlite_fts.py
-│   ├── router/              # LLM Router
-│   │   └── llm_router.py
-│   ├── cli/                 # CLI interface
-│   │   └── main.py
-│   └── app.py               # ADK App container
-├── tests/
-│   ├── test_tools/
-│   ├── test_agents/
-│   ├── test_memory/
-│   ├── test_router/
-│   └── test_workflows/
-├── pyproject.toml
-├── .env.example
-├── .gitignore
-└── README.md
-```
-
-Note: Each module targets a maximum of ~300 lines to avoid monolithic files. See consolidated planning doc, Patterns Explicitly Avoided.
+Each module targets a maximum of ~500 to avoid monolithic files.
 
 ---
 
@@ -111,7 +61,7 @@ OPENAI_API_KEY=sk-...                 # Alternative: OpenAI models
 GOOGLE_API_KEY=...                    # Alternative: Gemini models (native ADK)
 
 # --- Database ---
-AUTOBUILDER_DB_URL=sqlite:///./autobuilder_sessions.db   # Session persistence
+AUTOBUILDER_DB_URL=sqlite+aiosqlite:///./autobuilder.db   # Session persistence
 # AUTOBUILDER_DB_URL=postgresql+asyncpg://user:pass@localhost:5432/autobuilder
 
 # --- Web Search (optional, Phase 1 provider TBD) ---
@@ -145,7 +95,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ```bash
 git clone <repo-url>
-cd autobuilder
+cd AutoBuilder
 
 # Copy environment file
 cp .env.example .env
@@ -156,15 +106,8 @@ cp .env.example .env
 ### 4.3 Create Virtual Environment and Install Dependencies
 
 ```bash
-# Create virtual environment
-uv venv
-
-# Activate virtual environment
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate   # Windows
-
 # Install project with dev dependencies
-uv pip install -e ".[dev]"
+uv sync
 ```
 
 ### 4.4 Verify Installation
@@ -182,10 +125,10 @@ python -c "import litellm; print(litellm.__version__)"
 ```bash
 # TBD: CLI interface is Phase 1
 # Expected usage pattern:
-autobuilder run --spec ./spec.md --workflow auto-code
-autobuilder run --spec ./spec.md --workflow auto-code --resume
-autobuilder status
-autobuilder list-workflows
+app run --spec ./spec.md --workflow auto-code
+app run --spec ./spec.md --workflow auto-code --resume
+app status
+app list-workflows
 ```
 
 ### 4.6 Running the ADK Dev UI
@@ -194,7 +137,7 @@ ADK provides a built-in development UI for debugging agent interactions:
 
 ```bash
 # Start the ADK web UI (points to the app module)
-adk web src/autobuilder/app.py
+adk web app/app.py
 
 # Opens browser at http://localhost:8000 with:
 # - Agent interaction traces
@@ -214,7 +157,7 @@ adk web src/autobuilder/app.py
 pytest
 
 # Run with coverage
-pytest --cov=autobuilder --cov-report=html
+pytest --cov=app --cov-report=html
 
 # Run specific test directory
 pytest tests/test_tools/
@@ -233,23 +176,23 @@ pytest -m "not integration"
 
 ```bash
 # Lint check
-ruff check src/ tests/
+ruff check app/ tests/
 
 # Lint with auto-fix
-ruff check --fix src/ tests/
+ruff check --fix app/ tests/
 
 # Type checking
-pyright src/
+pyright app/
 ```
 
 ### 5.3 Formatting
 
 ```bash
 # Format code
-ruff format src/ tests/
+ruff format app/ tests/
 
 # Check formatting without changes
-ruff format --check src/ tests/
+ruff format --check app/ tests/
 ```
 
 ---
@@ -279,7 +222,7 @@ Install these extensions:
     }
   },
 
-  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.typeCheckingMode": "strict",
   "python.analysis.autoImportCompletions": true,
   "python.analysis.diagnosticMode": "workspace",
 
@@ -303,7 +246,7 @@ Install these extensions:
       "name": "AutoBuilder: CLI",
       "type": "debugpy",
       "request": "launch",
-      "module": "autobuilder.cli.main",
+      "module": "app.cli.main",
       "args": ["run", "--spec", "./spec.md", "--workflow", "auto-code"],
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env"
@@ -313,7 +256,7 @@ Install these extensions:
       "type": "debugpy",
       "request": "launch",
       "module": "google.adk.cli",
-      "args": ["web", "src/autobuilder/app.py"],
+      "args": ["web", "app/app.py"],
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env"
     },
@@ -340,8 +283,16 @@ Core dependencies (defined in `pyproject.toml`):
 |---------|---------|
 | `google-adk` | Agent framework (composition, state, sessions, events) |
 | `litellm` | Multi-provider LLM routing (Claude, OpenAI, Gemini via single interface) |
+| `fastapi` + `uvicorn` | Gateway API server (REST + SSE, OpenAPI spec generation) |
+| `sqlalchemy[asyncio]` | Async ORM for all database persistence |
+| `alembic` | Database schema migrations |
 | `aiosqlite` | Async SQLite driver (required by `DatabaseSessionService`) |
-| `pydantic` | Structured outputs, config validation |
+| `arq` | Async task queue with built-in cron (Redis-backed) |
+| `redis[hiredis]` | Task queue backend, event bus (Streams), cache |
+| `pydantic` | Structured outputs, config validation, API contracts |
+| `httpx` | Async HTTP client for webhooks and external API calls |
+| `typer` | CLI framework |
+| `pyyaml` | Skill frontmatter and workflow manifest parsing |
 
 Dev dependencies:
 
@@ -367,7 +318,7 @@ Optional dependencies:
 
 | Issue | Solution |
 |-------|----------|
-| `ModuleNotFoundError: google.adk` | Ensure virtual environment is activated and `uv pip install -e ".[dev]"` completed |
+| `ModuleNotFoundError: google.adk` | Ensure `uv sync` completed and you are running via `uv run` |
 | LiteLLM model not found | Check that the model string matches LiteLLM's expected format (e.g., `anthropic/claude-sonnet-4-5-20250929`) |
 | `ANTHROPIC_API_KEY` not set | Ensure `.env` file exists and is loaded; some shells require `source .env` or use `python-dotenv` |
 | SQLite FTS5 not available | Most Python distributions include FTS5; if missing, rebuild SQLite from source with `--enable-fts5` |
@@ -390,7 +341,7 @@ python -c "import sqlite3; conn = sqlite3.connect(':memory:'); conn.execute('CRE
 git worktree list
 
 # Reset development database
-rm -f autobuilder_sessions.db
+rm -f autobuilder.db
 
 # View ADK version
 python -c "import google.adk; print(google.adk.__version__)"
@@ -412,7 +363,7 @@ python -c "import google.adk; print(google.adk.__version__)"
 
 ### Module Size
 
-Maximum ~300 lines per module. If a module grows beyond this, decompose into sub-modules. This is an explicit architectural constraint. See consolidated planning doc, Patterns Explicitly Avoided.
+Maximum ~500 per module. If a module grows beyond this, decompose into sub-modules. This is an explicit architectural constraint.
 
 ### Error Handling
 
@@ -432,8 +383,8 @@ Maximum ~300 lines per module. If a module grows beyond this, decompose into sub
 ## 10. Related Documents
 
 - Consolidated planning doc: `.dev/.discussion/260211_plan-shaping.md`
-- State and memory: `.dev/06-STATE_MEMORY.md`
-- Tools and agents: `.dev/07-TOOLS.md`
+- State and memory: `.dev/08-STATE_MEMORY.md`
+- Tools and agents: `.dev/09-TOOLS.md`
 - ADK documentation: https://google.github.io/adk-docs/
 - LiteLLM documentation: https://docs.litellm.ai/
 

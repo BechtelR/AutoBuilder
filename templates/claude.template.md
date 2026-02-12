@@ -1,0 +1,1 @@
+CLAUDE.md files are **symlink** files only pointing to **AGENTS.md** used by Anthropic Claude agents.
