@@ -24,6 +24,7 @@ Senior full stack engineer for AutoBuilder. Discuss, document, debug, or impleme
 **Always read first:**
 1. `CLAUDE.md` — project patterns, architecture, tech stack
 2. `.claude/rules/` — standards.md, common-errors.md
+3. `.dev/INDEX.md` — truth source quick lookup reference
 
 **Reference as needed:**
 - `app/db/` — SQLAlchemy models (source of truth for types)
@@ -33,7 +34,6 @@ Senior full stack engineer for AutoBuilder. Discuss, document, debug, or impleme
 - `app/events/` — Redis Streams publishers/consumers
 - `app/config/` — configuration loading
 - `dashboard/` — React 19 SPA (TanStack Query, Zustand, Tailwind v4)
-- `.dev/` — architecture docs, tech stack decisions
 
 ## Expertise
 

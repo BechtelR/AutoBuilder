@@ -67,7 +67,7 @@ All persistence flows through one database, managed by SQLAlchemy 2.0 async with
 | Sessions + state | ADK `DatabaseSessionService` tables | Read/write from workers during pipeline execution; read from gateway for status queries |
 | Event listeners/hooks | AutoBuilder-owned table | Registered via gateway API; matched against Redis Stream events by consumers |
 | Job metadata | ARQ-managed (Redis) + AutoBuilder status table | Gateway writes job records; workers update status; gateway reads for API responses |
-| Memory (FTS5) | `SqliteFtsMemoryService` tables | Workers write after session completion; workers read during skill/memory loading |
+| Memory | `PostgresMemoryService` tables (tsvector + pgvector) | Workers write after session completion; workers read during skill/memory loading |
 | Alembic migrations | `alembic_version` table | Schema versioning for upgrades |
 
 ```python
@@ -75,7 +75,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 # Single engine shared across the application
 engine = create_async_engine(
-    settings.database_url,  # "sqlite+aiosqlite:///./autobuilder.db" or "postgresql+asyncpg://..."
+    settings.database_url,  # "postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder"
     echo=settings.debug,
 )
 async_session = async_sessionmaker(engine, expire_on_commit=False)
@@ -121,17 +121,17 @@ redis_pool = await create_pool(RedisSettings(
 | Service | Persistence | Use Case |
 |---------|------------|----------|
 | `InMemorySessionService` | None (lost on restart) | Dev/testing only |
-| **`DatabaseSessionService`** | **SQLite or Postgres** | **AutoBuilder production choice -- local, no GCP dependency** |
+| **`DatabaseSessionService`** | **PostgreSQL** | **AutoBuilder production choice -- local, no GCP dependency** |
 | `VertexAiSessionService` | Vertex AI managed | Skipping -- GCP dependency |
 
-`DatabaseSessionService` requires async drivers: `sqlite+aiosqlite` for SQLite, `asyncpg` for Postgres.
+`DatabaseSessionService` requires the `asyncpg` async driver for PostgreSQL.
 
 ```python
 from google.adk.sessions import DatabaseSessionService
 
 # AutoBuilder production configuration
 session_service = DatabaseSessionService(
-    db_url="sqlite+aiosqlite:///./autobuilder.db"  # Or postgresql+asyncpg://...
+    db_url="postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder"
 )
 ```
 
@@ -150,39 +150,39 @@ This is the primary gap AutoBuilder must fill.
 
 ---
 
-## 5. The Gap: Local Semantic Memory
+## 5. Memory Service: PostgreSQL tsvector + pgvector
 
-AutoBuilder needs a local, persistent, semantically-searchable memory service. Three options were evaluated:
+AutoBuilder needs a local, persistent, searchable memory service. PostgreSQL provides both capabilities in the existing database:
 
-### Option 1: SQLite FTS5
+### Full-Text Search: tsvector
 
-Full-text search built into SQLite. No additional dependencies. Good enough for keyword and phrase matching. Lightweight.
+PostgreSQL's built-in `tsvector` provides full-text search with ranking, stemming, and phrase matching. Sufficient for keyword-based queries like "what patterns did we establish in deliverables 1-10?"
 
-**Pros:** Zero-dependency (SQLite is already our database), fast, battle-tested.
-**Cons:** No true semantic similarity. Keyword-based matching only.
+### Semantic Search: pgvector
 
-### Option 2: Local Embedding + Vector Store
+The `pgvector` extension adds vector column types and similarity search operators to PostgreSQL. When semantic search is needed (Phase 9+), embeddings are stored alongside text in the same table — no separate vector database required.
 
-Embed session content locally (via a small embedding model or API call), store in ChromaDB/FAISS/SQLite-VSS. True semantic search.
+### Embedding Model
 
-**Pros:** Semantic similarity, better recall for conceptual queries.
-**Cons:** Additional dependencies, more complexity, embedding model cost/latency.
+pgvector stores and indexes vectors; an embedding model produces them. Embeddings are routed through **LiteLLM** (`litellm.embedding()`) — same provider-agnostic abstraction used for LLM calls. The model is a configuration value, not a hardcoded dependency.
 
-### Option 3: Hybrid
+| Option | Dims | Notes |
+|--------|------|-------|
+| `text-embedding-3-small` (OpenAI) | 1536 | Low cost (~$0.02/1M tokens) |
+| `text-embedding-004` (Gemini) | 768 | Free tier available |
+| `all-MiniLM-L6-v2` (local) | 384 | No API cost, ~80MB, sufficient for session similarity |
 
-SQLite FTS5 for structured lookups + vector store for semantic similarity. Best of both worlds.
+Default: whichever provider the project already has an API key for. Swappable via config without code changes.
 
-**Pros:** Most capable search.
-**Cons:** Most moving parts, highest complexity.
+### Implementation: `PostgresMemoryService`
 
-### Phase 1 Recommendation: SQLite FTS5
+Custom `BaseMemoryService` implementation (~200-500 LOC):
+- `add_session_to_memory(session)` — ingests completed session text + optional embeddings
+- `search_memory(app_name, user_id, query)` — tsvector keyword search (Phase 1), pgvector semantic search (Phase 9+)
+- Single table in the shared PostgreSQL database
+- Same SQLAlchemy models, same Alembic migrations, same connection pool
 
-Implement `BaseMemoryService` backed by SQLite FTS5. Rationale:
-
-- Zero-dependency -- SQLite is already our database
-- Provides useful full-text search
-- Sufficient for queries like "what patterns did we establish in deliverables 1-10?"
-- Evaluate upgrading to vector-backed semantic search in Phase 2 if FTS5 proves insufficient
+**Why not a separate vector database?** ChromaDB, Qdrant, Pinecone, etc. add another service to operate. pgvector keeps everything in PostgreSQL — one database, one backup strategy, one connection pool. The single-database architecture principle is preserved.
 
 ---
 
@@ -283,7 +283,7 @@ External filesystem state is not managed by rewind. AutoBuilder handles this via
 
 ### 8.4 Multiple Memory Services
 
-ADK allows agents to access more than one `MemoryService`. This could be useful if AutoBuilder later needs separate stores for different knowledge types (e.g., code patterns vs. project decisions). Phase 1 uses a single `SqliteFtsMemoryService`.
+ADK allows agents to access more than one `MemoryService`. This could be useful if AutoBuilder later needs separate stores for different knowledge types (e.g., code patterns vs. project decisions). Phase 1 uses a single `PostgresMemoryService`.
 
 ### 8.5 Redis Cache Strategy
 
@@ -328,7 +328,7 @@ These endpoints read from the database. They do not interact with ADK directly -
 
 ## 10. Scope Estimate
 
-**`SqliteFtsMemoryService`**: ~200-500 lines implementing `BaseMemoryService` with SQLite FTS5 backing.
+**`PostgresMemoryService`**: ~200-500 lines implementing `BaseMemoryService` with PostgreSQL tsvector backing (pgvector for semantic search in Phase 9+).
 
 **Database models + Alembic migrations**: ~200 lines for AutoBuilder-owned tables (event listeners, job metadata). ADK's `DatabaseSessionService` manages its own tables.
 

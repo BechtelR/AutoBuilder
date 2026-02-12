@@ -64,7 +64,7 @@ AutoBuilder/
 │   │   └── auto-market/            # Future
 │   │
 │   ├── router/                     # LLM Router (task_type to model mapping)
-│   ├── memory/                     # Memory service (SQLite FTS5)
+│   ├── memory/                     # Memory service (PostgreSQL tsvector + pgvector)
 │   ├── orchestrator/               # BatchOrchestrator (outer loop CustomAgent)
 │   │
 │   ├── db/                         # Database layer
@@ -114,9 +114,9 @@ AutoBuilder/
 │   └── ...
 │
 ├── docker/                         # Container configuration
-│   ├── Dockerfile                  # Production image
-│   ├── Dockerfile.dev              # Development image
-│   └── docker-compose.yml          # Service orchestration
+│   ├── docker-compose.yml          # All services (infra + app)
+│   ├── Dockerfile                  # Production image (Phase 2)
+│   └── Dockerfile.dev              # Development image (Phase 2)
 │
 ├── docs/                           # User-facing documentation (future)
 │
@@ -163,7 +163,7 @@ AutoBuilder/
 | `app/skills/` | Markdown skill files with YAML frontmatter |
 | `app/workflows/` | Pluggable workflow definitions (each a self-contained directory) |
 | `app/router/` | LLM model routing (task type to provider/model) |
-| `app/memory/` | Cross-session searchable memory (SQLite FTS5) |
+| `app/memory/` | Cross-session searchable memory (PostgreSQL tsvector + pgvector) |
 | `app/orchestrator/` | Outer-loop batch orchestration (CustomAgent) |
 | `app/db/` | Database engine, ORM models, Alembic migrations |
 | `app/config/` | Configuration loading, validation, defaults |
@@ -178,7 +178,7 @@ AutoBuilder/
 | `dashboard/src/generated/` | hey-api output (TS client + TanStack Query hooks) |
 | `tests/` | Test suite mirroring `app/` structure |
 | `scripts/` | Dev and deployment scripts (seed, reset, etc.) |
-| `docker/` | Dockerfiles and docker-compose configuration |
+| `docker/` | Docker Compose (PostgreSQL + Redis in Phase 0; app containers added in Phase 2) |
 | `docs/` | User-facing documentation (future) |
 | `.dev/` | Internal architecture docs and planning — not shipped |
 

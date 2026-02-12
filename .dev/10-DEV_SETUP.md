@@ -16,15 +16,13 @@ This guide walks you through setting up a local development environment for Auto
 | uv | Latest | Python package manager (fast, replaces pip) |
 | Redis | 7.0+ | Task queue (ARQ), event bus (Streams), cache, cron |
 | Git | 2.40+ | Version control + worktree isolation |
-| SQLite | 3.35+ (with FTS5) | Session persistence + memory service |
+| Docker + Docker Compose | Latest | PostgreSQL + Redis containers |
 
 ### 1.2 Optional Software
 
 | Software | Version | Purpose |
 |----------|---------|---------|
 | Node.js | 20 LTS | Dashboard UI (Phase 3) |
-| PostgreSQL | 15+ | Alternative to SQLite for session persistence |
-| Docker | Latest | Containerized development (TBD) |
 
 ### 1.3 API Keys
 
@@ -61,8 +59,7 @@ OPENAI_API_KEY=sk-...                 # Alternative: OpenAI models
 GOOGLE_API_KEY=...                    # Alternative: Gemini models (native ADK)
 
 # --- Database ---
-AUTOBUILDER_DB_URL=sqlite+aiosqlite:///./autobuilder.db   # Session persistence
-# AUTOBUILDER_DB_URL=postgresql+asyncpg://user:pass@localhost:5432/autobuilder
+AUTOBUILDER_DB_URL=postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder
 
 # --- Web Search (optional, Phase 1 provider TBD) ---
 # SEARXNG_URL=http://localhost:8080
@@ -103,14 +100,24 @@ cp .env.example .env
 # Edit .env with your API keys
 ```
 
-### 4.3 Create Virtual Environment and Install Dependencies
+### 4.3 Start Infrastructure Services
+
+```bash
+# Start PostgreSQL + Redis via Docker
+docker compose -f docker/docker-compose.yml up -d
+
+# Verify services are running
+docker compose -f docker/docker-compose.yml ps
+```
+
+### 4.4 Create Virtual Environment and Install Dependencies
 
 ```bash
 # Install project with dev dependencies
 uv sync
 ```
 
-### 4.4 Verify Installation
+### 4.5 Verify Installation
 
 ```bash
 # Verify ADK is available
@@ -120,7 +127,7 @@ python -c "import google.adk; print(google.adk.__version__)"
 python -c "import litellm; print(litellm.__version__)"
 ```
 
-### 4.5 Running the CLI
+### 4.6 Running the CLI
 
 ```bash
 # TBD: CLI interface is Phase 1
@@ -131,7 +138,7 @@ app status
 app list-workflows
 ```
 
-### 4.6 Running the ADK Dev UI
+### 4.7 Running the ADK Dev UI
 
 ADK provides a built-in development UI for debugging agent interactions:
 
@@ -162,8 +169,8 @@ pytest --cov=app --cov-report=html
 # Run specific test directory
 pytest tests/test_tools/
 
-# Run specific test file
-pytest tests/test_memory/test_sqlite_fts.py
+# Run specific test directory
+pytest tests/test_memory/
 
 # Run with verbose output
 pytest -v
@@ -286,7 +293,8 @@ Core dependencies (defined in `pyproject.toml`):
 | `fastapi` + `uvicorn` | Gateway API server (REST + SSE, OpenAPI spec generation) |
 | `sqlalchemy[asyncio]` | Async ORM for all database persistence |
 | `alembic` | Database schema migrations |
-| `aiosqlite` | Async SQLite driver (required by `DatabaseSessionService`) |
+| `asyncpg` | Async PostgreSQL driver (required for all environments) |
+| `pgvector` | Vector search extension for PostgreSQL |
 | `arq` | Async task queue with built-in cron (Redis-backed) |
 | `redis[hiredis]` | Task queue backend, event bus (Streams), cache |
 | `pydantic` | Structured outputs, config validation, API contracts |
@@ -304,11 +312,6 @@ Dev dependencies:
 | `ruff` | Linting + formatting |
 | `pyright` | Static type checking |
 
-Optional dependencies:
-
-| Package | Purpose |
-|---------|---------|
-| `asyncpg` | Postgres async driver (alternative to SQLite) |
 
 ---
 
@@ -321,9 +324,9 @@ Optional dependencies:
 | `ModuleNotFoundError: google.adk` | Ensure `uv sync` completed and you are running via `uv run` |
 | LiteLLM model not found | Check that the model string matches LiteLLM's expected format (e.g., `anthropic/claude-sonnet-4-5-20250929`) |
 | `ANTHROPIC_API_KEY` not set | Ensure `.env` file exists and is loaded; some shells require `source .env` or use `python-dotenv` |
-| SQLite FTS5 not available | Most Python distributions include FTS5; if missing, rebuild SQLite from source with `--enable-fts5` |
+| PostgreSQL not running | Run `docker compose -f docker/docker-compose.yml up -d` |
 | ADK Dev UI not starting | Ensure `google-adk[cli]` is installed; check that `app.py` exports an `app` variable |
-| Async driver error | Ensure `aiosqlite` is installed for SQLite or `asyncpg` for Postgres |
+| Async driver error | Ensure `asyncpg` is installed |
 
 ### Useful Commands
 
@@ -332,16 +335,16 @@ Optional dependencies:
 python --version
 
 # Check installed packages
-uv pip list | grep -E "google-adk|litellm|aiosqlite"
+uv pip list | grep -E "google-adk|litellm|asyncpg"
 
-# Verify SQLite FTS5 support
-python -c "import sqlite3; conn = sqlite3.connect(':memory:'); conn.execute('CREATE VIRTUAL TABLE t USING fts5(content)'); print('FTS5 OK')"
+# Check infrastructure services
+docker compose -f docker/docker-compose.yml ps
 
 # Check git worktree support
 git worktree list
 
 # Reset development database
-rm -f autobuilder.db
+docker compose -f docker/docker-compose.yml down -v && docker compose -f docker/docker-compose.yml up -d
 
 # View ADK version
 python -c "import google.adk; print(google.adk.__version__)"

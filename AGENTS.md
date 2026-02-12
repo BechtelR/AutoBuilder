@@ -115,7 +115,7 @@ uv run pyright                        # Identify type errors
 ## Environment Variables
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `AUTOBUILDER_DB_URL` | `sqlite+aiosqlite:///./autobuilder.db` | Database connection |
+| `AUTOBUILDER_DB_URL` | `postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder` | Database connection |
 | `AUTOBUILDER_REDIS_URL` | `redis://localhost:6379` | Redis connection |
 | `AUTOBUILDER_LOG_LEVEL` | `INFO` | Log verbosity |
 | `ANTHROPIC_API_KEY` | -- | Claude models |

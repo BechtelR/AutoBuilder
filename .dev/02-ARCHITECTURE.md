@@ -237,7 +237,7 @@ All persistent data lives in one database, accessed only through the gateway (an
 |---------|---------------|
 | ORM | **SQLAlchemy 2.0 async** (native async sessions, modern 2.0-style queries) |
 | Migrations | **Alembic** (version-controlled schema evolution) |
-| Driver | `asyncpg` (PostgreSQL) or `aiosqlite` (SQLite for dev) |
+| Driver | `asyncpg` (PostgreSQL) -- all environments |
 | Access pattern | Gateway and workers share the same SQLAlchemy models |
 
 No separate dashboard database. No separate session database. One schema, one migration history.
@@ -320,7 +320,7 @@ flowchart TB
         Router["LLM Router\n(task_type to model)\nplanning: opus\ncoding: sonnet\nreview: sonnet\nclassification: haiku\nFallback chains"]
         Models["Models (Shared Domain)\nenums.py, constants.py\nbase.py (Pydantic base models)"]
         State["State System (4 scopes)\nsession, user:, app:, temp:"]
-        Memory["Memory Service (SQLite FTS5)\nCross-session learnings\nSearchable archive"]
+        Memory["Memory Service (PostgreSQL)\ntsvector + pgvector\nCross-session learnings"]
         Observability["Observability\nADK Event stream\nOpenTelemetry native\nPython logging\nPlugin system"]
     end
 
@@ -426,8 +426,7 @@ Redis serves four distinct roles from day one. This is fundamental infrastructur
 |---------|--------|
 | ORM | SQLAlchemy 2.0 async |
 | Migrations | Alembic |
-| Production | PostgreSQL (asyncpg) |
-| Development | SQLite (aiosqlite) |
+| Driver | PostgreSQL (`asyncpg`) -- all environments |
 | Access | Gateway + workers (shared models, single schema) |
 
 ### Filesystem

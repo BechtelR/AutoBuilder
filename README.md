@@ -11,15 +11,15 @@ AutoBuilder takes a specification and runs it through pluggable workflows (auto-
 ### Prerequisites
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) package manager
-- Redis
+- [Docker](https://docs.docker.com/get-docker/) (PostgreSQL + Redis)
 
 ### Installation
 ```bash
+# Start infrastructure (PostgreSQL + Redis)
+docker compose -f docker/docker-compose.yml up -d
+
 # Install dependencies
 uv sync
-
-# Start Redis (must be running)
-redis-server
 
 # Apply database migrations
 uv run alembic upgrade head
@@ -90,7 +90,7 @@ See [.dev/03-STRUCTURE.md](./.dev/03-STRUCTURE.md) for the full project scaffold
 
 ### Environment Variables
 ```bash
-AUTOBUILDER_DB_URL=sqlite+aiosqlite:///./autobuilder.db   # Database
+AUTOBUILDER_DB_URL=postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder  # Database
 AUTOBUILDER_REDIS_URL=redis://localhost:6379                # Redis
 AUTOBUILDER_LOG_LEVEL=INFO                                  # Log level
 ANTHROPIC_API_KEY=                                          # Claude models
@@ -122,6 +122,9 @@ uv run pyright
 **Redis not running**: Gateway and workers require Redis to be running.
 - **Solution**: `redis-server` or check your system service: `redis-cli ping`
 
+**PostgreSQL not running**: Database requires Docker.
+- **Solution**: `docker compose -f docker/docker-compose.yml up -d`
+
 **Migration errors**: Database schema out of sync.
 - **Solution**: `uv run alembic upgrade head`
 
@@ -130,6 +133,7 @@ uv run pyright
 
 ### Debug Commands
 ```bash
+docker compose -f docker/docker-compose.yml ps  # Check infrastructure
 redis-cli ping                        # Verify Redis
 uv run alembic current                # Check migration state
 uv run adk web app/app.py             # ADK Dev UI (local debugging only)

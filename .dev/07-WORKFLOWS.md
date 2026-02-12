@@ -182,7 +182,7 @@ All workflows operate on the same platform foundation:
 - **Observability** — unified event stream, OpenTelemetry tracing, ADK Dev UI
 - **Outer loop** — BatchOrchestrator (if workflow supports `batch_parallel` pipeline type)
 - **App container** — ADK `App` class providing lifecycle management, context compression, resumability
-- **Memory service** — cross-session learnings via `MemoryService` (SQLite FTS5 in Phase 1)
+- **Memory service** — cross-session learnings via `MemoryService` (PostgreSQL tsvector + pgvector)
 
 ### Workflow-Specific
 

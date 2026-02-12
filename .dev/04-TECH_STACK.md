@@ -61,7 +61,7 @@ ADK is used behind an **anti-corruption layer** to isolate the rest of the syste
 | `InstructionProvider` | Dynamic context/knowledge loading per invocation |
 | `before_model_callback` | Context injection, token budget monitoring |
 | `BaseToolset` | Dynamic tool selection based on deliverable type |
-| `DatabaseSessionService` | State persistence to SQLite/Postgres |
+| `DatabaseSessionService` | State persistence to PostgreSQL |
 
 **Acknowledged Tradeoffs**:
 
@@ -69,7 +69,7 @@ ADK is used behind an **anti-corruption layer** to isolate the rest of the syste
 |----------|----------|------------|
 | Gemini-first bias | Medium | LiteLLM wrapper for Claude; test thoroughly in prototyping |
 | No Temporal-style durability | Medium-Low | Native Resume feature (v1.16+) covers most crash scenarios; evaluate Temporal only if insufficient |
-| Google ecosystem gravity | Medium | Discipline: local SQLite/Postgres only; skip all Vertex AI services; anti-corruption layer |
+| Google ecosystem gravity | Medium | Discipline: local PostgreSQL only; skip all Vertex AI services; anti-corruption layer |
 | Documentation accuracy issues | Low | Test everything empirically |
 | Type safety less emphasized | Low | Use Pydantic models for structured outputs within ADK agents |
 | No context-window usage awareness | Low | `before_model_callback` token-count implementation (~50 lines) |
@@ -146,7 +146,7 @@ Phase 1 implements static routing (task_type to model lookup table). Adaptive ro
 
 **Key points**:
 - Single database for all persistence (no split databases; see Architecture Decisions)
-- Async engine via `aiosqlite` (dev) or `asyncpg` (production)
+- Async engine via `asyncpg`
 - Declarative models as the database source of truth
 
 ### 1.7 Database Migrations: Alembic
@@ -214,17 +214,15 @@ Shared domain definitions live in `app/models/`:
 - Monitor progress
 - Human-in-the-loop intervention points
 
-### 1.12 Memory: SQLite FTS5
+### 1.12 Memory: PostgreSQL tsvector + pgvector
 
-**Choice**: Custom `BaseMemoryService` implementation backed by SQLite FTS5 full-text search
+**Choice**: Custom `BaseMemoryService` implementation backed by PostgreSQL tsvector (full-text) and pgvector (semantic search)
 
 **Rationale**: ADK's `MemoryService` interface (`BaseMemoryService`) has two methods: `add_session_to_memory()` and `search_memory()`. The only production-ready built-in implementation is `VertexAiMemoryBankService` (GCP-only, which we are avoiding). `InMemoryMemoryService` is keyword-only and non-persistent.
 
-AutoBuilder needs local, persistent, searchable cross-session memory so that deliverable 47 can know what patterns deliverables 1-10 established. SQLite FTS5 provides full-text search built into SQLite with zero additional dependencies.
+AutoBuilder needs local, persistent, searchable cross-session memory so that deliverable 47 can know what patterns deliverables 1-10 established. PostgreSQL is already the database. `tsvector` provides full-text search built into PostgreSQL. `pgvector` provides vector search as a column type -- no separate service needed. Single database principle maintained.
 
-**Implementation scope**: ~200-500 lines for `SqliteFtsMemoryService` implementing `BaseMemoryService`.
-
-**Phase 2 evaluation**: If FTS5 proves insufficient for semantic similarity queries, upgrade to a hybrid approach with local embeddings + vector store (ChromaDB/FAISS/SQLite-VSS).
+**Implementation scope**: ~200-500 lines for `PostgresMemoryService` implementing `BaseMemoryService`. Uses tsvector for keyword search, pgvector available for semantic search when needed.
 
 ---
 
@@ -303,17 +301,17 @@ AutoBuilder needs local, persistent, searchable cross-session memory so that del
 
 Redis Streams enable reliable SSE: when a dashboard client disconnects and reconnects, it provides its last received event ID and the server replays all missed events from that position. No data loss during network interruptions.
 
-### 3.2 Database: SQLite (Dev) / PostgreSQL (Production)
+### 3.2 Database: PostgreSQL + pgvector
 
-**Choice**: SQLite for development; PostgreSQL for production deployment
+**Choice**: PostgreSQL for all environments (dev via Docker, production native)
 
-**Rationale**: SQLAlchemy 2.0 async abstracts the database engine. SQLite provides zero-configuration local development with no external dependencies. PostgreSQL provides production-grade persistence with concurrent access, proper locking, and battle-tested reliability.
+**Rationale**: Gateway + ARQ workers are separate processes. SQLite serializes writes -- concurrent workers would hit SQLITE_BUSY. PostgreSQL handles concurrent access natively. pgvector provides vector search without a separate service. Docker makes local PostgreSQL trivial -- and Redis already requires Docker/install.
 
 **Single database** -- the gateway API is THE system. The dashboard is a pure consumer via the API. There is no reason for separate databases per concern. All persistence (sessions, workflow state, task results, metadata) lives in one database accessed through SQLAlchemy.
 
-**Async drivers**:
-- SQLite: `aiosqlite`
-- PostgreSQL: `asyncpg`
+**Async driver**: `asyncpg`
+
+**Note**: Docker required for local dev (PostgreSQL + Redis)
 
 ### 3.3 Observability: OpenTelemetry + Langfuse
 
@@ -394,6 +392,7 @@ Key decisions with rationale, collected for reference:
 | Database topology | Single database | Split databases | Gateway API is THE system; dashboard is a pure consumer; no reason for interfaces to have their own persistence |
 | Dashboard ORM | None (codegen) | Drizzle / Prisma | Dashboard has no database; type safety comes from OpenAPI codegen, not an ORM |
 | ADK integration | Anti-corruption layer | Direct coupling | Isolates framework-specific APIs; enables framework replacement without cascading changes |
+| Database engine | PostgreSQL + pgvector | SQLite (dev) + PostgreSQL (prod) | Concurrent worker access, vector search built-in, eliminates dev/prod divergence, Docker already required for Redis |
 
 ---
 
@@ -421,7 +420,8 @@ dependencies = [
     # ORM & Database
     "sqlalchemy[asyncio]>=2.0.0",
     "alembic>=1.13.0",
-    "aiosqlite>=0.19.0",
+    "asyncpg>=0.29.0",
+    "pgvector>=0.3.0",
 
     # Task Queue
     "arq>=0.26.0",
@@ -451,10 +451,6 @@ dev = [
     "ruff>=0.4.0",
     "pyright>=1.1.0",
     "pre-commit>=3.5.0",
-]
-
-postgres = [
-    "asyncpg>=0.28.0",
 ]
 
 observability = [
@@ -492,8 +488,8 @@ testpaths = ["tests"]
 | `fastapi` + `uvicorn` | Gateway API server: REST + SSE, OpenAPI spec generation |
 | `sqlalchemy[asyncio]` | Async ORM for all database persistence |
 | `alembic` | Database schema migrations |
-| `aiosqlite` | Async SQLite driver for development |
-| `asyncpg` | Async PostgreSQL driver for production |
+| `asyncpg` | Async PostgreSQL driver for all environments |
+| `pgvector` | Vector search extension for semantic memory |
 | `arq` | Async task queue with built-in cron |
 | `redis[hiredis]` | Task queue backend, event bus (Streams), cache |
 | `pydantic` | Single source of truth for types; structured outputs; validation; settings |
@@ -508,9 +504,10 @@ testpaths = ["tests"]
 | `anthropic` SDK | LiteLLM handles Anthropic API calls; direct SDK adds redundancy |
 | `openai` SDK | Same -- LiteLLM abstracts provider SDKs |
 | `langchain` | ADK provides its own composition primitives; LangChain would be redundant |
-| `chromadb` / `faiss` | Vector store deferred to Phase 2; SQLite FTS5 sufficient for Phase 1 |
+| `chromadb` / `faiss` | Separate vector database; pgvector provides vector search in PostgreSQL; no separate service needed |
+| `sqlite` / `aiosqlite` | PostgreSQL used for all environments; eliminates dev/prod divergence |
 | `celery` | Sync-first; poor asyncio bridging; ARQ is the async-native choice |
-| Any GCP SDK | Avoiding Google ecosystem gravity; local SQLite/Postgres only |
+| Any GCP SDK | Avoiding Google ecosystem gravity; local PostgreSQL only |
 | `drizzle` / `prisma` | Dashboard has no database; type safety from OpenAPI codegen |
 | `axios` | hey-api generates standalone clients without axios dependency |
 

@@ -26,13 +26,14 @@ AutoBuilder is delivered in phased increments. Each phase produces testable, ind
 - [ ] `alembic.ini` + initial Alembic configuration
 - [ ] `.gitignore` (Python, Node, IDE, env files)
 - [ ] `pre-commit` configuration (ruff + pyright hooks)
+- [ ] `docker/docker-compose.yml` (PostgreSQL + Redis services)
+- [ ] Docker verification: `docker compose up -d` starts PostgreSQL + Redis
 
 #### Directory Scaffold
 - [ ] `app/` package with `__init__.py` and `__main__.py`
 - [ ] All subdirectories per `.dev/03-STRUCTURE.md` with `__init__.py` files
 - [ ] `tests/conftest.py` skeleton
 - [ ] `scripts/` directory
-- [ ] `docker/` directory (placeholder Dockerfiles)
 - [ ] `dashboard/` placeholder (Phase 12)
 
 #### Configuration Module
@@ -53,7 +54,8 @@ AutoBuilder is delivered in phased increments. Each phase produces testable, ind
 
 ### Completion Contract
 
-- [ ] `uv sync && uv run ruff check . && uv run pyright && uv run pytest` all pass
+- [ ] `docker compose up -d` starts PostgreSQL and Redis
+- [ ] `docker compose up -d && uv sync && uv run ruff check . && uv run pyright && uv run pytest` all pass
 - [ ] Directory structure matches `.dev/03-STRUCTURE.md`
 - [ ] Configuration loads from environment variables with sensible defaults
 - [ ] Shared enums and base models importable from `app.models`
@@ -151,6 +153,13 @@ Four focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] Structured logging setup (`app/lib/logging.py`)
 - [ ] Custom exception hierarchy (`app/lib/exceptions.py`)
 - [ ] Request logging middleware
+
+#### Docker (App Containerization)
+- [ ] `docker/Dockerfile` — production image (gateway + worker in single image)
+- [ ] `docker/Dockerfile.dev` — development image (hot-reload, debug tools)
+- [ ] Update `docker/docker-compose.yml` — add gateway + worker services alongside PostgreSQL + Redis
+- [ ] Worker containers volume-mount the target project directory for filesystem access (git worktrees, bash, file I/O)
+- [ ] CLI remains a local tool (`uv tool install`) — not containerized
 
 ### Completion Contract
 
@@ -439,10 +448,10 @@ Four focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ### Deliverables
 
-#### SqliteFtsMemoryService
-- [ ] `BaseMemoryService` implementation backed by SQLite FTS5 (~200–500 LOC)
+#### PostgresMemoryService
+- [ ] `BaseMemoryService` implementation backed by PostgreSQL tsvector + pgvector (~200–500 LOC)
 - [ ] `add_session_to_memory(session)` — ingest completed session
-- [ ] `search_memory(app_name, user_id, query)` — full-text search
+- [ ] `search_memory(app_name, user_id, query)` — full-text search via tsvector
 
 #### Memory Integration
 - [ ] `PreloadMemoryTool` — auto-loads relevant memories each turn
@@ -456,8 +465,8 @@ Four focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 - [ ] Completed sessions are ingested into searchable memory
 - [ ] Agents can search for patterns from prior runs
-- [ ] Memory persists across sessions in SQLite FTS5
-- [ ] Zero additional dependencies (SQLite is already the dev database)
+- [ ] Memory persists across sessions in PostgreSQL
+- [ ] Uses existing PostgreSQL database — tsvector for keyword search, pgvector for semantic search
 
 ---
 
@@ -535,7 +544,7 @@ Four focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 #### Advanced Capabilities
 - [ ] Compound workflow composition (multi-workflow request decomposition)
-- [ ] Semantic memory upgrade evaluation (vector-backed if FTS5 insufficient)
+- [ ] Semantic memory upgrade — enable pgvector embeddings for semantic similarity search
 
 ### Completion Contract
 
@@ -646,10 +655,10 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 | 8 | Agent-browser integration approach for UI testing | Open | Phase 4 |
 | 9 | Durable execution — native ADK resume sufficient or need Temporal? | Likely sufficient | Phase 11 |
 | 10 | Memory ingestion — after each feature, each batch, or session end? | Open | Phase 9 |
-| 11 | SQLite FTS5 vs vector store for MemoryService | Start FTS5, evaluate Phase 11 | Phase 9 / 11 |
-| 12 | Quote style — double vs single for Python | Open | Phase 0 |
+| 11 | pgvector embedding strategy for semantic memory | Decided: tsvector for keyword search; pgvector available when needed | Phase 9 |
+| 12 | Quote style — double vs single for Python | Decided: double quotes (ruff default) | Phase 0 |
 | 13 | Auth strategy for gateway API | TBD | Phase 11 |
-| 14 | Docker configuration details | Open | Phase 0 |
+| 14 | Docker configuration details | Decided: docker-compose with PostgreSQL + Redis | Phase 0 |
 
 ---
 
@@ -673,7 +682,7 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 |------|----------|------------|
 | Feature scope creep toward 117k LOC | High | Phased delivery; MVP ruthlessness; max ~500 per module |
 | Skills system becomes too rigid | Low | OR-logic triggers; project overrides add flexibility |
-| Google ecosystem gravity (Vertex AI pull) | Medium | Strict discipline: local SQLite/Postgres only; no GCP services |
+| Google ecosystem gravity (Vertex AI pull) | Medium | Strict discipline: local PostgreSQL only; no GCP services |
 | Gateway/worker coupling | Medium | Anti-corruption layer isolates ADK; gateway routes are AutoBuilder-owned |
 
 ---
@@ -701,7 +710,7 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 | 6: Skills System | `M` | SkillLibrary, two-tier matching, initial skills |
 | 7: Workflow Composition | `M` | WorkflowRegistry, auto-code workflow, WORKFLOW.yaml |
 | 8: Spec Pipeline | `L` | BatchOrchestrator, autonomous loop, git worktrees |
-| 9: Memory Service | `M` | SqliteFtsMemoryService, cross-session search |
+| 9: Memory Service | `M` | PostgresMemoryService, cross-session search |
 | 10: Events, CLI, Observability | `L` | SSE, webhooks, typer CLI, OpenTelemetry |
 | 11: Hardening | `L` | Langfuse, cost tracking, crash recovery, adaptive routing |
 | 12: Dashboard | `L` | React 19 SPA, pipeline visualization, cost dashboards |
