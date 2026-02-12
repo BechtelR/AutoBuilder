@@ -16,7 +16,7 @@ AutoBuilder takes a specification and runs it through pluggable workflows (auto-
 ### Installation
 ```bash
 # Start infrastructure (PostgreSQL + Redis)
-docker compose -f docker/docker-compose.yml up -d
+docker compose up -d
 
 # Install dependencies
 uv sync
@@ -123,7 +123,7 @@ uv run pyright
 - **Solution**: `redis-server` or check your system service: `redis-cli ping`
 
 **PostgreSQL not running**: Database requires Docker.
-- **Solution**: `docker compose -f docker/docker-compose.yml up -d`
+- **Solution**: `docker compose up -d`
 
 **Migration errors**: Database schema out of sync.
 - **Solution**: `uv run alembic upgrade head`
@@ -133,7 +133,7 @@ uv run pyright
 
 ### Debug Commands
 ```bash
-docker compose -f docker/docker-compose.yml ps  # Check infrastructure
+docker compose ps  # Check infrastructure
 redis-cli ping                        # Verify Redis
 uv run alembic current                # Check migration state
 uv run adk web app/app.py             # ADK Dev UI (local debugging only)

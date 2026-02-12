@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "active_chat_session_id": null,
+  "sessions": [
+    {
+      "type": "workflow",
+      "session_id": "be4639b8-576b-4823-adae-a6c13074ce33",
+      "alias": null,
+      "workflow_name": "loop",
+      "status": "completed",
+      "created_at": "2026-02-12T13:17:15.324559Z",
+      "last_used_at": "2026-02-12T13:21:33.024617Z",
+      "total_cost_usd": 1.8520173,
+      "total_input_tokens": 249,
+      "total_output_tokens": 12371,
+      "prompt_preview": "# Context\nRead these files before starting:\n- `CLAUDE.md` — project rules (loaded automatically)\n- `",
+      "metadata": {
+        "max_iterations": 20,
+        "completion_promise": "DONE",
+        "loop_name": "fresh-loop",
+        "iterations": 1,
+        "completion_detected": true,
+        "reason": null
+      }
+    }
+  ]
+}

@@ -46,37 +46,14 @@ Each module targets a maximum of ~500 to avoid monolithic files.
 
 ## 3. Environment Variables
 
-Create a `.env` file in the project root (copy from `.env.example`):
+Copy `.env.example` to `.env` and fill in your API keys:
 
 ```bash
-# =============================================================================
-# AutoBuilder Environment Configuration
-# =============================================================================
-
-# --- LLM Providers (at least one required) ---
-ANTHROPIC_API_KEY=sk-ant-...          # Primary: Claude models via LiteLLM
-OPENAI_API_KEY=sk-...                 # Alternative: OpenAI models
-GOOGLE_API_KEY=...                    # Alternative: Gemini models (native ADK)
-
-# --- Database ---
-AUTOBUILDER_DB_URL=postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder
-
-# --- Web Search (optional, Phase 1 provider TBD) ---
-# SEARXNG_URL=http://localhost:8080
-# BRAVE_API_KEY=...
-# TAVILY_API_KEY=tvly-...
-
-# --- Application ---
-AUTOBUILDER_LOG_LEVEL=INFO            # DEBUG, INFO, WARNING, ERROR
-AUTOBUILDER_MAX_CONCURRENCY=3         # Max parallel feature pipelines
-AUTOBUILDER_SKILLS_DIR=./skills       # Additional project-local skills directory
-
-# --- LLM Router Defaults ---
-AUTOBUILDER_DEFAULT_CODE_MODEL=anthropic/claude-sonnet-4-5-20250929
-AUTOBUILDER_DEFAULT_PLAN_MODEL=anthropic/claude-opus-4-6
-AUTOBUILDER_DEFAULT_REVIEW_MODEL=anthropic/claude-sonnet-4-5-20250929
-AUTOBUILDER_DEFAULT_FAST_MODEL=anthropic/claude-haiku-4-5-20251001
+cp .env.example .env
+# Edit .env with your API keys and any configuration overrides
 ```
+
+See [`.env.example`](../.env.example) for all available variables and their defaults.
 
 ---
 
@@ -104,10 +81,10 @@ cp .env.example .env
 
 ```bash
 # Start PostgreSQL + Redis via Docker
-docker compose -f docker/docker-compose.yml up -d
+docker compose up -d
 
 # Verify services are running
-docker compose -f docker/docker-compose.yml ps
+docker compose ps
 ```
 
 ### 4.4 Create Virtual Environment and Install Dependencies
@@ -324,7 +301,7 @@ Dev dependencies:
 | `ModuleNotFoundError: google.adk` | Ensure `uv sync` completed and you are running via `uv run` |
 | LiteLLM model not found | Check that the model string matches LiteLLM's expected format (e.g., `anthropic/claude-sonnet-4-5-20250929`) |
 | `ANTHROPIC_API_KEY` not set | Ensure `.env` file exists and is loaded; some shells require `source .env` or use `python-dotenv` |
-| PostgreSQL not running | Run `docker compose -f docker/docker-compose.yml up -d` |
+| PostgreSQL not running | Run `docker compose up -d` |
 | ADK Dev UI not starting | Ensure `google-adk[cli]` is installed; check that `app.py` exports an `app` variable |
 | Async driver error | Ensure `asyncpg` is installed |
 
@@ -338,13 +315,13 @@ python --version
 uv pip list | grep -E "google-adk|litellm|asyncpg"
 
 # Check infrastructure services
-docker compose -f docker/docker-compose.yml ps
+docker compose ps
 
 # Check git worktree support
 git worktree list
 
 # Reset development database
-docker compose -f docker/docker-compose.yml down -v && docker compose -f docker/docker-compose.yml up -d
+docker compose down -v && docker compose up -d
 
 # View ADK version
 python -c "import google.adk; print(google.adk.__version__)"

@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: autobuilder-postgres
+    environment:
+      POSTGRES_USER: autobuilder
+      POSTGRES_PASSWORD: autobuilder
+      POSTGRES_DB: autobuilder
+    ports:
+      - "5432:5432"
+    volumes:
+      - autobuilder-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autobuilder"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: autobuilder-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - autobuilder-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  autobuilder-pgdata:
+  autobuilder-redis-data:

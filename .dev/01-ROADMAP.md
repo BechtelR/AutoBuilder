@@ -1,5 +1,5 @@
 # AutoBuilder Project Roadmap
-*Version: 1.1.0*
+*Version: 1.2.0*
 
 **Single source of truth for project status and phased delivery.**
 
@@ -7,7 +7,7 @@
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0–10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention — through a production-grade API gateway with async worker execution.
 
-**Status — Phase 0: IN PROGRESS**
+**Status — Phase 0: COMPLETE ✓ | Phase 1: NEXT**
 
 ---
 
@@ -15,50 +15,50 @@ AutoBuilder is delivered in phased increments. Each phase produces testable, ind
 
 **Goal**: Working empty project that builds, lints, and type-checks clean.
 
-**Status**: IN PROGRESS
+**Status**: COMPLETE
 
 **Prerequisites**: None
 
 ### Deliverables
 
 #### Project Configuration
-- [ ] `pyproject.toml` (uv, ruff, pyright, pytest, hatchling)
-- [ ] `alembic.ini` + initial Alembic configuration
-- [ ] `.gitignore` (Python, Node, IDE, env files)
-- [ ] `pre-commit` configuration (ruff + pyright hooks)
-- [ ] `docker/docker-compose.yml` (PostgreSQL + Redis services)
-- [ ] Docker verification: `docker compose up -d` starts PostgreSQL + Redis
+- [x] `pyproject.toml` (uv, ruff, pyright, pytest, hatchling)
+- [x] `alembic.ini` + initial Alembic configuration
+- [x] `.gitignore` (Python, Node, IDE, env files)
+- [x] `pre-commit` configuration (ruff + pyright hooks)
+- [x] `docker-compose.yml` (PostgreSQL + Redis services)
+- [x] Docker verification: `docker compose up -d` starts PostgreSQL + Redis
 
 #### Directory Scaffold
-- [ ] `app/` package with `__init__.py` and `__main__.py`
-- [ ] All subdirectories per `.dev/03-STRUCTURE.md` with `__init__.py` files
-- [ ] `tests/conftest.py` skeleton
-- [ ] `scripts/` directory
-- [ ] `dashboard/` placeholder (Phase 12)
+- [x] `app/` package with `__init__.py` and `__main__.py`
+- [x] All subdirectories per `.dev/03-STRUCTURE.md` with `__init__.py` files
+- [x] `tests/conftest.py` skeleton
+- [x] `scripts/` directory
+- [x] `dashboard/` placeholder (Phase 12)
 
 #### Configuration Module
-- [ ] `app/config/` — Pydantic Settings for environment variables
-- [ ] Default values matching CLAUDE.md environment table
+- [x] `app/config/` — Pydantic Settings for environment variables
+- [x] Default values matching CLAUDE.md environment table
 
 #### Shared Domain Models
-- [ ] `app/models/enums.py` — initial domain enums (WorkflowStatus, DeliverableStatus, AgentRole)
-- [ ] `app/models/constants.py` — shared constants
-- [ ] `app/models/base.py` — Pydantic base models
+- [x] `app/models/enums.py` — initial domain enums (WorkflowStatus, DeliverableStatus, AgentRole)
+- [x] `app/models/constants.py` — shared constants
+- [x] `app/models/base.py` — Pydantic base models
 
 #### Dev Tooling
-- [ ] `uv sync` installs all dependencies
-- [ ] `ruff check .` passes
-- [ ] `ruff format --check .` passes
-- [ ] `pyright` passes (strict mode)
-- [ ] `pytest` runs (0 tests collected, 0 errors)
+- [x] `uv sync` installs all dependencies
+- [x] `ruff check .` passes
+- [x] `ruff format --check .` passes
+- [x] `pyright` passes (strict mode)
+- [x] `pytest` runs (3 scaffold tests pass)
 
 ### Completion Contract
 
-- [ ] `docker compose up -d` starts PostgreSQL and Redis
-- [ ] `docker compose up -d && uv sync && uv run ruff check . && uv run pyright && uv run pytest` all pass
-- [ ] Directory structure matches `.dev/03-STRUCTURE.md`
-- [ ] Configuration loads from environment variables with sensible defaults
-- [ ] Shared enums and base models importable from `app.models`
+- [x] `docker compose up -d` starts PostgreSQL and Redis
+- [x] `uv sync && uv run ruff check . && uv run pyright && uv run pytest` all pass
+- [x] Directory structure matches `.dev/03-STRUCTURE.md`
+- [x] Configuration loads from environment variables with sensible defaults
+- [x] Shared enums and base models importable from `app.models`
 
 ---
 
@@ -157,7 +157,7 @@ Four focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 #### Docker (App Containerization)
 - [ ] `docker/Dockerfile` — production image (gateway + worker in single image)
 - [ ] `docker/Dockerfile.dev` — development image (hot-reload, debug tools)
-- [ ] Update `docker/docker-compose.yml` — add gateway + worker services alongside PostgreSQL + Redis
+- [ ] Update `docker-compose.yml` — add gateway + worker services alongside PostgreSQL + Redis
 - [ ] Worker containers volume-mount the target project directory for filesystem access (git worktrees, bash, file I/O)
 - [ ] CLI remains a local tool (`uv tool install`) — not containerized
 
@@ -728,8 +728,9 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 |---------|------|---------|
 | 1.0.0 | 2026-02-12 | Initial roadmap — restructured from delivery plan into phased increments with completion contracts |
 | 1.1.0 | 2026-02-12 | Renumbered all phases to sequential whole numbers (eliminated sub-phases) |
+| 1.2.0 | 2026-02-12 | Phase 0 verified COMPLETE — all deliverables and completion contract pass |
 
 ---
 
-*Document Version: 1.1.0*
+*Document Version: 1.2.0*
 *Last Updated: 2026-02-12*
