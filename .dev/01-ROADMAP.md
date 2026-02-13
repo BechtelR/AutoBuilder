@@ -7,7 +7,7 @@
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0–10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention — through a production-grade API gateway with async worker execution.
 
-**Status — Phase 0: COMPLETE ✓ | Phase 1: NEXT**
+**Status — Phase 0: COMPLETE ✓ | Phase 1: DONE ✓ | Phase 2: NEXT**
 
 ---
 
@@ -66,7 +66,7 @@ AutoBuilder is delivered in phased increments. Each phase produces testable, ind
 
 **Goal**: Validate four critical ADK assumptions before full commitment. Go/no-go gate.
 
-**Status**: PLANNED
+**Status**: DONE
 
 **Prerequisites**: Phase 0 (project scaffold exists, dependencies installable)
 
@@ -77,45 +77,45 @@ Four focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 ### Deliverables
 
 #### P1: Basic Agent Loop + Claude via LiteLLM
-- [ ] ADK `LlmAgent` with Claude via LiteLLM wrapper
-- [ ] `FunctionTool` wrappers: file-read, file-write, bash
-- [ ] **Validates**: Claude reliability through LiteLLM, latency, token counting accuracy
-- [ ] **Pass criteria**: Claude responds reliably, tools execute correctly, token counts are accurate
+- [x] ADK `LlmAgent` with Claude via LiteLLM wrapper
+- [x] `FunctionTool` wrappers: file-read, file-write, bash
+- [x] **Validates**: Claude reliability through LiteLLM, latency, token counting accuracy
+- [x] **Pass criteria**: Claude responds reliably, tools execute correctly, token counts are accurate
 
 #### P2: Mixed Agent Coordination (LLM + Deterministic)
-- [ ] `plan_agent` (LlmAgent) + `linter_agent` (CustomAgent)
-- [ ] `SequentialAgent` pipeline wiring
-- [ ] State passing via `output_key` → state read
-- [ ] **Validates**: Unified event stream, state persistence across agent types, observability of deterministic steps
-- [ ] **Pass criteria**: Deterministic agent events appear in same stream; state written by one agent is readable by next
+- [x] `plan_agent` (LlmAgent) + `linter_agent` (CustomAgent)
+- [x] `SequentialAgent` pipeline wiring
+- [x] State passing via `output_key` → state read
+- [x] **Validates**: Unified event stream, state persistence across agent types, observability of deterministic steps
+- [x] **Pass criteria**: Deterministic agent events appear in same stream; state written by one agent is readable by next
 
 #### P3: Parallel Execution
-- [ ] 3 `LlmAgent` instances via `ParallelAgent`
-- [ ] Each writes to distinct state keys
-- [ ] **Validates**: No state collision, proper isolation, concurrent LLM calls, correct event interleaving
-- [ ] **Pass criteria**: All 3 agents produce correct output without cross-contamination
+- [x] 3 `LlmAgent` instances via `ParallelAgent`
+- [x] Each writes to distinct state keys
+- [x] **Validates**: No state collision, proper isolation, concurrent LLM calls, correct event interleaving
+- [x] **Pass criteria**: All 3 agents produce correct output without cross-contamination
 
 #### P4: Dynamic Outer Loop (CustomAgent Orchestrator)
-- [ ] `CustomAgent` that dynamically constructs `ParallelAgent` batches
-- [ ] "While incomplete features exist" loop with dependency ordering
-- [ ] Test with 5 simple features
-- [ ] **Validates**: Dynamic workflow construction, execution order respects dependencies, failure handling
-- [ ] **Pass criteria**: Features execute in dependency order; failed features don't block independent ones; loop terminates
+- [x] `CustomAgent` that dynamically constructs `ParallelAgent` batches
+- [x] "While incomplete features exist" loop with dependency ordering
+- [x] Test with 5 simple features
+- [x] **Validates**: Dynamic workflow construction, execution order respects dependencies, failure handling
+- [x] **Pass criteria**: Features execute in dependency order; failed features don't block independent ones; loop terminates
 
 ### Completion Contract
 
-- [ ] All 4 prototypes pass their criteria
-- [ ] Go/no-go decision documented in `.dev/.discussion/`
-- [ ] Any ADK quirks or workarounds documented
+- [x] All 4 prototypes pass their criteria
+- [x] Go/no-go decision documented in `.dev/.discussion/`
+- [x] Any ADK quirks or workarounds documented
 
 ### Decision Gate
 
 | Prototype | Pass? | Decision |
 |-----------|-------|----------|
-| P1: Claude via LiteLLM | ? | If fail → evaluate Pydantic AI |
-| P2: Mixed Agents | ? | If fail → simplify to plain Python + ADK inner only |
-| P3: Parallel Execution | ? | If fail → sequential-only initially |
-| P4: Dynamic Outer Loop | ? | If fail → plain Python loop, ADK for inner pipelines only |
+| P1: Claude via LiteLLM | PASS | Proceed with ADK + LiteLLM |
+| P2: Mixed Agents | PASS | Proceed with SequentialAgent + CustomAgent pattern |
+| P3: Parallel Execution | PASS | Proceed with ParallelAgent for concurrent execution |
+| P4: Dynamic Outer Loop | PASS | Proceed with CustomAgent orchestrator pattern |
 
 ---
 

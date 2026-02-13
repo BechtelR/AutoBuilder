@@ -62,41 +62,7 @@ Two files. Both MUST be written.
 
 FILE 1: `.dev/build/phase-{N}/spec.md`
 
-```
-# Phase {N} Spec: {Phase Title}
-*Generated: {date}*
-
-## Overview
-{Phase goal expanded with design decisions}
-
-## Prerequisites
-{Each prerequisite — met/unmet with evidence}
-
-## Design Decisions
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-
-## Deliverables
-
-### P{N}.D1: {Title}
-**Files:** `path/to/file.py`
-**Depends on:** —
-**Description:** {what to build}
-**Acceptance criteria:**
-- [ ] {testable condition}
-**Validation:** `{command}`
-
-(repeat for all deliverables)
-
-## Build Order
-{Batched topological sort}
-
-## Completion Contract Traceability
-| Completion Contract Item | Covered By | Validation |
-
-## Research Notes
-{Key findings, patterns, APIs referenced}
-```
+Follow template at `.dev/build/.templates/spec.md` — fill all `{placeholders}`, keep all sections.
 
 FILE 2: `.dev/build/phase-{N}/prompt.md`
 
