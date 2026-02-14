@@ -1,0 +1,373 @@
+# Phase 1 Spec: ADK Prototype Validation
+*Generated: 2026-02-12*
+
+## Overview
+
+Four focused prototypes validate that Google ADK can serve as AutoBuilder's orchestration engine with Claude models via LiteLLM. This is a go/no-go gate: if P1 (Claude reliability) or P4 (CustomAgent outer loop) fail, re-evaluate Pydantic AI. Each prototype tests a specific architectural assumption before committing to ADK for the full system.
+
+Prototypes are structured as pytest integration tests in `tests/phase1/`. They use `InMemoryRunner` (no infrastructure dependencies — no Redis, PostgreSQL, or Docker required). Tests require `ANTHROPIC_API_KEY` and auto-skip when it's not set.
+
+**ADK version**: 1.25.0 (installed, all import paths verified)
+
+## Prerequisites
+
+**Phase 0 — MET**
+
+| Requirement | Status | Evidence |
+|-------------|--------|----------|
+| Project scaffold exists | MET | All directories per `03-STRUCTURE.md` present with `__init__.py` |
+| Dependencies installable | MET | `uv sync` succeeds; google-adk 1.25.0 installed |
+| `ruff check .` passes | MET | 0 errors |
+| `pyright` passes (strict) | MET | 0 errors |
+| `pytest` runs | MET | 3 tests collected, 3 passed |
+| Configuration loads | MET | `app.config.settings.Settings` loads from env |
+| Shared models importable | MET | `app.models.enums`, `app.models.base`, `app.models.constants` |
+| Docker (PostgreSQL + Redis) | N/A | Not required — all prototypes use `InMemoryRunner` |
+
+## Design Decisions
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | Test location | `tests/phase1/` | Prototypes are validation tests — pytest-runnable, structured, repeatable |
+| 2 | Runner | `InMemoryRunner` | Zero infrastructure deps; validates ADK logic without Redis/PostgreSQL |
+| 3 | API key handling | Auto-skip via `pytest.mark.skipif` | Prototypes make real API calls; CI can skip; local dev requires key |
+| 4 | Tool implementations | Minimal wrappers in temp dirs | Validate the FunctionTool pattern, not production tools (Phase 4) |
+| 5 | Models for parallel tests | Haiku for P3/P4, Sonnet for P1/P2 | Minimize API cost; P3 runs 3 concurrent LLM calls, P4 runs 5 |
+| 6 | P4 test features | Synthetic text-generation tasks | Validates orchestration without real code generation |
+| 7 | Event collection | List accumulation from `run_async()` | Collect all events into list for assertions |
+| 8 | BaseAgent subclasses | Pydantic v2 model fields | ADK BaseAgent is a Pydantic model — custom attrs must be model fields, not `__init__` params |
+| 9 | State writes in CustomAgent | Direct `ctx.session.state[key] = value` | Simpler for prototypes; production will use Event state_delta for auditability |
+
+## Deliverables
+
+### P1.D1: Test Infrastructure for Phase 1
+
+**Files:** `tests/phase1/__init__.py`, `tests/phase1/conftest.py`
+**Depends on:** —
+
+**Description:** Create the test infrastructure for all Phase 1 prototypes. Shared pytest fixtures for `InMemoryRunner` instantiation, temporary directory management, API key skip logic, and event collection helpers. The conftest establishes the pattern all prototype tests follow.
+
+**Acceptance criteria:**
+- [x] `pytest tests/phase1/ --co` discovers test modules without error
+- [x] `requires_api_key` skip logic auto-skips tests when `ANTHROPIC_API_KEY` is not set
+- [x] Fixture provides `InMemoryRunner` factory accepting a root agent, returning runner instance
+- [x] Fixture provides temporary directory for file tool tests (auto-cleaned via `tmp_path`)
+- [x] `collect_events` async helper runs `runner.run_async()` and returns `(list[Event], Session)`
+
+**Validation:** `uv run pytest tests/phase1/ --co`
+
+---
+
+### P1.D2: Prototype 1 — Basic Agent Loop + Claude via LiteLLM
+
+**Files:** `tests/phase1/test_p1_basic_agent.py`
+**Depends on:** P1.D1
+
+**Description:** Validate three things: (1) Claude responds reliably through the `LiteLlm` wrapper in ADK's `LlmAgent`, (2) `FunctionTool` wrappers execute correctly when called by the agent, and (3) token usage is reported accurately. This is the foundational prototype — if Claude doesn't work through LiteLLM+ADK, nothing else matters.
+
+**FunctionTool prototypes** (minimal — production tools come in Phase 4):
+- `file_read(path: str) -> dict[str, str]` — read file contents from temp dir
+- `file_write(path: str, content: str) -> dict[str, str]` — write file to temp dir
+- `bash_exec(command: str) -> dict[str, str]` — subprocess with timeout
+
+**Key API patterns:**
+```python
+from google.adk.agents import LlmAgent
+from google.adk.models.lite_llm import LiteLlm
+from google.adk.runners import InMemoryRunner
+from google.adk.tools import FunctionTool
+from google.genai import types
+
+agent = LlmAgent(
+    model=LiteLlm(model="anthropic/claude-sonnet-4-5-20250929"),
+    name="test_agent",
+    instruction="You are a helpful assistant.",
+    tools=[FunctionTool(file_read), FunctionTool(file_write)],
+)
+
+runner = InMemoryRunner(agent=agent, app_name="test")
+async for event in runner.run_async(
+    user_id="test_user",
+    session_id="test_session",
+    new_message=types.Content(parts=[types.Part(text="Hello")])
+):
+    events.append(event)
+```
+
+**Acceptance criteria:**
+- [x] `LlmAgent` with `LiteLlm(model="anthropic/claude-sonnet-4-5-20250929")` produces a non-empty text response
+- [x] Agent successfully calls `file_read` tool and receives file contents
+- [x] Agent successfully calls `file_write` tool and file is created on disk
+- [x] Agent successfully calls `bash_exec` tool and receives command output
+- [x] Token usage reported in events (`event.usage_metadata`) with `prompt_token_count > 0` and `candidates_token_count > 0`
+- [x] Single request latency < 60s (generous bound; typical < 10s)
+
+**Validation:** `uv run pytest tests/phase1/test_p1_basic_agent.py -v`
+
+---
+
+### P1.D3: Prototype 2 — Mixed Agent Coordination (LLM + Deterministic)
+
+**Files:** `tests/phase1/test_p2_mixed_agents.py`
+**Depends on:** P1.D2
+
+**Description:** Validate that an `LlmAgent` and a `CustomAgent` (deterministic) compose in a `SequentialAgent` pipeline with shared state. The plan_agent (LLM) writes a plan to state via `output_key`; the linter_agent (CustomAgent, inheriting BaseAgent) reads it, runs a deterministic check, and writes results to state. Key validations: unified event stream contains events from both agent types, state persists across agents in the sequence.
+
+**Key API patterns:**
+```python
+from google.adk.agents import BaseAgent, LlmAgent, SequentialAgent
+
+class LinterAgent(BaseAgent):
+    """Deterministic agent — Pydantic v2 model, no extra fields needed."""
+    async def _run_async_impl(self, ctx):
+        plan = ctx.session.state.get("plan_output", "")
+        has_steps = len(plan.strip()) > 0
+        ctx.session.state["lint_results"] = f"Plan length: {len(plan)} chars"
+        ctx.session.state["lint_passed"] = has_steps
+        yield Event(author=self.name, actions=EventActions(state_delta={}))
+
+pipeline = SequentialAgent(
+    name="pipeline",
+    sub_agents=[plan_agent, linter_agent]
+)
+```
+
+**Acceptance criteria:**
+- [x] `plan_agent` writes structured output to state via `output_key="plan_output"`
+- [x] `linter_agent` (CustomAgent) reads `plan_output` from `ctx.session.state`
+- [x] `linter_agent` emits Event objects visible in the event stream alongside LLM events
+- [x] `lint_results` and `lint_passed` state keys are set after pipeline completes
+- [x] Event stream contains events from both agent types (verified by `event.author`)
+
+**Validation:** `uv run pytest tests/phase1/test_p2_mixed_agents.py -v`
+
+---
+
+### P1.D4: Prototype 3 — Parallel Execution
+
+**Files:** `tests/phase1/test_p3_parallel.py`
+**Depends on:** P1.D2
+
+**Description:** Validate `ParallelAgent` with 3 `LlmAgent` instances executing concurrently. Each agent writes to a distinct state key via `output_key`. Key validations: no state collision between parallel agents, each produces topically relevant output, all events appear in the unified stream, and execution demonstrates concurrency.
+
+**Key API patterns:**
+```python
+from google.adk.agents import LlmAgent, ParallelAgent
+
+agents = [
+    LlmAgent(name="ocean_agent", model=LiteLlm(model="anthropic/claude-haiku-4-5-20251001"),
+             instruction="Write one sentence about the ocean.", output_key="agent_1_output"),
+    LlmAgent(name="mountain_agent", model=LiteLlm(model="anthropic/claude-haiku-4-5-20251001"),
+             instruction="Write one sentence about mountains.", output_key="agent_2_output"),
+    LlmAgent(name="forest_agent", model=LiteLlm(model="anthropic/claude-haiku-4-5-20251001"),
+             instruction="Write one sentence about forests.", output_key="agent_3_output"),
+]
+parallel = ParallelAgent(name="parallel_test", sub_agents=agents)
+```
+
+**Acceptance criteria:**
+- [x] All 3 agents produce non-empty output in their respective state keys
+- [x] No cross-contamination — each output relates to its assigned topic
+- [x] Events from all 3 agents appear in the collected event stream
+- [x] Total execution time < 3x the slowest single agent (demonstrates concurrency)
+- [x] State keys `agent_1_output`, `agent_2_output`, `agent_3_output` all populated
+
+**Validation:** `uv run pytest tests/phase1/test_p3_parallel.py -v`
+
+---
+
+### P1.D5: Prototype 4 — Dynamic Outer Loop (CustomAgent Orchestrator)
+
+**Files:** `tests/phase1/test_p4_outer_loop.py`
+**Depends on:** P1.D2, P1.D3, P1.D4
+
+**Description:** Validate the core orchestration pattern: a `CustomAgent` (BaseAgent subclass) that dynamically constructs `ParallelAgent` batches based on feature dependencies, runs them in a "while incomplete features exist" loop. Tests with 5 synthetic features forming a dependency DAG. This is the most complex prototype and validates the production `BatchOrchestrator` pattern.
+
+**Feature DAG:**
+```
+Feature A (no deps)     → Batch 1
+Feature B (no deps)     → Batch 1
+Feature C (depends: A)  → Batch 2
+Feature D (depends: A)  → Batch 2
+Feature E (depends: C, D) → Batch 3
+```
+
+**Key API patterns:**
+```python
+from google.adk.agents import BaseAgent, LlmAgent, ParallelAgent
+from pydantic import Field
+
+class Feature(BaseModel):
+    name: str
+    depends_on: list[str] = Field(default_factory=list)
+    prompt: str
+
+class BatchOrchestrator(BaseAgent):
+    """Pydantic v2 model — features stored as model field."""
+    features: list[Feature] = Field(default_factory=list)
+
+    async def _run_async_impl(self, ctx):
+        completed: set[str] = set()
+        batch_num = 0
+
+        while len(completed) < len(self.features):
+            ready = [f for f in self.features
+                     if f.name not in completed
+                     and all(d in completed for d in f.depends_on)]
+            if not ready:
+                break
+
+            batch_num += 1
+            sub_agents = [create_feature_agent(f) for f in ready]
+            parallel = ParallelAgent(name=f"batch_{batch_num}", sub_agents=sub_agents)
+
+            async for event in parallel.run_async(ctx):
+                yield event
+
+            for f in ready:
+                if ctx.session.state.get(f"feature_{f.name}_output"):
+                    completed.add(f.name)
+
+        ctx.session.state["all_completed"] = len(completed) == len(self.features)
+        ctx.session.state["completed_features"] = sorted(completed)
+        ctx.session.state["total_batches"] = batch_num
+```
+
+**Acceptance criteria:**
+- [x] Features execute in dependency order (A,B before C,D before E)
+- [x] At least 2 parallel batches observed (batch 1: A+B, batch 2: C+D)
+- [x] Loop terminates when all 5 features have completed
+- [x] Each feature's output is written to state under `feature_{name}_output`
+- [x] If a feature is simulated as "failed", independent features still execute (e.g., B fails → C,D still run since they depend on A, not B)
+- [x] Orchestrator state contains `all_completed`, `completed_features`, `total_batches`
+
+**Validation:** `uv run pytest tests/phase1/test_p4_outer_loop.py -v`
+
+---
+
+### P1.D6: Document Go/No-Go Decision
+
+**Files:** `.dev/.discussion/phase1-decision.md`
+**Depends on:** P1.D2, P1.D3, P1.D4, P1.D5
+
+**Description:** After running all prototypes, capture results in the decision table format from the roadmap. Document any ADK quirks, workarounds, or unexpected behaviors discovered during implementation. Record the go/no-go decision with rationale.
+
+**Acceptance criteria:**
+- [x] Decision table filled out with pass/fail for each prototype (P1–P4)
+- [x] Quirks/workarounds section documents any issues encountered during implementation
+- [x] Clear go/no-go recommendation with rationale
+- [x] If any prototype fails, alternative approach documented
+
+**Validation:** `cat .dev/.discussion/phase1-decision.md` (manual review)
+
+---
+
+## Build Order
+
+```
+Batch 1:              P1.D1                    # Test infrastructure (no deps)
+Batch 2:              P1.D2                    # Basic agent (foundational)
+Batch 3 (parallel):   P1.D3, P1.D4            # Mixed agents + Parallel (independent, both need D2)
+Batch 4:              P1.D5                    # Outer loop (needs D2+D3+D4 patterns)
+Batch 5:              P1.D6                    # Document results (after all prototypes)
+```
+
+## Completion Contract Traceability
+
+| # | Roadmap Completion Contract Item | Covered By | Validation |
+|---|----------------------------------|------------|------------|
+| 1 | All 4 prototypes pass their criteria | P1.D2, P1.D3, P1.D4, P1.D5 | `uv run pytest tests/phase1/ -v` — all pass |
+| 2 | Go/no-go decision documented in `.dev/.discussion/` | P1.D6 | File exists at `.dev/.discussion/phase1-decision.md` with completed decision table |
+| 3 | Any ADK quirks or workarounds documented | P1.D6 | Quirks section present and populated in decision doc |
+
+## Research Notes
+
+### Verified Import Paths (ADK 1.25.0)
+```python
+from google.adk.agents import LlmAgent, SequentialAgent, ParallelAgent, LoopAgent, BaseAgent
+from google.adk.models.lite_llm import LiteLlm
+from google.adk.runners import InMemoryRunner
+from google.adk.events import Event, EventActions
+from google.adk.tools import FunctionTool
+from google.genai import types  # Content, Part
+```
+
+### InMemoryRunner Signatures
+```python
+# Constructor
+InMemoryRunner(
+    agent: BaseAgent | None = None,
+    *,
+    app_name: str | None = None,
+    plugins: list[BasePlugin] | None = None,
+    app: App | None = None,
+    plugin_close_timeout: float = 5.0,
+)
+
+# Execution
+runner.run_async(
+    *,
+    user_id: str,
+    session_id: str,
+    invocation_id: str | None = None,
+    new_message: types.Content | None = None,    # NOT plain str
+    state_delta: dict[str, Any] | None = None,
+    run_config: RunConfig | None = None,
+) -> AsyncGenerator[Event, None]
+
+# Convenience (testing only)
+runner.run_debug(
+    user_messages: str | list[str],  # Accepts plain strings
+    user_id: str = "debug_user_id",
+    session_id: str = "debug_session_id",
+) -> list[Event]
+```
+
+### Message Construction
+```python
+# For run_async — must wrap in Content/Part
+new_message = types.Content(parts=[types.Part(text="Hello")])
+
+# For run_debug — plain strings accepted
+events = await runner.run_debug(user_messages="Hello")
+```
+
+### BaseAgent is a Pydantic v2 Model
+Custom fields must be declared as Pydantic model fields:
+```python
+class MyAgent(BaseAgent):
+    features: list[Feature] = Field(default_factory=list)  # Model field
+    # NOT: def __init__(self, features, **kwargs): ...
+```
+
+### State Access in CustomAgent
+```python
+async def _run_async_impl(self, ctx):
+    # Read
+    value = ctx.session.state.get("key")
+    # Write (direct)
+    ctx.session.state["key"] = "value"
+    # Write (event-sourced — visible in event stream)
+    yield Event(author=self.name, actions=EventActions(state_delta={"key": "value"}))
+```
+
+### Token Usage
+```python
+# On events that carry LLM responses
+if event.usage_metadata:
+    event.usage_metadata.prompt_token_count      # Input tokens
+    event.usage_metadata.candidates_token_count   # Output tokens
+```
+
+### ADK State Scopes
+| Prefix | Scope | Persistence |
+|--------|-------|-------------|
+| *(none)* | Current session | If service persistent |
+| `user:` | All sessions for user | If service persistent |
+| `app:` | All users/sessions | If service persistent |
+| `temp:` | Current invocation only | Never |
+
+### Model Strings
+- Sonnet: `"anthropic/claude-sonnet-4-5-20250929"`
+- Haiku: `"anthropic/claude-haiku-4-5-20251001"`
+- Opus: `"anthropic/claude-opus-4-6"`

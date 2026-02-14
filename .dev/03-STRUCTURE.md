@@ -8,7 +8,12 @@ Single source of truth for the project scaffold. All other docs reference this f
 AutoBuilder/
 │
 ├── app/                            # Python engine (main package)
-│   ├── __main__.py                 # CLI entry point
+│   ├── __main__.py                 # CLI entry point (invokes typer app)
+│   │
+│   ├── cli/                        # CLI interface (typer) — pure gateway API consumer
+│   │   ├── main.py                 # Typer app definition and command registration
+│   │   ├── commands.py             # Command implementations (run, status, list, logs, intervene)
+│   │   └── output.py               # Terminal formatting and display helpers
 │   │
 │   ├── gateway/                    # FastAPI application
 │   │   ├── main.py                 # FastAPI app factory, lifespan
@@ -151,6 +156,7 @@ AutoBuilder/
 | Directory | Role |
 |-----------|------|
 | `app/` | Python engine — all server-side code lives here |
+| `app/cli/` | CLI interface — thin typer API client; imports `httpx` and `app/config`, never engine internals |
 | `app/gateway/` | FastAPI REST + SSE layer; owns the external API contract |
 | `app/gateway/middleware/` | Request middleware (auth, rate limiting, error handling, CORS) |
 | `app/workers/` | ARQ async workers; execute ADK pipelines out-of-process |
