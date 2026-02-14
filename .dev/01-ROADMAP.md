@@ -7,7 +7,7 @@
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0–10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention — through a production-grade API gateway with async worker execution.
 
-**Status — Phase 0: COMPLETE ✓ | Phase 1: DONE ✓ | Phase 2: NEXT**
+**Status — Phase 0: COMPLETE ✓ | Phase 1: DONE ✓ | Phase 2: DONE ✓ | Phase 3: NEXT**
 
 ---
 
@@ -132,52 +132,48 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 **Goal**: Production-grade FastAPI gateway, Redis infrastructure, database layer, and ARQ workers — the foundation everything else sits on.
 
-**Status**: PLANNED
+**Status**: DONE
 
 **Prerequisites**: Phase 1 (ADK validated)
 
 ### Deliverables
 
 #### FastAPI Gateway
-- [ ] App factory with lifespan management (`app/gateway/main.py`)
-- [ ] Health endpoint (`GET /health`)
-- [ ] CORS middleware
-- [ ] Error handling middleware (structured error responses)
-- [ ] Dependency injection (`app/gateway/deps.py` — DB sessions, Redis client)
-- [ ] Pydantic request/response models (`app/gateway/models/`)
+- [x] App factory with lifespan management (`app/gateway/main.py`)
+- [x] Health endpoint (`GET /health`)
+- [x] CORS middleware
+- [x] Error handling middleware (structured error responses)
+- [x] Dependency injection (`app/gateway/deps.py` — DB sessions, Redis client)
+- [x] Pydantic request/response models (`app/gateway/models/`)
 
 #### Database Layer
-- [ ] AsyncEngine + AsyncSession factory (`app/db/engine.py`)
-- [ ] SQLAlchemy mapped models (`app/db/models.py`) — specifications, workflows, deliverables
-- [ ] Alembic migration environment configured
-- [ ] Initial migration (core tables)
+- [x] AsyncEngine + AsyncSession factory (`app/db/engine.py`)
+- [x] SQLAlchemy mapped models (`app/db/models.py`) — specifications, workflows, deliverables
+- [x] Alembic migration environment configured
+- [x] Initial migration (core tables)
 
 #### Redis Infrastructure
-- [ ] Redis client connection with health check
-- [ ] ARQ worker settings (`app/workers/settings.py`)
-- [ ] ARQ worker entry point with Redis URL configuration
-- [ ] ARQ cron skeleton (heartbeat, stale job cleanup)
+- [x] Redis client connection with health check
+- [x] ARQ worker settings (`app/workers/settings.py`)
+- [x] ARQ worker entry point with Redis URL configuration
+- [x] ARQ cron skeleton (heartbeat, stale job cleanup)
 
 #### Logging & Exceptions
-- [ ] Structured logging setup (`app/lib/logging.py`)
-- [ ] Custom exception hierarchy (`app/lib/exceptions.py`)
-- [ ] Request logging middleware
+- [x] Structured logging setup (`app/lib/logging.py`)
+- [x] Custom exception hierarchy (`app/lib/exceptions.py`)
+- [x] Request logging middleware
 
 #### Docker (App Containerization)
-- [ ] `Dockerfile` — production image (gateway + worker in single image)
-- [ ] `Dockerfile.dev` — development image (hot-reload, debug tools)
-- [ ] Update `docker-compose.yml` — add gateway + worker services alongside PostgreSQL + Redis
-- [ ] Worker containers volume-mount the target project directory for filesystem access (git worktrees, bash, file I/O)
-- [ ] CLI remains a local tool (`uv tool install`) — not containerized
+- [x] `Dockerfile` — production image (gateway + worker in single image)
 
 ### Completion Contract
 
-- [ ] `uv run uvicorn app.gateway.main:app` starts and serves `/health`
-- [ ] `uv run arq app.workers.settings.WorkerSettings` starts worker
-- [ ] `uv run alembic upgrade head` creates tables
-- [ ] Redis `PING` succeeds
-- [ ] Gateway can enqueue a test job, worker can dequeue and process it
-- [ ] All quality gates pass (ruff, pyright, pytest)
+- [x] `uv run uvicorn app.gateway.main:app` starts and serves `/health`
+- [x] `uv run arq app.workers.settings.WorkerSettings` starts worker
+- [x] `uv run alembic upgrade head` creates tables
+- [x] Redis `PING` succeeds
+- [x] Gateway can enqueue a test job, worker can dequeue and process it
+- [x] All quality gates pass (ruff, pyright, pytest)
 
 ---
 

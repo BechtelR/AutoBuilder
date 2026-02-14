@@ -101,13 +101,13 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** —
 **Description:** Structured JSON logging setup with `app.*` logger hierarchy and a custom `JsonFormatter` that outputs one JSON object per log line. Custom exception hierarchy rooted at `AutoBuilderError` with subclasses for common error categories, each carrying an `ErrorCode` enum value and optional details dict.
 **Requirements:**
-- [ ] `setup_logging(level: str)` configures the root `app` logger with JSON formatter and the specified level
-- [ ] `get_logger(name: str)` returns a `logging.Logger` under the `app.*` hierarchy (e.g., `get_logger("gateway")` → `app.gateway`)
-- [ ] `JsonFormatter` outputs `{"timestamp": "...", "level": "...", "logger": "...", "message": "...", ...extras}` per line
-- [ ] `AutoBuilderError` base class has `code: ErrorCode`, `message: str`, `details: dict[str, object]`
-- [ ] Subclasses: `NotFoundError`, `ConflictError`, `ValidationError`, `ConfigurationError`, `WorkerError` — each with appropriate default `ErrorCode`
-- [ ] All classes importable from `app.lib`
-- [ ] Both files pass pyright strict mode
+- [x] `setup_logging(level: str)` configures the root `app` logger with JSON formatter and the specified level
+- [x] `get_logger(name: str)` returns a `logging.Logger` under the `app.*` hierarchy (e.g., `get_logger("gateway")` → `app.gateway`)
+- [x] `JsonFormatter` outputs `{"timestamp": "...", "level": "...", "logger": "...", "message": "...", ...extras}` per line
+- [x] `AutoBuilderError` base class has `code: ErrorCode`, `message: str`, `details: dict[str, object]`
+- [x] Subclasses: `NotFoundError`, `ConflictError`, `ValidationError`, `ConfigurationError`, `WorkerError` — each with appropriate default `ErrorCode`
+- [x] All classes importable from `app.lib`
+- [x] Both files pass pyright strict mode
 **Validation:**
 - `uv run pyright app/lib/`
 
@@ -118,10 +118,10 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** —
 **Description:** Add `SpecificationStatus` and `ErrorCode` enums to the existing enums module, following the established `enum.StrEnum` pattern where values match names. Update `__init__.py` exports.
 **Requirements:**
-- [ ] `SpecificationStatus` has members: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` (all `StrEnum`, values match names)
-- [ ] `ErrorCode` has members: `NOT_FOUND`, `CONFLICT`, `VALIDATION_ERROR`, `CONFIGURATION_ERROR`, `WORKER_ERROR`, `INTERNAL_ERROR` (all `StrEnum`, values match names)
-- [ ] Both enums exported from `app.models`
-- [ ] Existing enums (`WorkflowStatus`, `DeliverableStatus`, `AgentRole`) unchanged
+- [x] `SpecificationStatus` has members: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` (all `StrEnum`, values match names)
+- [x] `ErrorCode` has members: `NOT_FOUND`, `CONFLICT`, `VALIDATION_ERROR`, `CONFIGURATION_ERROR`, `WORKER_ERROR`, `INTERNAL_ERROR` (all `StrEnum`, values match names)
+- [x] Both enums exported from `app.models`
+- [x] Existing enums (`WorkflowStatus`, `DeliverableStatus`, `AgentRole`) unchanged
 **Validation:**
 - `uv run pyright app/models/`
 
@@ -132,15 +132,15 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** P2.D1, P2.D2
 **Description:** Async SQLAlchemy 2.0 engine factory and session factory. Declarative `Base` class with UUID primary key and timestamp mixins. Three ORM models (`Specification`, `Workflow`, `Deliverable`) with proper column types, foreign key relationships, and domain enum usage. All typed with `Mapped[]` annotations for pyright strict compatibility.
 **Requirements:**
-- [ ] `create_engine(url: str) -> AsyncEngine` creates an async engine with `asyncpg` driver
-- [ ] `async_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]` returns a configured session factory
-- [ ] `Base` class (via `DeclarativeBase`) provides `id` (UUID PK with `uuid4` default), `created_at`, `updated_at` (timezone-aware UTC timestamps)
-- [ ] `Specification` model has columns: `name` (str), `content` (text), `status` (`SpecificationStatus` enum)
-- [ ] `Workflow` model has columns: `specification_id` (FK nullable), `workflow_type` (str), `status` (`WorkflowStatus` enum), `params` (JSONB nullable), `started_at` (nullable), `completed_at` (nullable)
-- [ ] `Deliverable` model has columns: `workflow_id` (FK), `name` (str), `description` (text nullable), `status` (`DeliverableStatus` enum), `depends_on` (JSONB default `[]`), `result` (JSONB nullable)
-- [ ] Foreign key relationships: `Workflow.specification_id → Specification.id`, `Deliverable.workflow_id → Workflow.id`
-- [ ] All models use domain enums for status columns (not raw strings)
-- [ ] `Base`, `Specification`, `Workflow`, `Deliverable`, `create_engine`, `async_session_factory` importable from `app.db`
+- [x] `create_engine(url: str) -> AsyncEngine` creates an async engine with `asyncpg` driver
+- [x] `async_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]` returns a configured session factory
+- [x] `Base` class (via `DeclarativeBase`) provides `id` (UUID PK with `uuid4` default), `created_at`, `updated_at` (timezone-aware UTC timestamps)
+- [x] `Specification` model has columns: `name` (str), `content` (text), `status` (`SpecificationStatus` enum)
+- [x] `Workflow` model has columns: `specification_id` (FK nullable), `workflow_type` (str), `status` (`WorkflowStatus` enum), `params` (JSONB nullable), `started_at` (nullable), `completed_at` (nullable)
+- [x] `Deliverable` model has columns: `workflow_id` (FK), `name` (str), `description` (text nullable), `status` (`DeliverableStatus` enum), `depends_on` (JSONB default `[]`), `result` (JSONB nullable)
+- [x] Foreign key relationships: `Workflow.specification_id → Specification.id`, `Deliverable.workflow_id → Workflow.id`
+- [x] All models use domain enums for status columns (not raw strings)
+- [x] `Base`, `Specification`, `Workflow`, `Deliverable`, `create_engine`, `async_session_factory` importable from `app.db`
 **Validation:**
 - `uv run pyright app/db/`
 
@@ -151,11 +151,11 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** P2.D3
 **Description:** Update the existing Alembic `env.py` to import `Base` from `app.db.models` and set `target_metadata = Base.metadata` (the commented-out import is already there). Generate the initial migration creating `specifications`, `workflows`, and `deliverables` tables. Verify upgrade and downgrade both succeed.
 **Requirements:**
-- [ ] `env.py` imports `Base` from `app.db.models` and sets `target_metadata = Base.metadata`
-- [ ] Initial migration file exists in `app/db/migrations/versions/` and creates all three tables
-- [ ] `uv run alembic upgrade head` succeeds against a running PostgreSQL instance
-- [ ] `uv run alembic downgrade base` reverses cleanly (drops all three tables)
-- [ ] Tables have correct column types, constraints, and foreign keys
+- [x] `env.py` imports `Base` from `app.db.models` and sets `target_metadata = Base.metadata`
+- [x] Initial migration file exists in `app/db/migrations/versions/` and creates all three tables
+- [x] `uv run alembic upgrade head` succeeds against a running PostgreSQL instance
+- [x] `uv run alembic downgrade base` reverses cleanly (drops all three tables)
+- [x] Tables have correct column types, constraints, and foreign keys
 **Validation:**
 - `docker compose up -d postgres && uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic upgrade head`
 
@@ -166,12 +166,12 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** P2.D1
 **Description:** ARQ `WorkerSettings` class with Redis connection from `AUTOBUILDER_REDIS_URL`. A minimal `test_task` job function for round-trip validation. Worker entry point runnable via `uv run arq`. Cron skeleton with heartbeat job. Worker `on_startup` initializes structured logging.
 **Requirements:**
-- [ ] `WorkerSettings` class defines `redis_settings` parsed from `AUTOBUILDER_REDIS_URL` (default `redis://localhost:6379`)
-- [ ] `WorkerSettings.functions` list includes `test_task`
-- [ ] `test_task(ctx: dict[str, object], payload: str) -> dict[str, str]` is async, logs execution via structured logger, returns `{"status": "completed", "payload": payload}`
-- [ ] `WorkerSettings.cron_jobs` includes a `heartbeat` job that logs "worker alive" every 60 seconds
-- [ ] `WorkerSettings.on_startup` calls `setup_logging()` from `app.lib`
-- [ ] `uv run arq app.workers.settings.WorkerSettings` starts the worker process without error
+- [x] `WorkerSettings` class defines `redis_settings` parsed from `AUTOBUILDER_REDIS_URL` (default `redis://localhost:6379`)
+- [x] `WorkerSettings.functions` list includes `test_task`
+- [x] `test_task(ctx: dict[str, object], payload: str) -> dict[str, str]` is async, logs execution via structured logger, returns `{"status": "completed", "payload": payload}`
+- [x] `WorkerSettings.cron_jobs` includes a `heartbeat` job that logs "worker alive" every 60 seconds
+- [x] `WorkerSettings.on_startup` calls `setup_logging()` from `app.lib`
+- [x] `uv run arq app.workers.settings.WorkerSettings` starts the worker process without error
 **Validation:**
 - `uv run arq app.workers.settings.WorkerSettings` (starts, runs heartbeat, Ctrl+C to stop)
 
@@ -182,11 +182,11 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** P2.D2
 **Description:** API contract models for error responses and the health endpoint. `ErrorResponse` envelope per DD-1. `HealthResponse` with service status details. All models inherit from the project's `app.models.base.BaseModel` (which has `from_attributes=True`, `strict=True`).
 **Requirements:**
-- [ ] `ErrorDetail` model has `code: ErrorCode`, `message: str`, `details: dict[str, object]` (details defaults to `{}`)
-- [ ] `ErrorResponse` model has `error: ErrorDetail`
-- [ ] `HealthResponse` model has `status: str`, `version: str`, `services: dict[str, str]` (service names as keys, `"ok"` / `"unavailable"` as values)
-- [ ] All models inherit from `app.models.base.BaseModel`
-- [ ] Models importable from `app.gateway.models`
+- [x] `ErrorDetail` model has `code: ErrorCode`, `message: str`, `details: dict[str, object]` (details defaults to `{}`)
+- [x] `ErrorResponse` model has `error: ErrorDetail`
+- [x] `HealthResponse` model has `status: str`, `version: str`, `services: dict[str, str]` (service names as keys, `"ok"` / `"unavailable"` as values)
+- [x] All models inherit from `app.models.base.BaseModel`
+- [x] Models importable from `app.gateway.models`
 **Validation:**
 - `uv run pyright app/gateway/models/`
 
@@ -197,18 +197,18 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** P2.D1, P2.D3, P2.D5, P2.D6
 **Description:** FastAPI app factory with lifespan managing DB engine + Redis client lifecycle. Dependency injection functions for `AsyncSession` and `Redis` client. Health endpoint checking DB + Redis connectivity. Error handling middleware mapping `AutoBuilderError` subclasses to HTTP status codes and structured JSON error responses. CORS middleware for local development. Request logging middleware that logs method, path, status code, and duration for every request.
 **Requirements:**
-- [ ] `create_app() -> FastAPI` returns a configured FastAPI instance with lifespan, middleware, and routes
-- [ ] Lifespan creates `AsyncEngine` and `Redis` client on startup, disposes on shutdown
-- [ ] Lifespan verifies DB connectivity (`SELECT 1`) and Redis connectivity (`PING`) at startup — logs warning on failure but does not crash
-- [ ] `GET /health` returns `200` with `HealthResponse` showing service statuses when DB and Redis are reachable
-- [ ] `GET /health` returns `503` with degraded status if DB or Redis is unreachable
-- [ ] `get_db_session()` dependency yields an `AsyncSession` from the engine's session factory
-- [ ] `get_redis()` dependency returns the `Redis` client from `app.state`
-- [ ] Error middleware catches `AutoBuilderError` subclasses and returns `ErrorResponse` JSON with correct HTTP status codes (404, 409, 422, 500)
-- [ ] Unhandled exceptions return 500 with generic `INTERNAL_ERROR` response (no stack trace in response body)
-- [ ] CORS middleware allows `localhost:*` and `127.0.0.1:*` origins
-- [ ] Request logging middleware logs `{"method": "...", "path": "...", "status": ..., "duration_ms": ...}` for every request
-- [ ] Application importable as `app.gateway.main:app` for uvicorn
+- [x] `create_app() -> FastAPI` returns a configured FastAPI instance with lifespan, middleware, and routes
+- [x] Lifespan creates `AsyncEngine` and `Redis` client on startup, disposes on shutdown
+- [x] Lifespan verifies DB connectivity (`SELECT 1`) and Redis connectivity (`PING`) at startup — logs warning on failure but does not crash
+- [x] `GET /health` returns `200` with `HealthResponse` showing service statuses when DB and Redis are reachable
+- [x] `GET /health` returns `503` with degraded status if DB or Redis is unreachable
+- [x] `get_db_session()` dependency yields an `AsyncSession` from the engine's session factory
+- [x] `get_redis()` dependency returns the `Redis` client from `app.state`
+- [x] Error middleware catches `AutoBuilderError` subclasses and returns `ErrorResponse` JSON with correct HTTP status codes (404, 409, 422, 500)
+- [x] Unhandled exceptions return 500 with generic `INTERNAL_ERROR` response (no stack trace in response body)
+- [x] CORS middleware allows `localhost:*` and `127.0.0.1:*` origins
+- [x] Request logging middleware logs `{"method": "...", "path": "...", "status": ..., "duration_ms": ...}` for every request
+- [x] Application importable as `app.gateway.main:app` for uvicorn
 **Validation:**
 - `uv run uvicorn app.gateway.main:app --port 8000` then `curl -s localhost:8000/health | python -m json.tool`
 
@@ -219,11 +219,11 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** P2.D7
 **Description:** Production Dockerfile using multi-stage build with `uv` for dependency installation. Single image runs either gateway or worker based on command argument. Used for production deployment and CI — not for daily development (dev runs locally via `uv run`).
 **Requirements:**
-- [ ] `Dockerfile` uses multi-stage build: Stage 1 installs deps with `uv`, Stage 2 copies venv + source
-- [ ] Image runs gateway by default: `uvicorn app.gateway.main:app --host 0.0.0.0 --port 8000`
-- [ ] Image can run worker via command override: `arq app.workers.settings.WorkerSettings`
-- [ ] `docker build -t autobuilder .` succeeds
-- [ ] `docker run --rm autobuilder` starts the gateway process
+- [x] `Dockerfile` uses multi-stage build: Stage 1 installs deps with `uv`, Stage 2 copies venv + source
+- [x] Image runs gateway by default: `uvicorn app.gateway.main:app --host 0.0.0.0 --port 8000`
+- [x] Image can run worker via command override: `arq app.workers.settings.WorkerSettings`
+- [x] `docker build -t autobuilder .` succeeds
+- [x] `docker run --rm autobuilder` starts the gateway process
 **Validation:**
 - `docker build -t autobuilder . && docker run --rm --name ab-test -d autobuilder && sleep 2 && docker logs ab-test && docker stop ab-test`
 
@@ -234,17 +234,17 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Depends on:** P2.D7, P2.D5
 **Description:** Test fixtures for async DB sessions (using a separate `autobuilder_test` PostgreSQL database for isolation), Redis mock, and FastAPI test client via `httpx.AsyncClient`. Unit tests for logging setup, exception hierarchy, DB engine/session creation, and health endpoint responses. Integration test demonstrating gateway enqueue → worker dequeue round-trip with `test_task`.
 **Requirements:**
-- [ ] `conftest.py` provides `async_session` fixture (async DB session for testing)
-- [ ] `conftest.py` provides `test_client` fixture (`httpx.AsyncClient` with FastAPI test app)
-- [ ] Logging tests verify `setup_logging()` configures JSON output and `get_logger()` returns correctly-named loggers
-- [ ] Exception tests verify each subclass has correct `code: ErrorCode` and `message` attributes
-- [ ] DB engine test verifies `create_engine()` returns `AsyncEngine` and sessions can execute queries
-- [ ] Health endpoint test verifies `GET /health` returns 200 with correct `HealthResponse` schema
-- [ ] Health endpoint test verifies 503 response when services are degraded
-- [ ] Worker test verifies `test_task` processes payload and returns expected result dict
-- [ ] Error middleware test verifies `AutoBuilderError` subclasses map to correct HTTP status codes
-- [ ] All tests pass: `uv run pytest tests/ --ignore=tests/phase1`
-- [ ] All quality gates pass: `uv run ruff check . && uv run pyright && uv run pytest`
+- [x] `conftest.py` provides `async_session` fixture (async DB session for testing)
+- [x] `conftest.py` provides `test_client` fixture (`httpx.AsyncClient` with FastAPI test app)
+- [x] Logging tests verify `setup_logging()` configures JSON output and `get_logger()` returns correctly-named loggers
+- [x] Exception tests verify each subclass has correct `code: ErrorCode` and `message` attributes
+- [x] DB engine test verifies `create_engine()` returns `AsyncEngine` and sessions can execute queries
+- [x] Health endpoint test verifies `GET /health` returns 200 with correct `HealthResponse` schema
+- [x] Health endpoint test verifies 503 response when services are degraded
+- [x] Worker test verifies `test_task` processes payload and returns expected result dict
+- [x] Error middleware test verifies `AutoBuilderError` subclasses map to correct HTTP status codes
+- [x] All tests pass: `uv run pytest tests/ --ignore=tests/phase1`
+- [x] All quality gates pass: `uv run ruff check . && uv run pyright && uv run pytest`
 **Validation:**
 - `uv run pytest tests/ --ignore=tests/phase1 --cov=app -v`
 

@@ -30,3 +30,23 @@ class AgentRole(enum.StrEnum):
     CODER = "CODER"
     REVIEWER = "REVIEWER"
     FIXER = "FIXER"
+
+
+class SpecificationStatus(enum.StrEnum):
+    """Status of a specification through its lifecycle."""
+
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class ErrorCode(enum.StrEnum):
+    """Machine-readable error codes for API error responses."""
+
+    NOT_FOUND = "NOT_FOUND"
+    CONFLICT = "CONFLICT"
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    CONFIGURATION_ERROR = "CONFIGURATION_ERROR"
+    WORKER_ERROR = "WORKER_ERROR"
+    INTERNAL_ERROR = "INTERNAL_ERROR"

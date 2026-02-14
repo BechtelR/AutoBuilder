@@ -10,7 +10,9 @@ CRITICAL: NOT done until spec.md is written AND every roadmap completion contrac
 </objective>
 
 <context>
-Parse phase number from arguments (if missing, ask). Flags: `--research-only` (steps 1-3 only), `--resume` (continue existing spec).
+Parse phase number from arguments (if missing, ask). Flags:
+- `--research-only` — steps 1-4 only, report gaps and stop
+- `--resume` — read existing spec.md, re-run all steps against current state (prerequisite specs may have been added, code may have changed), update sections that are stale or incomplete, leave valid sections unchanged
 
 Bootstrap (parallel, token discipline — do NOT bulk-read):
 - @.dev/01-ROADMAP.md — target phase + prerequisites ONLY
@@ -32,7 +34,13 @@ If spec exists and no flag: ask user — overwrite or resume?
 Steps 1-9 sequential. Announce each step.
 
 STEP 1 — PREREQUISITE AUDIT
-Check prerequisite phase's completion contract. Evidence from git/code/`.dev/build-phase/`. Unmet → stop and report.
+For each prerequisite phase listed in the roadmap:
+1. Identify what THIS phase depends on from it (interfaces, types, patterns)
+2. Check what's available:
+   - Spec exists → use its deliverables and decisions as reliable input
+   - Code exists → note established patterns and interfaces for Step 2
+   - Neither → work from roadmap descriptions, note assumptions in Design Decisions
+Build-phase will hard-gate on actual code. Spec-phase plans against what's known.
 
 STEP 2 — EXISTING CODE SURVEY
 For every file the phase creates or modifies (per `03-STRUCTURE.md` + roadmap deliverables):
@@ -46,11 +54,11 @@ Skip for Phase 0 or phases that create entirely new directories.
 STEP 3 — DESIGN COMPLETENESS AUDIT
 Per deliverable group verify: clear responsibility, interfaces defined, file placement in `03-STRUCTURE.md`, dependencies, integration points.
 Check gaps: open questions table, unmade architecture decisions, unvalidated patterns.
-`--research-only` → report gaps and stop.
 
 STEP 4 — RESEARCH & RESOLUTION
 Per gap: research (`.dev/.knowledge/`, architecture docs, web) → propose with rationale → get user confirmation on non-obvious choices → record for spec.
 Use `Explore`/`subtask` agents for parallel research.
+`--research-only` → report findings and stop here.
 
 STEP 5 — DELIVERABLE DECOMPOSITION
 Per deliverable: ID (`P{N}.D{n}`), title (imperative), description (what not how, 2-4 sentences), files (exact paths from `03-STRUCTURE.md`), dependencies (by ID), requirements (what must be true when complete — concrete, measurable), validation command.

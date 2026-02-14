@@ -1,0 +1,50 @@
+# Version control
+.git/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+dashboard/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment (secrets)
+.env
+.env.*
+
+# Docker
+docker-volumes/
+Dockerfile
+Dockerfile.dev
+docker-compose.yml
+
+# Testing / Quality
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+
+# Docs / Dev (not needed in image)
+.dev/
+.claude/
+docs/
+scripts/
+tests/
+*.md
+!README.md
+LICENSE
+
+# OS
+.DS_Store
+*.log

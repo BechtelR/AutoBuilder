@@ -4,10 +4,11 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import get_settings
+from app.db.models import Base
 
 # Alembic Config object
 config = context.config
@@ -16,10 +17,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Add your model's MetaData object here for 'autogenerate' support.
-# from app.db.models import Base
-# target_metadata = Base.metadata
-target_metadata = None
+# Model metadata for autogenerate support.
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
@@ -36,9 +35,9 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection: object) -> None:  # noqa: ANN001
+def do_run_migrations(connection: Connection) -> None:
     """Run migrations with a sync connection."""
-    context.configure(connection=connection, target_metadata=target_metadata)  # type: ignore[arg-type]
+    context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
         context.run_migrations()

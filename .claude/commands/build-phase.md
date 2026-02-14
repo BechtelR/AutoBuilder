@@ -135,8 +135,8 @@ Split files evenly across reviewers. Each checks:
 3. **Consolidate**: Merge results into `.dev/build-phase/phase-{N}/review.md`. Deduplicate. Classify unresolved findings by severity (HIGH / MEDIUM / LOW).
 
 **Unresolved Fix Loop:**
-1. Fix all unresolved HIGH and MEDIUM findings (disputed items → get user confirmation)
-2. Repeat until clean or all remaining confirmed false positives
+1. Fix all unresolved findings — HIGH, MEDIUM, and LOW (disputed items → get user confirmation)
+2. Repeat until zero unresolved findings or all remaining confirmed false positives
 
 Do NOT proceed to Step 5 until resolved.
 
@@ -179,7 +179,7 @@ Before reporting done, verify:
 1. All spec deliverables implemented (check off in spec.md)
 2. Quality gate passes (ruff, pyright, pytest)
 3. Review report exists at `.dev/build-phase/phase-{N}/review.md` (unless `--review=none`)
-4. All HIGH/MEDIUM findings resolved (unless `--review=none`)
+4. All findings resolved (unless `--review=none`)
 5. Completion Protocol steps A-E all executed with evidence
 6. Roadmap updated (status, checkboxes)
 7. Evidence table printed with all rows PASS
