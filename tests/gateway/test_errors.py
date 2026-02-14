@@ -1,11 +1,13 @@
 """Tests for error handling middleware."""
 
 from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock
 
 import pytest
+import pytest_asyncio
 from fastapi import APIRouter
 from httpx import ASGITransport, AsyncClient
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.gateway.deps import get_db_session, get_redis
 from app.gateway.main import create_app
@@ -47,20 +49,22 @@ async def raise_unhandled() -> None:
     raise RuntimeError("unexpected boom")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def error_test_client(
-    mock_db_session: AsyncMock,
-    mock_redis: AsyncMock,
+    engine: AsyncEngine,
+    redis_client: Redis,  # type: ignore[type-arg]
 ) -> AsyncIterator[AsyncClient]:
     """AsyncClient with error-raising test routes added."""
     app = create_app()
     app.include_router(_test_router)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    async def override_db_session() -> AsyncIterator[AsyncMock]:
-        yield mock_db_session
+    async def override_db_session() -> AsyncIterator[AsyncSession]:
+        async with factory() as session:
+            yield session
 
-    async def override_redis() -> AsyncMock:
-        return mock_redis
+    def override_redis() -> Redis:  # type: ignore[type-arg]
+        return redis_client
 
     app.dependency_overrides[get_db_session] = override_db_session
     app.dependency_overrides[get_redis] = override_redis
