@@ -115,6 +115,8 @@ retrieved_session.state['key'] = value  # Bypasses event tracking
 
 **Always use:** `output_key`, `EventActions.state_delta`, or context object modifications.
 
+> **AutoBuilder note (Phase 1 verified):** This warning also applies to `ctx.session.state["key"] = value` inside `BaseAgent._run_async_impl()`. Although `ctx` is a "managed context", direct dict writes on the session state are NOT processed by the session service. Only `state_delta` on yielded `Event` objects persists. See `adk/ERRATA.md` #1.
+
 ## Best Practices
 
 - Store only essential, dynamic data

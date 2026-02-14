@@ -122,6 +122,15 @@ Topic-to-file mappings and keyword index.
 | Planners | `python-adk/google-adk-planners.md` |
 | Auth utilities | `python-adk/google-adk-auth.md` |
 
+### Errata & Gotchas
+
+| Topic | File(s) |
+|-------|---------|
+| ADK quirks (empirically verified) | `adk/ERRATA.md` |
+| State writes don't persist (CRITICAL) | `adk/ERRATA.md` #1 |
+| InMemoryRunner auto_create_session | `adk/ERRATA.md` #2 |
+| pyright strict workarounds | `adk/ERRATA.md` #3-6 |
+
 ---
 
 ## "How do I..."
@@ -161,6 +170,7 @@ Topic-to-file mappings and keyword index.
 | App | `adk/components/apps.md`, `python-adk/google-adk-apps.md` |
 | Artifacts | `adk/components/artifacts.md`, `python-adk/google-adk-artifacts.md` |
 | Async | `adk/runtime/event-loop.md` |
+| auto_create_session | `adk/ERRATA.md` #2, `python-adk/google-adk-runners.md` |
 | BaseAgent | `python-adk/google-adk-agents.md` |
 | BaseLlm | `python-adk/google-adk-models.md` |
 | before_model_callback | `adk/components/callbacks-types.md`, `python-adk/google-adk-agents-LlmAgent.md` |
@@ -203,5 +213,7 @@ Topic-to-file mappings and keyword index.
 | State | `adk/components/sessions-state.md` |
 | State scopes | `adk/components/sessions-state.md` |
 | Streaming | `adk/components/bidi-streaming-part1.md` through `part5.md` |
+| state_delta | `adk/components/sessions-state.md`, `adk/ERRATA.md` #1 |
 | sub_agents | `adk/agents/sequential-agents.md`, `adk/agents/parallel-agents.md` |
 | transfer_to_agent | `adk/agents/multi-agents.md`, `python-adk/tools/transfer_to_agent_tool.md` |
+| ERRATA | `adk/ERRATA.md` |

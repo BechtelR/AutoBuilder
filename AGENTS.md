@@ -118,9 +118,12 @@ uv run pyright                        # Identify type errors
 | `AUTOBUILDER_DB_URL` | `postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder` | Database connection |
 | `AUTOBUILDER_REDIS_URL` | `redis://localhost:6379` | Redis connection |
 | `AUTOBUILDER_LOG_LEVEL` | `INFO` | Log verbosity |
-| `ANTHROPIC_API_KEY` | -- | Claude models |
-| `OPENAI_API_KEY` | -- | OpenAI models |
-| `GOOGLE_API_KEY` | -- | Gemini models |
+| `AUTOBUILDER_DEFAULT_*_MODEL` | See `.env` | LLM routing: `CODE`, `PLAN`, `REVIEW`, `FAST` |
+| `ANTHROPIC_API_KEY` | -- | Claude models (primary) |
+| `OPENAI_API_KEY` | -- | OpenAI models (fallback) |
+| `GOOGLE_API_KEY` | -- | Gemini models (fallback) |
+
+See [.dev/11-PROVIDERS.md](./.dev/11-PROVIDERS.md) for full model reference (strings, pricing, fallback chains).
 
 ## Related Documentation
 - **[README.md](./README.md)**: Setup and introduction

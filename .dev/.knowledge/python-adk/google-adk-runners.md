@@ -332,3 +332,7 @@ Eithersessionor bothuser_idandsession_idmust be provided.
 
 **session_service*:*[*BaseSessionService*¶**
 The session service for the runner.
+
+## AutoBuilder Errata
+
+**`InMemoryRunner` does not expose `auto_create_session`:** The constructor doesn't pass this parameter to the parent `Runner`. Default is `False`, causing `ValueError: Session not found` when passing `session_id` to `run_async()`. Workaround: set `runner.auto_create_session = True` after construction. See `adk/ERRATA.md` #2.

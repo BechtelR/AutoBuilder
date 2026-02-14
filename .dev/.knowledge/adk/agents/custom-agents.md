@@ -44,3 +44,9 @@ This demonstrates the power of custom agents: conditional regeneration based on 
 ## Language Support
 
 Custom agents are supported across: Python (v0.1.0+), TypeScript (v0.2.0+), Go (v0.1.0+), and Java (v0.1.0+).
+
+## AutoBuilder Errata
+
+**State writes MUST use `state_delta`:** Direct `ctx.session.state["key"] = value` writes inside `_run_async_impl` do NOT persist to the session service. Always use `Event(actions=EventActions(state_delta={...}))`. See `adk/ERRATA.md` #1.
+
+**`_run_async_impl` override:** Requires `# type: ignore[override]` for pyright strict compliance. See `adk/ERRATA.md` #4.

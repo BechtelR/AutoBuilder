@@ -91,8 +91,8 @@ See [.dev/03-STRUCTURE.md](./.dev/03-STRUCTURE.md) for the full project scaffold
 ### Environment Variables
 ```bash
 AUTOBUILDER_DB_URL=postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder  # Database
-AUTOBUILDER_REDIS_URL=redis://localhost:6379                # Redis
-AUTOBUILDER_LOG_LEVEL=INFO                                  # Log level
+AUTOBUILDER_REDIS_URL=redis://localhost:6379                         # Redis
+AUTOBUILDER_LOG_LEVEL=INFO                                           # Log level
 ANTHROPIC_API_KEY=                                          # Claude models
 OPENAI_API_KEY=                                             # OpenAI models
 GOOGLE_API_KEY=                                             # Gemini models

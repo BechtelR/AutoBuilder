@@ -3,9 +3,9 @@
 
 ## Overview
 
-Four focused prototypes validate that Google ADK can serve as AutoBuilder's orchestration engine with Claude models via LiteLLM. This is a go/no-go gate: if P1 (Claude reliability) or P4 (CustomAgent outer loop) fail, re-evaluate Pydantic AI. Each prototype tests a specific architectural assumption before committing to ADK for the full system.
+Five focused prototypes validate that Google ADK can serve as AutoBuilder's orchestration engine. P1–P4 validate core ADK patterns with Claude via LiteLLM. P5 validates that alternate providers (OpenAI, Gemini) work through the same LiteLLM+ADK pipeline — critical since these are production fallback providers. If P1 or P4 fail, re-evaluate Pydantic AI. If P5 fails for a provider, that provider cannot serve as a fallback.
 
-Prototypes are structured as pytest integration tests in `tests/phase1/`. They use `InMemoryRunner` (no infrastructure dependencies — no Redis, PostgreSQL, or Docker required). Tests require `ANTHROPIC_API_KEY` and auto-skip when it's not set.
+Prototypes are structured as pytest integration tests in `tests/phase1/`. They use `InMemoryRunner` (no infrastructure dependencies — no Redis, PostgreSQL, or Docker required). Tests auto-skip per provider when the corresponding API key is not set (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`).
 
 **ADK version**: 1.25.0 (installed, all import paths verified)
 
@@ -36,7 +36,9 @@ Prototypes are structured as pytest integration tests in `tests/phase1/`. They u
 | 6 | P4 test features | Synthetic text-generation tasks | Validates orchestration without real code generation |
 | 7 | Event collection | List accumulation from `run_async()` | Collect all events into list for assertions |
 | 8 | BaseAgent subclasses | Pydantic v2 model fields | ADK BaseAgent is a Pydantic model — custom attrs must be model fields, not `__init__` params |
-| 9 | State writes in CustomAgent | Direct `ctx.session.state[key] = value` | Simpler for prototypes; production will use Event state_delta for auditability |
+| 9 | State writes in CustomAgent | `Event(actions=EventActions(state_delta={...}))` | **REVISED**: Direct `ctx.session.state` writes do NOT persist. All CustomAgent state writes must use `state_delta`. Discovered during live testing. |
+| 10 | Alternate provider testing | Cheapest models per provider, per-provider skip markers | Validates LiteLLM translation layer works for tool calling + response parsing across all 3 providers. Uses cheapest tier to minimize cost. |
+| 11 | Gemini via LiteLlm (not native) | `LiteLlm(model="gemini/...")` | AutoBuilder routes everything through LiteLLM for consistency. Must validate Gemini through LiteLlm wrapper, not native ADK Gemini support. |
 
 ## Deliverables
 
@@ -49,7 +51,7 @@ Prototypes are structured as pytest integration tests in `tests/phase1/`. They u
 
 **Acceptance criteria:**
 - [x] `pytest tests/phase1/ --co` discovers test modules without error
-- [x] `requires_api_key` skip logic auto-skips tests when `ANTHROPIC_API_KEY` is not set
+- [x] Per-provider skip markers auto-skip tests when the corresponding API key is not set (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`)
 - [x] Fixture provides `InMemoryRunner` factory accepting a root agent, returning runner instance
 - [x] Fixture provides temporary directory for file tool tests (auto-cleaned via `tmp_path`)
 - [x] `collect_events` async helper runs `runner.run_async()` and returns `(list[Event], Session)`
@@ -262,6 +264,48 @@ class BatchOrchestrator(BaseAgent):
 
 ---
 
+### P1.D7: Prototype 5 — Alternate Provider Validation (OpenAI + Gemini)
+
+**Files:** `tests/phase1/test_p5_alternate_providers.py`, `tests/phase1/conftest.py` (update)
+**Depends on:** P1.D1, P1.D2
+
+**Description:** Validate that OpenAI and Gemini models work through the same LiteLLM+ADK pipeline used for Claude. This is critical because these providers serve as production fallbacks (see `11-PROVIDERS.md`). Each provider's function calling format is different — LiteLLM must translate correctly for ADK's FunctionTool mechanism to work. Tests use the cheapest model per provider to minimize cost.
+
+Each provider is tested independently with its own skip marker. A missing API key skips that provider's tests without failing the suite.
+
+**conftest.py updates:**
+```python
+requires_openai_key = pytest.mark.skipif(
+    "OPENAI_API_KEY" not in os.environ,
+    reason="OPENAI_API_KEY not set — skipping OpenAI integration test",
+)
+requires_google_key = pytest.mark.skipif(
+    "GOOGLE_API_KEY" not in os.environ,
+    reason="GOOGLE_API_KEY not set — skipping Gemini integration test",
+)
+```
+
+**Models under test** (cheapest per provider — see `11-PROVIDERS.md`):
+- OpenAI: `LiteLlm(model="openai/gpt-5-nano")` — $0.05/$0.40 per 1M tokens
+- Gemini: `LiteLlm(model="gemini/gemini-2.5-flash-lite")` — $0.10/$0.40 per 1M tokens
+
+**Per-provider test cases:**
+1. **Basic response** — `LlmAgent` produces non-empty text answer to a simple question
+2. **Tool calling** — Agent successfully calls a `FunctionTool` (`file_write` + `file_read`) and uses the result in its response. This is the critical validation — each provider formats function calls differently, and LiteLLM must translate them correctly for ADK.
+3. **Token usage** — `event.usage_metadata` reports non-zero token counts (soft assertion — log warning if absent, don't fail)
+
+**Acceptance criteria:**
+- [x] OpenAI: `LlmAgent` with `LiteLlm(model="openai/gpt-5-nano")` produces a non-empty text response
+- [x] OpenAI: Agent successfully calls `FunctionTool` and receives tool result
+- [x] Gemini: `LlmAgent` with `LiteLlm(model="gemini/gemini-2.5-flash-lite")` produces a non-empty text response
+- [x] Gemini: Agent successfully calls `FunctionTool` and receives tool result
+- [x] Each provider's tests skip cleanly when its API key is absent
+- [x] Token usage logged per provider (warning if absent, not failure)
+
+**Validation:** `uv run pytest tests/phase1/test_p5_alternate_providers.py -v`
+
+---
+
 ## Build Order
 
 ```
@@ -269,16 +313,18 @@ Batch 1:              P1.D1                    # Test infrastructure (no deps)
 Batch 2:              P1.D2                    # Basic agent (foundational)
 Batch 3 (parallel):   P1.D3, P1.D4            # Mixed agents + Parallel (independent, both need D2)
 Batch 4:              P1.D5                    # Outer loop (needs D2+D3+D4 patterns)
-Batch 5:              P1.D6                    # Document results (after all prototypes)
+Batch 5:              P1.D7                    # Alternate providers (needs D1+D2 patterns)
+Batch 6:              P1.D6                    # Document results (after all prototypes, update with P5 results)
 ```
 
 ## Completion Contract Traceability
 
 | # | Roadmap Completion Contract Item | Covered By | Validation |
 |---|----------------------------------|------------|------------|
-| 1 | All 4 prototypes pass their criteria | P1.D2, P1.D3, P1.D4, P1.D5 | `uv run pytest tests/phase1/ -v` — all pass |
+| 1 | All 5 prototypes pass their criteria | P1.D2, P1.D3, P1.D4, P1.D5, P1.D7 | `uv run pytest tests/phase1/ -v` — all pass |
 | 2 | Go/no-go decision documented in `.dev/.discussion/` | P1.D6 | File exists at `.dev/.discussion/phase1-decision.md` with completed decision table |
 | 3 | Any ADK quirks or workarounds documented | P1.D6 | Quirks section present and populated in decision doc |
+| 4 | Alternate providers validated as fallback-ready | P1.D7 | OpenAI + Gemini tests pass (basic response + tool calling) |
 
 ## Research Notes
 
@@ -368,6 +414,5 @@ if event.usage_metadata:
 | `temp:` | Current invocation only | Never |
 
 ### Model Strings
-- Sonnet: `"anthropic/claude-sonnet-4-5-20250929"`
-- Haiku: `"anthropic/claude-haiku-4-5-20251001"`
-- Opus: `"anthropic/claude-opus-4-6"`
+
+See [.dev/11-PROVIDERS.md](../../11-PROVIDERS.md) for full model reference (all providers, pricing, context windows, fallback chains).

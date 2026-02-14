@@ -319,11 +319,9 @@ routing_rules:
     model: "anthropic/claude-haiku-4-5-20251001"
   - task_type: summarization
     model: "anthropic/claude-haiku-4-5-20251001"
-
-fallback_chains:
-  anthropic/claude-opus-4-6: ["anthropic/claude-sonnet-4-5-20250929"]
-  anthropic/claude-sonnet-4-5-20250929: ["anthropic/claude-haiku-4-5-20251001"]
 ```
+
+For full model reference (all providers, pricing, fallback chains): see [11-PROVIDERS.md](./11-PROVIDERS.md).
 
 ### Implementation
 
@@ -434,6 +432,8 @@ yield Event(
 ```
 
 State values must be serializable (strings, numbers, booleans, simple lists/dicts). No complex objects.
+
+> **VERIFIED (Phase 1):** Direct `ctx.session.state["key"] = value` writes inside `_run_async_impl` do NOT persist. This is mandatory, not a style preference — the session service only processes state changes delivered via `state_delta`. See `.knowledge/adk/ERRATA.md` #1.
 
 ### Communication Flow Through the Pipeline
 

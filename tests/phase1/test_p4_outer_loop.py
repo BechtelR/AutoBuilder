@@ -83,7 +83,11 @@ class BatchOrchestrator(BaseAgent):
 
             batch_num += 1
             batch_names = sorted([f.name for f in ready])
-            ctx.session.state[f"batch_{batch_num}_features"] = batch_names
+
+            yield Event(
+                author=self.name,
+                actions=EventActions(state_delta={f"batch_{batch_num}_features": batch_names}),
+            )
 
             sub_agents: list[BaseAgent] = [create_feature_agent(f) for f in ready]
             parallel = ParallelAgent(
@@ -99,13 +103,15 @@ class BatchOrchestrator(BaseAgent):
                 if ctx.session.state.get(output_key):
                     completed.add(f.name)
 
-        ctx.session.state["all_completed"] = len(completed) == len(self.features)
-        ctx.session.state["completed_features"] = sorted(completed)
-        ctx.session.state["total_batches"] = batch_num
-
         yield Event(
             author=self.name,
-            actions=EventActions(state_delta={}),
+            actions=EventActions(
+                state_delta={
+                    "all_completed": len(completed) == len(self.features),
+                    "completed_features": sorted(completed),
+                    "total_batches": batch_num,
+                }
+            ),
         )
 
 

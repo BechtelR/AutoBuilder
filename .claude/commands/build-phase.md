@@ -48,7 +48,7 @@ MUST DELEGATE work to parallel subagents to preserve context window:
 </delegation>
 
 <process>
-Steps 1-5 sequential. Announce each step.
+Steps 1-5 sequential. Announce each step. Use `TaskCreate` to create one task per step + one per batch in Step 2, chained with `blockedBy`. Mark each `in_progress` when starting, `completed` when done. This is the primary enforcement mechanism — do NOT skip tasks.
 
 STEP 1 — PLAN
 
@@ -72,8 +72,8 @@ D. **Surface the plan:**
 **Completion Contract** (from spec.md Traceability — ALL items, NONE omitted):
 - [ ] {Contract item} → verify: `{command}`
 
-**Without `--go`:** Enter Plan Mode. Present the plan for user approval before proceeding.
-**With `--go`:** Print the plan summary, then proceed directly to Step 2.
+**Without `--go` (default):** Stop and ask the user to approve the plan before proceeding.
+**With `--go`:** Do NOT enter plan mode. Print the plan summary, then proceed directly to Step 2. Do NOT stop for approval.
 
 STEP 2 — IMPLEMENT BY BATCH
 
@@ -102,6 +102,8 @@ ALL must pass before proceeding to review:
 2. `uv run ruff format --check .` — formatted
 3. `uv run pyright` — zero errors (strict)
 4. `uv run pytest` — all pass (or 0 collected, 0 errors)
+
+Fix and re-run until clean. Reviewers should see mechanically clean code.
 
 STEP 4 — REVIEW GATE
 
@@ -134,9 +136,7 @@ Split files evenly across reviewers. Each checks:
 
 **Unresolved Fix Loop:**
 1. Fix all unresolved HIGH and MEDIUM findings (disputed items → get user confirmation)
-2. Re-run quality gate (Step 3)
-3. HIGH severity items → re-launch one reviewer on affected files
-4. Repeat until clean or all remaining confirmed false positives
+2. Repeat until clean or all remaining confirmed false positives
 
 Do NOT proceed to Step 5 until resolved.
 
@@ -144,8 +144,8 @@ STEP 5 — COMPLETION PROTOCOL
 
 CRITICAL — Every checkbox requires EVIDENCE (command output or observable result). Never mark without proof.
 
-**A. Verify Success Criteria**
-Per item in Success Criteria: run verification command → read output → only mark `[x]` on proven success. Failures → fix and re-verify.
+**A. Verify Completion Contract**
+Per item in Completion Contract: run verification command → read output → only mark `[x]` on proven success. Failures → fix and re-verify.
 
 **B. Mark Spec Complete**
 Open `.dev/build-phase/phase-{N}/spec.md`. Per deliverable: run validation → check off (`[x]`) only passing requirements. Unverifiable → leave unchecked, report to user.
@@ -158,8 +158,9 @@ Open `.dev/01-ROADMAP.md`:
 4. Update top-level status to next phase
 
 **D. Final Quality Gate**
+Run directly (not via subagent):
 ```
-uv run ruff check . && uv run pyright && uv run pytest
+uv run ruff check . && uv run ruff format --check . && uv run pyright
 ```
 Fix and re-run until clean.
 

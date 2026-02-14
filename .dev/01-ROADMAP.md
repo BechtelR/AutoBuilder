@@ -64,7 +64,7 @@ AutoBuilder is delivered in phased increments. Each phase produces testable, ind
 
 ## Phase 1: ADK Prototype Validation `M`
 
-**Goal**: Validate four critical ADK assumptions before full commitment. Go/no-go gate.
+**Goal**: Validate critical ADK assumptions before full commitment. Go/no-go gate.
 
 **Status**: DONE
 
@@ -72,7 +72,7 @@ AutoBuilder is delivered in phased increments. Each phase produces testable, ind
 
 ### Overview
 
-Four focused prototypes validate that Google ADK can serve as AutoBuilder's orchestration engine with Claude models via LiteLLM. If all four pass, commit to ADK. If P1 (Claude reliability) or P4 (CustomAgent outer loop) fail, re-evaluate Pydantic AI.
+Five focused prototypes validate that Google ADK can serve as AutoBuilder's orchestration engine. P1–P4 validate core patterns with Claude via LiteLLM. P5 validates alternate providers (OpenAI, Gemini) as production fallbacks.
 
 ### Deliverables
 
@@ -102,10 +102,17 @@ Four focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [x] **Validates**: Dynamic workflow construction, execution order respects dependencies, failure handling
 - [x] **Pass criteria**: Features execute in dependency order; failed features don't block independent ones; loop terminates
 
+#### P5: Alternate Provider Validation (OpenAI + Gemini)
+- [x] OpenAI basic response + tool calling via `LiteLlm(model="openai/gpt-5-nano")`
+- [x] Gemini basic response + tool calling via `LiteLlm(model="gemini/gemini-2.5-flash-lite")`
+- [x] **Validates**: LiteLLM translation layer works for function calling across all 3 providers
+- [x] **Pass criteria**: Each provider responds reliably and calls FunctionTools correctly through ADK
+
 ### Completion Contract
 
-- [x] All 4 prototypes pass their criteria
-- [x] Go/no-go decision documented in `.dev/.discussion/`
+- [x] P1–P4 prototypes pass their criteria
+- [x] P5 alternate providers validated as fallback-ready
+- [x] Go/no-go decision updated with P5 results
 - [x] Any ADK quirks or workarounds documented
 
 ### Decision Gate
@@ -116,6 +123,8 @@ Four focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 | P2: Mixed Agents | PASS | Proceed with SequentialAgent + CustomAgent pattern |
 | P3: Parallel Execution | PASS | Proceed with ParallelAgent for concurrent execution |
 | P4: Dynamic Outer Loop | PASS | Proceed with CustomAgent orchestrator pattern |
+| P5: OpenAI via LiteLLM | PASS | Proceed — OpenAI validated as fallback provider |
+| P5: Gemini via LiteLLM | PASS | Proceed — Gemini validated as fallback provider |
 
 ---
 

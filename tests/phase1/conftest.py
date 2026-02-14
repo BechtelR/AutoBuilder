@@ -28,13 +28,25 @@ requires_api_key = pytest.mark.skipif(
     reason="ANTHROPIC_API_KEY not set — skipping integration test",
 )
 
+requires_openai_key = pytest.mark.skipif(
+    "OPENAI_API_KEY" not in os.environ,
+    reason="OPENAI_API_KEY not set — skipping OpenAI integration test",
+)
+
+requires_google_key = pytest.mark.skipif(
+    "GOOGLE_API_KEY" not in os.environ,
+    reason="GOOGLE_API_KEY not set — skipping Gemini integration test",
+)
+
 
 @pytest.fixture()
 def runner_factory() -> Callable[[BaseAgent], InMemoryRunner]:
     """Factory that accepts a root agent and returns an InMemoryRunner."""
 
     def _create(agent: BaseAgent) -> InMemoryRunner:
-        return InMemoryRunner(agent=agent, app_name="phase1_test")
+        runner = InMemoryRunner(agent=agent, app_name="phase1_test")
+        runner.auto_create_session = True
+        return runner
 
     return _create
 

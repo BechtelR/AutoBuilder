@@ -103,7 +103,7 @@ Pydantic v2 fields always exist on the class. `hasattr()` is always `True` — u
 - ❌ `if hasattr(model, "field") and model.field:`
 - ✅ `if model.field is not None:`
 
-## ADK CustomAgent: Empty `state_delta` on Events
-CustomAgent subclasses that mutate `ctx.session.state` directly then yield `Event(actions=EventActions(state_delta={}))` produce invisible state changes — event consumers can't see what changed without polling session state. Production agents (Phase 5+) MUST populate `state_delta` with changed keys so event stream is self-describing for replay/audit.
-- ❌ `ctx.session.state["key"] = val; yield Event(actions=EventActions(state_delta={}))`
-- ✅ `delta = {"key": val}; ctx.session.state.update(delta); yield Event(actions=EventActions(state_delta=delta))`
+## ADK CustomAgent: State Writes (CRITICAL)
+Direct `ctx.session.state["key"] = val` does NOT persist. Only `state_delta` on yielded Events persists. Reads work normally.
+- ❌ `ctx.session.state["key"] = val`
+- ✅ `yield Event(author=self.name, actions=EventActions(state_delta={"key": val}))`

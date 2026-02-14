@@ -21,6 +21,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | 08 | `08-STATE_MEMORY.md` | State & memory architecture | ADK 4-scope state, session rewind, cross-session memory |
 | 09 | `09-TOOLS.md` | Tools & deterministic agents | FunctionTool vs CustomAgent, MCP guidance, tool isolation |
 | 10 | `10-DEV_SETUP.md` | Development environment setup | Prerequisites, env vars, local dev workflow |
+| 11 | `11-PROVIDERS.md` | External providers | LLM models, pricing, fallback chains, search providers |
 
 ---
 
@@ -49,6 +50,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | How does state persist? | `08-STATE_MEMORY.md` |
 | What tools are available? | `09-TOOLS.md` |
 | How do I set up local dev? | `10-DEV_SETUP.md` |
+| What external providers do we use? | `11-PROVIDERS.md` |
 | Why was decision X made? | `.discussion/design-changelog.md` |
 | How does ADK feature X work? | `.knowledge/SEARCH_GUIDE.md` |
 | What are the coding standards? | `.standards.md`, `CLAUDE.md` (project root) |

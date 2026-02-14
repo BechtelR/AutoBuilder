@@ -267,6 +267,8 @@ yield Event(
         "lint_status": "passed",
     })
 )
+
+> **VERIFIED (Phase 1):** Direct `ctx.session.state["key"] = value` writes inside `_run_async_impl` do NOT persist to the session service. Only `state_delta` on yielded Events persists state. Direct reads from `ctx.session.state` still work within the same execution because ADK applies incoming `state_delta` from sub-agent events. See `.knowledge/adk/ERRATA.md` #1.
 ```
 
 ### 8.2 Memory Ingestion Is Explicit

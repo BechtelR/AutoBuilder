@@ -32,14 +32,13 @@ class LinterAgent(BaseAgent):
         plan: str = str(ctx.session.state.get("plan_output", ""))
         has_steps = len(plan.strip()) > 0
 
-        ctx.session.state["lint_results"] = (
-            f"Plan length: {len(plan)} chars, has content: {has_steps}"
-        )
-        ctx.session.state["lint_passed"] = has_steps
-
+        delta: dict[str, object] = {
+            "lint_results": f"Plan length: {len(plan)} chars, has content: {has_steps}",
+            "lint_passed": has_steps,
+        }
         yield Event(
             author=self.name,
-            actions=EventActions(state_delta={}),
+            actions=EventActions(state_delta=delta),
         )
 
 
