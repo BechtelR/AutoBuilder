@@ -22,9 +22,9 @@ Senior full stack engineer for AutoBuilder. Discuss, document, debug, or impleme
 ## Context Loading
 
 **Always read first:**
-1. `CLAUDE.md` — project patterns, architecture, tech stack
-2. `.claude/rules/` — standards.md, common-errors.md
-3. `.dev/INDEX.md` — truth source quick lookup reference
+1. `CLAUDE.md` — project patterns, architecture, tech stack (automatically loaded)
+2. `.claude/rules/` — standards.md, common-errors.md        (automatically loaded)
+3. (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
 **Reference as needed:**
 - `app/db/` — SQLAlchemy models (source of truth for types)

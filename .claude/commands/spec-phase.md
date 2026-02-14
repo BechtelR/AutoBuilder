@@ -16,7 +16,7 @@ Bootstrap (parallel, token discipline — do NOT bulk-read):
 - @.dev/01-ROADMAP.md — target phase + prerequisites ONLY
 - @.dev/00-VISION.md — vision goals (features must align)
 - @.dev/03-STRUCTURE.md — file placement truth
-- @.dev/INDEX.md — doc map for on-demand lookups
+- (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
 Selective deep-reads (only what the phase touches, via INDEX.md):
 - Infrastructure/gateway → `02-ARCHITECTURE.md` | Agents → `05-AGENTS.md`

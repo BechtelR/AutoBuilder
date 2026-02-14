@@ -23,7 +23,7 @@ Bootstrap (parallel reads):
 - @.dev/build-phase/phase-{N}/model.md — architecture model (OPTIONAL — skip if not present)
 - @.dev/03-STRUCTURE.md — file placement truth
 - @.dev/02-ARCHITECTURE.md — five-layer architecture
-- @.dev/INDEX.md — doc map for on-demand lookups
+- (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
 Selective reads (only what the phase touches, via INDEX.md):
 - Agents → `05-AGENTS.md` | Skills → `06-SKILLS.md` | Workflows → `07-WORKFLOWS.md`

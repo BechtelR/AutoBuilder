@@ -118,11 +118,6 @@ AutoBuilder/
 │   ├── reset-db.sh                 # Drop and recreate database
 │   └── ...
 │
-├── docker/                         # Container configuration
-│   ├── docker-compose.yml          # All services (infra + app)
-│   ├── Dockerfile                  # Production image (Phase 2)
-│   └── Dockerfile.dev              # Development image (Phase 2)
-│
 ├── docs/                           # User-facing documentation (future)
 │
 ├── .dev/                           # Architecture docs and planning (not shipped)
@@ -145,6 +140,8 @@ AutoBuilder/
 ├── AGENTS.md                       # AI agent guidance (concise)
 ├── CLAUDE.md                       # Symlink -> AGENTS.md
 ├── README.md                       # Project overview and quick start
+├── Dockerfile                      # Production image (deployment + CI)
+├── docker-compose.yml              # Infrastructure services (postgres + redis)
 ├── pyproject.toml                  # Project config (uv, ruff, pyright)
 └── alembic.ini                     # Alembic configuration
 ```
@@ -184,11 +181,10 @@ AutoBuilder/
 | `dashboard/src/generated/` | hey-api output (TS client + TanStack Query hooks) |
 | `tests/` | Test suite mirroring `app/` structure |
 | `scripts/` | Dev and deployment scripts (seed, reset, etc.) |
-| `docker/` | Docker Compose (PostgreSQL + Redis in Phase 0; app containers added in Phase 2) |
 | `docs/` | User-facing documentation (future) |
 | `.dev/` | Internal architecture docs and planning — not shipped |
 
 ---
 
-*Document Version: 1.1*
-*Last Updated: 2026-02-11*
+*Document Version: 1.2*
+*Last Updated: 2026-02-14*

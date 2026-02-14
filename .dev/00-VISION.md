@@ -6,7 +6,7 @@ AutoBuilder is an autonomous agentic workflow system built on Google ADK that or
 
 The system exposes an API-first gateway (FastAPI) that owns the external contract. ADK runs behind an anti-corruption layer -- clients never see ADK internals. Workflow execution is out-of-process via ARQ workers backed by Redis. Interfaces (CLI and web dashboard) are pure API consumers over REST + SSE.
 
-Unlike chat-based assistants that require constant human steering, AutoBuilder is a standalone orchestrator that runs autonomously from spec to verified deliverable. It treats deterministic tools (validators, test runners, formatters) as first-class workflow participants alongside LLM agents, guaranteeing that quality gates execute at the right time regardless of LLM judgment.
+Unlike chat-based assistants that require constant human steering, AutoBuilder is a standalone orchestrator that runs autonomously from spec to verified deliverable. It treats deterministic tools (validators, test runners, formatters, etc.) as first-class workflow participants alongside LLM agents, guaranteeing that deterministic steps execute at prescribed pipeline stages regardless of LLM judgment.
 
 ---
 

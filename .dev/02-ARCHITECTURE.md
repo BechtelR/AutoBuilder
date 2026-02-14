@@ -26,7 +26,7 @@ flowchart TB
     end
 
     subgraph GATEWAY["GATEWAY LAYER"]
-        FastAPI["FastAPI Gateway\n\nRoutes:\n- POST /workflows/{id}/run\n- GET /workflows/{id}/status\n- POST /workflows/{id}/intervene\n- GET /events/stream\n- GET /deliverables\n- POST /specs\n\nModels: Pydantic (auto-generates OpenAPI)\nAuth: TBD (Phase 2)"]
+        FastAPI["FastAPI Gateway\n\nRoutes:\n- POST /workflows/{id}/run\n- GET /workflows/{id}/status\n- POST /workflows/{id}/intervene\n- GET /events/stream\n- GET /deliverables\n- POST /specs\n\nModels: Pydantic (auto-generates OpenAPI)\nAuth: TBD (Phase 11)"]
         ARQ[("ARQ Queue\n(Redis)")]
         DB[("SQLAlchemy 2.0 async\n(via gateway only)")]
     end

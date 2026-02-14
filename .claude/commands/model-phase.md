@@ -18,7 +18,7 @@ Bootstrap (parallel reads):
 - @.dev/build-phase/phase-{N}/spec.md — full spec (deliverables, decisions, files)
 - @.dev/02-ARCHITECTURE.md — five-layer architecture (conformance target)
 - @.dev/03-STRUCTURE.md — file placement truth
-- @.dev/INDEX.md — doc map for on-demand lookups
+- (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
 Selective deep-reads (only what the phase touches, via INDEX.md):
 - Agents → `05-AGENTS.md` | Skills → `06-SKILLS.md` | Workflows → `07-WORKFLOWS.md`

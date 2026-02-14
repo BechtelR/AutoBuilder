@@ -164,8 +164,8 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] Request logging middleware
 
 #### Docker (App Containerization)
-- [ ] `docker/Dockerfile` — production image (gateway + worker in single image)
-- [ ] `docker/Dockerfile.dev` — development image (hot-reload, debug tools)
+- [ ] `Dockerfile` — production image (gateway + worker in single image)
+- [ ] `Dockerfile.dev` — development image (hot-reload, debug tools)
 - [ ] Update `docker-compose.yml` — add gateway + worker services alongside PostgreSQL + Redis
 - [ ] Worker containers volume-mount the target project directory for filesystem access (git worktrees, bash, file I/O)
 - [ ] CLI remains a local tool (`uv tool install`) — not containerized

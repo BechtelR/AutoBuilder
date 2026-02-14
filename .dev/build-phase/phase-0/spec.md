@@ -172,7 +172,7 @@ Batch 4 (sequential): P0.D10
 
 | Completion Contract Item | Covered By | Validation |
 |--------------------------|------------|------------|
-| `docker compose up -d` starts PostgreSQL and Redis | P0.D3 | `docker compose -f docker/docker-compose.yml up -d && docker compose -f docker/docker-compose.yml ps` |
+| `docker compose up -d` starts PostgreSQL and Redis | P0.D3 | `docker compose up -d && docker compose ps` |
 | `docker compose up -d && uv sync && ruff check && pyright && pytest` all pass | P0.D10 | Full quality gate command |
 | Directory structure matches `03-STRUCTURE.md` | P0.D5 | `import app; import app.models; import app.config; ...` |
 | Configuration loads from env vars with sensible defaults | P0.D6 | `from app.config import get_settings; s = get_settings()` |
