@@ -1,24 +1,24 @@
 # Phase 3 Spec: ADK Engine Integration
-*Generated: 2026-02-14*
+*Generated: 2026-02-14 | Updated: 2026-02-17*
 
 ## Overview
 
 Phase 3 wires Google ADK into the production infrastructure built in Phase 2. After this phase, the system can receive a workflow execution request through the gateway, enqueue it to an ARQ worker, execute an ADK agent pipeline with Claude via LiteLLM, persist session state to PostgreSQL via DatabaseSessionService, translate ADK events into gateway-native event objects, and publish them to Redis Streams. This is the critical integration layer between the API-first gateway and the ADK orchestration engine.
 
-This phase directly advances four core vision differentiators: **Multi-model orchestration** (#4) — the LLM Router selects models by task type and complexity, with cross-provider fallback chains. **API-first architecture** (#6) — the anti-corruption layer ensures ADK types never leak through the gateway API. **Out-of-process execution** (#7) — workflow pipelines run in ARQ workers, triggered by gateway job enqueueing. **Autonomous completion** (#1) — session state persistence enables workflows to maintain context across invocations, the foundation for the autonomous "run until done" loop.
+This phase directly advances four core vision differentiators: **Multi-model orchestration** (#5) — the LLM Router selects models by task type and complexity, with 3-step fallback chain resolution and runtime model override via `before_model_callback`. **API-first architecture** (#7) — the anti-corruption layer ensures ADK types never leak through the gateway API. **Out-of-process execution** (#8) — workflow pipelines run in ARQ workers, triggered by gateway job enqueueing. **Autonomous completion** (#1) — session state persistence with 4-scope state system enables workflows to maintain context across invocations, the foundation for the autonomous "run until done" loop.
 
 Key constraints: ADK types never appear in gateway API models or route handlers. All ADK interaction happens inside worker processes. The anti-corruption layer translates in both directions: gateway commands → ADK Runner calls (inbound), ADK Events → Redis Stream messages (outbound). Phase 3 uses a minimal test agent (`EchoAgent` — an `LlmAgent` with simple instructions) to validate the full stack; real agent definitions come in Phase 5.
 
 ## Features
 
-- **LLM Router** — Static routing mapping task type × complexity to LiteLLM model strings, with 3-step fallback chain resolution (user override → chain → default)
-- **ADK App container + Runner factory** — App class with EventsCompactionConfig and ResumabilityConfig; Runner creation with DatabaseSessionService for PostgreSQL-backed session persistence
-- **Anti-corruption layer (inbound)** — Gateway workflow commands translate to ADK Runner calls inside worker tasks
-- **Anti-corruption layer (outbound)** — ADK events translate to gateway-native PipelineEvent objects, published to per-workflow Redis Streams
-- **Worker pipeline bridge** — `run_workflow` ARQ task that creates/resumes ADK sessions, runs pipelines, publishes translated events, and updates workflow status in the database
+- **LLM Router** — Static routing mapping task type × complexity to LiteLLM model strings, with 3-step fallback chain resolution and `before_model_callback` for runtime model override
+- **ADK App container + Runner factory** — App class with EventsCompactionConfig, ResumabilityConfig, ContextCacheConfig, and LoggingPlugin; Runner creation with DatabaseSessionService for PostgreSQL-backed session persistence
+- **Anti-corruption layer** — Bidirectional translation: gateway commands → ADK Runner calls (inbound), ADK events → gateway PipelineEvent objects (outbound)
+- **Worker pipeline bridge** — `run_workflow` ARQ task with session creation/resumption, event streaming, and workflow status tracking
+- **4-scope state system** — `temp:`, session, `user:`, `app:` scopes operational via DatabaseSessionService with `app:` scope initialization
+- **Redis infrastructure** — Cache helpers and Stream publishing helpers for event distribution
 - **Gateway workflow endpoint** — `POST /workflows/run` enqueues workflow execution jobs via ArqRedis, returns 202 Accepted
-- **Event infrastructure** — PipelineEvent schema and Redis Stream publisher for event distribution
-- **Session state persistence** — ADK 4-scope state operational via DatabaseSessionService; state writes persist to PostgreSQL across invocations
+- **Context compression** — Sliding window summarization via EventsCompactionConfig + LlmEventSummarizer
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ Shared resources (DatabaseSessionService, LlmRouter) are created during worker `
 app = create_app_container(root_agent=echo_agent)
 runner = Runner(app=app, session_service=ctx["session_service"])
 
-# App provides: EventsCompactionConfig, ResumabilityConfig
+# App provides: EventsCompactionConfig, ResumabilityConfig, ContextCacheConfig, plugins
 # Runner provides: session management, event streaming
 ```
 
@@ -65,16 +65,22 @@ The session service is initialized during worker `on_startup` and stored in `ctx
 ### DD-4: Session Identity — Workflow ID as Session ID
 Each workflow execution maps 1:1 to an ADK session: `app_name="autobuilder"`, `user_id="system"`, `session_id=str(workflow.id)`. No additional columns on the `workflows` table. Re-running a workflow resumes the existing session, enabling state continuity. This directly supports the completion contract requirement "session state persists across worker invocations."
 
-### DD-5: LLM Router — Configuration via Settings
+### DD-5: LLM Router — Configuration via Settings + Runtime Override
 The router loads defaults from `app/config/settings.py` via `AUTOBUILDER_DEFAULT_*_MODEL` env vars (code, plan, review, fast). Fallback chains are defined in code — they change rarely and benefit from type safety. The router is a stateless lookup with no I/O.
 
-Phase 3 implements static routing only. The `before_model_callback` integration pattern (runtime model override) is deferred to Phase 5 when real agents exist — EchoAgent uses a fixed model. Adaptive routing with cost/latency tracking deferred to Phase 11.
+Runtime model override: `create_model_override_callback(router)` returns a `before_model_callback` function that maps agent names to TaskTypes and overrides `llm_request.model` via the router. This callback is set on the EchoAgent in Phase 3; in Phase 5, it's registered as a plugin on the App for all agents. The callback reads the agent name from `callback_context.agent_name` and an optional user override from `callback_context.state.get("user:model_override")`.
 
 ```python
 router = LlmRouter.from_settings(get_settings())
 model = router.select_model(TaskType.CODE)  # → "anthropic/claude-sonnet-4-5-20250929"
 model = router.select_model(TaskType.PLAN, user_override="openai/gpt-5")  # → user override wins
+
+# before_model_callback wires the router into ADK
+callback = create_model_override_callback(router)
+agent = LlmAgent(..., before_model_callback=callback)
 ```
+
+Adaptive routing with cost/latency tracking deferred to Phase 11.
 
 ### DD-6: Gateway Event Schema
 Gateway events are ADK-agnostic Pydantic models. ADK event internals are mapped to a simplified `PipelineEventType` enum. The translator inspects ADK Event fields (author, content, actions) to determine the gateway event type:
@@ -101,18 +107,37 @@ class PipelineEvent(BaseModel):
 ```
 
 ### DD-7: Redis Stream Key Pattern
-Events are published to per-workflow streams: `workflow:{workflow_id}:events`. Stream entry IDs are auto-generated by Redis (timestamp-based), mapping naturally to SSE event IDs for replay support (Phase 10). One stream per workflow provides isolation and simplifies cleanup of completed workflows.
+Events are published to per-workflow streams: `workflow:{workflow_id}:events`. Stream entry IDs are auto-generated by Redis (timestamp-based), mapping naturally to SSE event IDs for replay support (Phase 10). One stream per workflow provides isolation and simplifies cleanup of completed workflows. The naming convention is enforced via the `stream_key()` helper function in the stream helpers module.
 
 ### DD-8: Gateway Job Enqueueing via ArqRedis
 The gateway lifespan creates an `ArqRedis` pool (via `arq.connections.create_pool()`) for job enqueueing. `ArqRedis` extends `redis.asyncio.Redis`, so it supports both job enqueueing and general Redis operations. Stored on `app.state.arq_pool`. A new dependency `get_arq_pool()` provides FastAPI injection.
 
 The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` since ArqRedis is a Redis superset — no need for two separate clients. The `get_redis()` dependency returns the ArqRedis instance (type-compatible with Redis). Health checks use the same pool.
 
+### DD-9: Redis Cache + Stream Helpers
+Two small utility modules (~100 LOC each) provide the foundation for Redis-based infrastructure:
+
+- **Cache helpers** (`app/lib/cache.py`): `cache_get`, `cache_set`, `cache_delete` with TTL support. Used by LLM Router (routing config cache), Skill Library (Phase 6), and Workflow Registry (Phase 7).
+- **Stream helpers** (`app/events/streams.py`): `stream_publish`, `stream_read_range` wrapping `XADD`/`XRANGE` with the naming convention `workflow:{id}:events`. Used by EventPublisher and future SSE consumers.
+
+These are thin wrappers — no abstraction beyond type safety and naming convention enforcement.
+
+### DD-10: LoggingPlugin
+A `BasePlugin` subclass that emits structured log entries for agent and tool lifecycle events. Logs `agent_started`, `agent_completed`, `tool_called`, `tool_result` via the existing `get_logger()` infrastructure. Minimal implementation: only `before_agent_callback`, `after_agent_callback`, `before_tool_callback`, `after_tool_callback` methods. Registered on the App container. ~50 LOC.
+
+### DD-11: Job Metadata Tracking
+The existing `Workflow` model (`app/db/models.py`) serves as the job metadata table for ARQ tracking. It already has `status`, `started_at`, `completed_at`, `params`. Phase 3 adds an `error_message: str | None` column via Alembic migration to persist the last error without requiring event stream reads. No separate job metadata table is needed — the Workflow table IS the AutoBuilder status table for ARQ job tracking.
+
+### DD-12: App Scope Initialization
+Worker startup initializes `app:`-scoped state keys as scaffolding for later phases. In Phase 3, this means writing placeholder values: `app:skill_index` (empty dict), `app:workflow_registry` (empty dict). These keys are written via `session_service` on first startup and skipped if already present (idempotent). This validates the `app:` scope persistence mechanism.
+
 ## Deliverables
 
 ### P3.D1: Configuration Extensions + Domain Enums
 **Files:** `app/config/settings.py` (update), `app/models/enums.py` (update), `app/models/__init__.py` (update)
 **Depends on:** —
+**BOM Components:**
+- [ ] `R02` — Routing rules (static config — settings fields for default models per task type)
 **Description:** Add LLM model default settings for each task type and new domain enums for LLM routing and event classification. Settings fields use `AUTOBUILDER_DEFAULT_*_MODEL` env vars with defaults pointing to Anthropic models per `06-PROVIDERS.md`.
 **Requirements:**
 - [ ] `Settings` has `default_code_model: str` defaulting to `"anthropic/claude-sonnet-4-5-20250929"`
@@ -128,10 +153,16 @@ The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` si
 
 ---
 
-### P3.D2: LLM Router — Static Routing + Fallback Chains
+### P3.D2: LLM Router + Model Override Callback
 **Files:** `app/router/router.py`, `app/router/__init__.py` (update)
 **Depends on:** P3.D1
-**Description:** `LlmRouter` class that maps `TaskType` to LiteLLM model strings using configuration from Settings. Implements 3-step fallback chain resolution: user override → fallback chain → default. Phase 3 fallback chains define Anthropic-tier degradation paths (opus → sonnet → haiku). Cross-provider fallbacks (Anthropic → OpenAI → Google per `06-PROVIDERS.md`) deferred to Phase 11 (adaptive routing). A `from_settings()` class method creates the router from application settings. The router is a stateless, synchronous lookup — no API calls, no I/O.
+**BOM Components:**
+- [ ] `R01` — `LlmRouter` module
+- [ ] `R03` — Fallback chain resolution (3-step)
+- [ ] `R04` — `before_model_callback` model override
+- [ ] `A44` — `before_model_callback` LLM Router override
+- [ ] `M22` — Routing config cache (long TTL)
+**Description:** `LlmRouter` class that maps `TaskType` to LiteLLM model strings using configuration from Settings. Implements 3-step fallback chain resolution: user override → fallback chain → default. Also provides `create_model_override_callback()` — a factory that returns a `before_model_callback` function for ADK agents, enabling runtime model selection via the router. Includes `to_dict()` / `cache_to_redis()` for caching the routing config in Redis with long TTL.
 **Requirements:**
 - [ ] `LlmRouter.select_model(task_type: TaskType, user_override: str | None = None) -> str` returns model string matching Settings defaults: `CODE`→`"anthropic/claude-sonnet-4-5-20250929"`, `PLAN`→`"anthropic/claude-opus-4-6"`, `REVIEW`→`"anthropic/claude-sonnet-4-5-20250929"`, `FAST`→`"anthropic/claude-haiku-4-5-20251001"`
 - [ ] When `user_override` is a non-None string, `select_model()` returns that string regardless of task_type
@@ -139,24 +170,57 @@ The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` si
 - [ ] Fallback chains: opus→`["anthropic/claude-sonnet-4-5-20250929", "anthropic/claude-haiku-4-5-20251001"]`, sonnet→`["anthropic/claude-haiku-4-5-20251001"]`, haiku→`[]` (empty, no fallback)
 - [ ] `LlmRouter.get_fallbacks(model: str) -> list[str]` returns the ordered fallback list for a model string; returns `[]` for unknown models
 - [ ] `LlmRouter.from_settings(settings: Settings) -> LlmRouter` creates router from settings defaults
-- [ ] All methods synchronous (pure lookup, no I/O)
-- [ ] Importable as `from app.router import LlmRouter`
+- [ ] `LlmRouter.to_dict() -> dict[str, object]` serializes routing table for caching
+- [ ] `LlmRouter.cache_to_redis(redis: Redis) -> None` (async) stores routing config in Redis with 1-hour TTL via `cache_set` from `app.lib.cache`
+- [ ] `create_model_override_callback(router: LlmRouter) -> Callable` returns a `before_model_callback`-compatible function that: reads `callback_context.agent_name`, maps agent name → `TaskType` via `AGENT_TASK_TYPES` dict, calls `router.select_model()` with optional `user:model_override` from state, sets `llm_request.model` to result, returns `None`
+- [ ] `AGENT_TASK_TYPES: dict[str, TaskType]` mapping at module level (initially: `echo_agent` → `FAST`)
+- [ ] All `select_model` / `get_fallbacks` / `from_settings` methods synchronous (pure lookup, no I/O)
+- [ ] Importable as `from app.router import LlmRouter, create_model_override_callback`
 **Validation:**
 - `uv run pyright app/router/`
 
 ---
 
-### P3.D3: Gateway Event Schema + Redis Stream Publisher
+### P3.D3: Redis Cache + Stream Helpers
+**Files:** `app/lib/cache.py`, `app/events/streams.py`, `app/events/__init__.py` (update), `app/lib/__init__.py` (update if needed)
+**Depends on:** —
+**BOM Components:**
+- [ ] `M25` — Redis cache helpers (~100 LOC)
+- [ ] `M26` — Redis Stream publishers (~100 LOC)
+- [ ] `V02` — Redis Stream naming convention
+**Description:** Two small utility modules providing Redis infrastructure foundations. Cache helpers: `cache_get`, `cache_set`, `cache_delete` with typed JSON serialization and TTL support. Stream helpers: `stream_publish`, `stream_read_range` wrapping XADD/XRANGE with enforced naming convention (`workflow:{id}:events`). Both modules use `redis.asyncio.Redis` as the client type. The stream naming convention is defined as a constant function `stream_key(workflow_id: str) -> str`.
+**Requirements:**
+- [ ] `cache_get(redis: Redis, key: str) -> str | None` retrieves a cached value; returns `None` on miss
+- [ ] `cache_set(redis: Redis, key: str, value: str, ttl: int = 3600) -> None` stores a value with TTL in seconds
+- [ ] `cache_delete(redis: Redis, key: str) -> None` removes a cached value
+- [ ] `stream_key(workflow_id: str) -> str` returns `f"workflow:{workflow_id}:events"` (naming convention)
+- [ ] `stream_publish(redis: Redis, workflow_id: str, data: str) -> str` calls `XADD` on the workflow stream, returns the stream entry ID
+- [ ] `stream_read_range(redis: Redis, workflow_id: str, start: str = "-", end: str = "+", count: int | None = None) -> list[tuple[str, dict[str, str]]]` calls `XRANGE` on the workflow stream
+- [ ] Both modules use `redis.asyncio.Redis` type (compatible with `ArqRedis`)
+- [ ] All functions async
+- [ ] `app/lib/cache.py` importable as `from app.lib.cache import cache_get, cache_set, cache_delete`
+- [ ] `app/events/streams.py` importable as `from app.events.streams import stream_key, stream_publish, stream_read_range`
+**Validation:**
+- `uv run pyright app/lib/cache.py app/events/streams.py`
+
+---
+
+### P3.D4: Gateway Event Schema + Event Translation
 **Files:** `app/gateway/models/events.py`, `app/events/publisher.py`, `app/events/__init__.py` (update), `app/gateway/models/__init__.py` (update)
-**Depends on:** P3.D1
-**Description:** `PipelineEvent` Pydantic model defining the gateway-native event payload — ADK-agnostic, suitable for SSE and webhook consumers. `EventPublisher` class that translates ADK Event objects into PipelineEvent instances and publishes them to per-workflow Redis Streams. The translator inspects ADK Event fields (`author`, `content`, `actions`, `error_code`) to determine the appropriate `PipelineEventType`. Stream key pattern: `workflow:{workflow_id}:events`.
+**Depends on:** P3.D1, P3.D3
+**BOM Components:**
+- [ ] `G21` — Anti-corruption translation layer (outbound: ADK events → gateway events)
+- [ ] `V01` — Per-workflow Redis Stream publishing
+- [ ] `W06` — `translate_event()`
+- [ ] `W07` — `publish_to_stream()`
+**Description:** `PipelineEvent` Pydantic model defining the gateway-native event payload — ADK-agnostic, suitable for SSE and webhook consumers. `EventPublisher` class that translates ADK Event objects into PipelineEvent instances and publishes them to per-workflow Redis Streams using stream helpers from D3. The translator inspects ADK Event fields (`author`, `content`, `actions`, `error_code`) to determine the appropriate `PipelineEventType`. Stream key pattern enforced via `stream_key()` from `app.events.streams`.
 **Requirements:**
 - [ ] `PipelineEvent` model has fields: `event_type: PipelineEventType`, `workflow_id: str`, `timestamp: datetime`, `agent_name: str | None`, `content: str | None`, `metadata: dict[str, object]`
 - [ ] `PipelineEvent` inherits from `app.models.base.BaseModel`
 - [ ] `EventPublisher.__init__(redis: Redis)` accepts a Redis client instance
 - [ ] `EventPublisher.translate(adk_event: object, workflow_id: str) -> PipelineEvent | None` converts ADK Event to gateway event, returns `None` for unclassified events (skipped) — `adk_event` typed as `object` at the module boundary (ADK types never in gateway model signatures)
 - [ ] Translation maps per DD-6: `error_code` present→`ERROR`, `function_call` in content→`TOOL_CALLED`, `function_response`→`TOOL_RESULT`, `state_delta` present→`STATE_UPDATED`, final response→`AGENT_COMPLETED`, first event for author→`AGENT_STARTED`, all others→`None` (skip)
-- [ ] `EventPublisher.publish(event: PipelineEvent) -> None` publishes to Redis Stream `workflow:{event.workflow_id}:events` via `XADD`
+- [ ] `EventPublisher.publish(event: PipelineEvent) -> None` publishes via `stream_publish()` from `app.events.streams`
 - [ ] `EventPublisher.publish_lifecycle(workflow_id: str, event_type: PipelineEventType) -> None` publishes synthetic lifecycle events (STARTED, COMPLETED, FAILED)
 - [ ] Published events are JSON-serialized with `model_dump_json()`
 - [ ] `app/events/publisher.py` has zero `google.adk` imports — translation uses `getattr()` / `hasattr()` only (ACL boundary)
@@ -165,47 +229,80 @@ The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` si
 
 ---
 
-### P3.D4: ADK Engine Setup — App Container + Session Service + Runner
+### P3.D5: ADK Engine — App Container + Session Service + Plugins
 **Files:** `app/workers/adk.py`
 **Depends on:** P3.D1, P3.D2
-**Description:** Factory functions for ADK infrastructure. `create_session_service()` initializes DatabaseSessionService with the PostgreSQL URL. `create_app_container()` builds an ADK App with EventsCompactionConfig and ResumabilityConfig. `create_runner()` wraps the App in a Runner with a session service for programmatic execution. Also defines the minimal `EchoAgent` — an LlmAgent used for Phase 3 validation that responds to prompts and writes to state via `output_key`.
+**BOM Components:**
+- [ ] `E01` — `App` container (`autobuilder`)
+- [ ] `E04` — `EventsCompactionConfig`
+- [ ] `E05` — `LlmEventSummarizer` (haiku model)
+- [ ] `E06` — `ResumabilityConfig`
+- [ ] `E07` — `context_cache_config`
+- [ ] `E09` — `LoggingPlugin`
+- [ ] `E12` — `DatabaseSessionService` integration
+- [ ] `D04` — `sessions` table (ADK auto-created)
+- [ ] `W04` — `create_adk_runner()` factory
+- [ ] `O04` — Context compression (sliding window summarization)
+**Description:** Factory functions for ADK infrastructure. `create_session_service()` initializes DatabaseSessionService with the PostgreSQL URL (triggers lazy table creation for D04). `create_app_container()` builds an ADK App with EventsCompactionConfig (using LlmEventSummarizer for context compression, O04), ResumabilityConfig, ContextCacheConfig, and LoggingPlugin. `create_runner()` wraps the App in a Runner. Also defines the minimal `EchoAgent` with `before_model_callback` wired to the LLM Router, and `LoggingPlugin` as a `BasePlugin` subclass.
 **Requirements:**
 - [ ] `create_session_service(db_url: str) -> DatabaseSessionService` creates a session service connected to PostgreSQL (ADK uses `create_async_engine` internally — `postgresql+asyncpg://` URLs from `Settings.db_url` work directly)
-- [ ] `create_app_container(root_agent: BaseAgent) -> App` creates App with `name="autobuilder"`, `EventsCompactionConfig(compaction_interval=5, overlap_size=1)` and `ResumabilityConfig(is_resumable=True)`
-- [ ] App container uses `LlmEventSummarizer` with haiku model for context compression
-- [ ] `create_runner(app: App, session_service: DatabaseSessionService) -> Runner` creates a Runner from the App
-- [ ] `create_echo_agent(model: str) -> LlmAgent` creates a test agent with `name="echo_agent"`, `output_key="agent_response"`, and a simple instruction string
+- [ ] `create_app_container(root_agent: BaseAgent, plugins: list[BasePlugin] | None = None) -> App` creates App with `name="autobuilder"`, `EventsCompactionConfig(compaction_interval=5, overlap_size=1, summarizer=LlmEventSummarizer(...))`, `ResumabilityConfig(is_resumable=True)`, and `ContextCacheConfig(min_tokens=1000, ttl_seconds=300, cache_intervals=5)`
+- [ ] `LlmEventSummarizer` initialized with `LiteLlm(model="anthropic/claude-haiku-4-5-20251001")`
+- [ ] Default `plugins` list includes `LoggingPlugin()` if no plugins argument provided
+- [ ] `create_runner(app: App, session_service: DatabaseSessionService) -> Runner` creates a Runner from the App with `auto_create_session=False` (sessions managed explicitly)
+- [ ] `create_echo_agent(model: str, before_model_callback: Callable | None = None) -> LlmAgent` creates a test agent with `name="echo_agent"`, `output_key="agent_response"`, simple instructions, and optional `before_model_callback`
 - [ ] Echo agent uses `LiteLlm(model=model)` for the LLM backend
-- [ ] `create_session_service` returns `DatabaseSessionService`, `create_app_container` returns `App`, `create_runner` returns `Runner`, `create_echo_agent` returns `LlmAgent` — all with explicit return type annotations
-- [ ] Module imports only from `google.adk.*`, `app.config`, `app.router`, and stdlib — never from `app.gateway` (ACL boundary)
+- [ ] `LoggingPlugin` extends `BasePlugin` with `before_agent_callback` (logs agent start) and `after_agent_callback` (logs agent completion) using `get_logger("engine.plugins")`
+- [ ] All factory functions have explicit return type annotations
+- [ ] Module imports only from `google.adk.*`, `app.config`, `app.router`, `app.lib`, and stdlib — never from `app.gateway` (ACL boundary)
 **Validation:**
 - `uv run pyright app/workers/adk.py`
 
 ---
 
-### P3.D5: Worker Pipeline Bridge — run_workflow Task
+### P3.D6: Worker Pipeline Bridge — run_workflow + Lifecycle
 **Files:** `app/workers/tasks.py` (update), `app/workers/settings.py` (update), `app/workers/__init__.py` (update)
-**Depends on:** P3.D3, P3.D4
-**Description:** ARQ task function `run_workflow` that orchestrates the full execution cycle. On invocation: reads the workflow record from the database, updates status to RUNNING, creates or resumes an ADK session (using `workflow.id` as `session_id`), instantiates an App container + Runner with the EchoAgent, iterates the ADK event stream translating and publishing each event to Redis Streams, and updates the workflow status to COMPLETED or FAILED on conclusion. Worker startup (`on_startup`) initializes shared resources (DatabaseSessionService, LlmRouter) stored in the worker context.
+**Depends on:** P3.D3, P3.D4, P3.D5
+**BOM Components:**
+- [ ] `W03` — `run_workflow()` ARQ job function
+- [ ] `W05` — `create_or_resume_session()`
+- [ ] `W08` — `update_workflow_state()`
+- [ ] `D11` — Job metadata table (ARQ tracking — via existing Workflow model)
+- [ ] `E13` — 4-scope state system (operational via DatabaseSessionService)
+- [ ] `E14` — `app:` scope initialization (skill index, workflow registry)
+- [ ] `E15` — App lifecycle hooks (`on_startup` / `on_shutdown`)
+- [ ] `A71` — Work session model (long-running ARQ job)
+- [ ] `G21` — Anti-corruption translation layer (inbound: gateway commands → ADK Runner)
+- [ ] `M01` — `temp:` scope handling
+- [ ] `M02` — `user:` scope handling
+- [ ] `M03` — `app:` scope handling
+- [ ] `M04` — Session (no prefix) scope handling
+**Description:** ARQ task function `run_workflow` that orchestrates the full execution cycle — the inbound anti-corruption layer (gateway commands → ADK). On invocation: reads the workflow record (D11 job metadata), updates status to RUNNING, creates or resumes an ADK session (W05, A71 work session model), instantiates App container + Runner with EchoAgent, iterates the ADK event stream translating and publishing events, and updates workflow status (W08). Worker `on_startup` (E15) initializes shared resources (DatabaseSessionService, LlmRouter) in context, caches routing config in Redis (M22), and initializes `app:` scope state (E14). The 4-scope state system (E13, M01-M04) is operational through DatabaseSessionService — all four prefix scopes are available to agents.
+
+Also adds `error_message` column to the Workflow model (D11) via Alembic migration.
 **Requirements:**
 - [ ] `run_workflow(ctx: dict[str, object], workflow_id: str) -> dict[str, str]` is async and registered in `WorkerSettings.functions`
 - [ ] Task reads workflow record from database; raises `NotFoundError(message=f"Workflow {workflow_id} not found")` if not found
 - [ ] Task updates workflow `status` to `RUNNING` (with `started_at` timestamp) before pipeline execution
 - [ ] Task creates or resumes ADK session using `app_name="autobuilder"`, `user_id="system"`, `session_id=workflow_id`
-- [ ] Task creates App container with EchoAgent (model from LlmRouter) and Runner with DatabaseSessionService
+- [ ] Task creates App container with EchoAgent (model from LlmRouter, `before_model_callback` from `create_model_override_callback`) and Runner with DatabaseSessionService
 - [ ] ADK events are translated via `EventPublisher.translate()` and published to Redis Stream
 - [ ] `WORKFLOW_STARTED` event published before pipeline execution; `WORKFLOW_COMPLETED` or `WORKFLOW_FAILED` published after
 - [ ] On success: workflow `status` updated to `COMPLETED` with `completed_at` timestamp
-- [ ] On error: workflow `status` updated to `FAILED`, `WORKFLOW_FAILED` event published with error message in `metadata`, exception logged at `ERROR` level with `workflow_id` and stack trace
+- [ ] On error: workflow `status` updated to `FAILED`, `error_message` set on workflow record, `WORKFLOW_FAILED` event published with error message in `metadata`, exception logged at `ERROR` level with `workflow_id` and stack trace
 - [ ] Worker `on_startup` initializes `DatabaseSessionService` and `LlmRouter` in worker context (`ctx`)
+- [ ] Worker `on_startup` calls `router.cache_to_redis()` to cache routing config
+- [ ] Worker `on_startup` initializes `app:` scope state: `app:skill_index` = `{}`, `app:workflow_registry` = `{}` (idempotent — skip if keys already exist)
 - [ ] Worker `on_shutdown` disposes of session service resources
 - [ ] Existing tasks (`test_task`, `heartbeat`) remain functional and registered
+- [ ] Workflow model has `error_message: Mapped[str | None]` column with Alembic migration
 **Validation:**
 - `uv run pyright app/workers/`
+- `uv run alembic upgrade head`
 
 ---
 
-### P3.D6: Gateway Workflow Route + Job Enqueueing
+### P3.D7: Gateway Workflow Route + Job Enqueueing
 **Files:** `app/gateway/routes/workflows.py`, `app/gateway/models/workflows.py`, `app/gateway/deps.py` (update), `app/gateway/main.py` (update)
 **Depends on:** P3.D1
 **Description:** Minimal workflow API endpoint: `POST /workflows/run` accepts a workflow type and optional params, creates a workflow record in the database with status PENDING, enqueues an ARQ `run_workflow` job, and returns 202 Accepted. Gateway lifespan updated to create an ArqRedis pool (replacing the separate Redis client per DD-8). New dependency `get_arq_pool()` provides FastAPI injection.
@@ -228,17 +325,24 @@ The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` si
 
 ---
 
-### P3.D7: Test Suite
-**Files:** `tests/router/__init__.py`, `tests/router/test_router.py`, `tests/events/__init__.py`, `tests/events/test_publisher.py`, `tests/workers/test_tasks.py` (update), `tests/gateway/test_workflows.py`, `tests/conftest.py` (update)
-**Depends on:** P3.D5, P3.D6
-**Description:** Unit and integration tests covering all Phase 3 deliverables. LLM calls are mocked in unit tests — no live API keys required for CI. Redis Stream operations tested with a real or mocked Redis client. Database operations use the existing test fixtures from Phase 2. Tests verify the full request flow: gateway enqueue → worker execution → event publication → status update.
+### P3.D8: Test Suite
+**Files:** `tests/router/__init__.py`, `tests/router/test_router.py`, `tests/events/__init__.py`, `tests/events/test_publisher.py`, `tests/events/test_streams.py`, `tests/lib/test_cache.py`, `tests/lib/__init__.py`, `tests/workers/test_tasks.py` (update), `tests/workers/test_adk.py`, `tests/gateway/test_workflows.py`, `tests/conftest.py` (update)
+**Depends on:** P3.D6, P3.D7
+**Description:** Tests covering all Phase 3 deliverables. Tests use real infrastructure (PostgreSQL, Redis) per project testing standards — skip when unavailable. Tests requiring LLM calls (ADK pipeline execution, session persistence, 4-scope state) use real LLM APIs — skip when `ANTHROPIC_API_KEY` is not set (same `require_*` marker pattern as `require_postgres`/`require_redis`). No mocking of local infrastructure or LLM calls. The `before_model_callback` tests construct real `CallbackContext`/`LlmRequest` objects (no mocks) — these are pure in-process logic tests, no LLM call needed. Event publisher `translate()` tests construct ADK Event-like objects with the expected attributes (not mocks — real `object` instances with `getattr`-accessible fields).
 **Requirements:**
-- [ ] **Router tests**: `select_model(TaskType.CODE)` returns `"anthropic/claude-sonnet-4-5-20250929"`; `select_model(TaskType.PLAN)` returns `"anthropic/claude-opus-4-6"`; `select_model(TaskType.CODE, user_override="openai/gpt-5")` returns `"openai/gpt-5"`; `get_fallbacks("anthropic/claude-opus-4-6")` returns list of 2 models
-- [ ] **Event publisher tests**: `translate()` maps a mock ADK event with `function_call` content to `PipelineEventType.TOOL_CALLED`; `publish()` calls `XADD` on stream key `workflow:{id}:events`; `publish_lifecycle()` publishes event with `WORKFLOW_STARTED` type
-- [ ] **Worker task tests**: `run_workflow` with valid workflow_id updates status to `RUNNING` then `COMPLETED`; with invalid workflow_id raises `NotFoundError`; events appear in Redis Stream `workflow:{id}:events`
-- [ ] **Gateway route tests**: `POST /workflows/run` with `{"workflow_type": "echo"}` returns 202 with `workflow_id` in response; request missing `workflow_type` field returns 422
-- [ ] **ADK engine tests**: `create_session_service()` returns `DatabaseSessionService` instance; `create_echo_agent("anthropic/claude-haiku-4-5-20251001")` returns `LlmAgent` with `name="echo_agent"` and `output_key="agent_response"`; `create_app_container(agent)` returns `App` with `name="autobuilder"` and non-None `events_compaction_config`
-- [ ] **Session persistence test**: First invocation writes `agent_response` to session state; second invocation on same `(app_name, user_id, session_id)` tuple retrieves session with `agent_response` in state
+- [ ] `require_llm` marker added to `conftest.py`: skips test if `ANTHROPIC_API_KEY` env var is not set
+- [ ] **Router tests** (no infra needed — pure logic): `select_model(TaskType.CODE)` returns `"anthropic/claude-sonnet-4-5-20250929"`; `select_model(TaskType.PLAN)` returns `"anthropic/claude-opus-4-6"`; `select_model(TaskType.CODE, user_override="openai/gpt-5")` returns `"openai/gpt-5"`; `get_fallbacks("anthropic/claude-opus-4-6")` returns list of 2 models
+- [ ] **before_model_callback tests** (no infra needed — pure logic): callback reads agent name from `callback_context.agent_name`; maps `echo_agent` to `TaskType.FAST`; sets `llm_request.model` to router result; returns `None`; respects `user:model_override` from state
+- [ ] **Cache helper tests** (`require_redis`): `cache_set` + `cache_get` round-trips a value; `cache_get` returns `None` on miss; `cache_delete` removes the value; TTL expiry works
+- [ ] **Stream helper tests** (`require_redis`): `stream_key("abc")` returns `"workflow:abc:events"`; `stream_publish` calls XADD and returns stream ID; `stream_read_range` reads published events
+- [ ] **Event publisher tests** (`require_redis`): `translate()` maps an ADK Event-like object with `function_call` content to `PipelineEventType.TOOL_CALLED`; `publish()` publishes to correct stream via `stream_publish`; `publish_lifecycle()` publishes event with `WORKFLOW_STARTED` type
+- [ ] **ADK engine tests** (no infra needed — construction only): `create_echo_agent("anthropic/claude-haiku-4-5-20251001")` returns `LlmAgent` with `name="echo_agent"` and `output_key="agent_response"`; `create_app_container(agent)` returns `App` with `name="autobuilder"`, non-None `events_compaction_config`, non-None `context_cache_config`, non-None `resumability_config`; LoggingPlugin is in default plugins list
+- [ ] **ADK engine tests** (`require_postgres`): `create_session_service()` returns `DatabaseSessionService` instance that can create a session
+- [ ] **Worker task tests** (`require_infra`, `require_llm`): `run_workflow` with valid workflow_id updates status to `RUNNING` then `COMPLETED`; with invalid workflow_id raises `NotFoundError`; events appear in Redis Stream `workflow:{id}:events`; error case sets `error_message` on workflow record
+- [ ] **Gateway route tests** (`require_infra`): `POST /workflows/run` with `{"workflow_type": "echo"}` returns 202 with `workflow_id` in response; request missing `workflow_type` field returns 422
+- [ ] **Session persistence test** (`require_postgres`, `require_llm`): First invocation writes `agent_response` to session state; second invocation on same `(app_name, user_id, session_id)` tuple retrieves session with `agent_response` in state
+- [ ] **4-scope state tests** (`require_postgres`, `require_llm`): `temp:` key set in one invocation is NOT present in next invocation; session key (no prefix) persists across invocations; `app:` scope key is accessible; `user:` scope key is accessible across sessions with same user_id
+- [ ] **App scope initialization test** (`require_postgres`): After worker startup, `app:skill_index` and `app:workflow_registry` exist in `app:` scope state
 - [ ] All Phase 2 tests continue to pass (no regressions): `uv run pytest tests/ --ignore=tests/phase1`
 - [ ] All quality gates exit 0: `uv run ruff check .`, `uv run pyright`, `uv run pytest`
 **Validation:**
@@ -249,37 +353,82 @@ The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` si
 ## Build Order
 
 ```
-Batch 1: P3.D1
+Batch 1 (parallel): P3.D1, P3.D3
   D1: Config + enums — app/config/settings.py, app/models/enums.py
+  D3: Redis cache + stream helpers — app/lib/cache.py, app/events/streams.py
 
-Batch 2 (parallel): P3.D2, P3.D3, P3.D6
-  D2: LLM Router — app/router/router.py (depends D1)
-  D3: Event schema + publisher — app/gateway/models/events.py, app/events/publisher.py (depends D1)
-  D6: Gateway workflow route — app/gateway/routes/workflows.py, app/gateway/deps.py (depends D1)
+Batch 2 (parallel): P3.D2, P3.D7
+  D2: LLM Router + callback — app/router/router.py (depends D1)
+  D7: Gateway workflow route — app/gateway/routes/workflows.py, app/gateway/deps.py (depends D1)
 
-Batch 3: P3.D4
-  D4: ADK engine setup — app/workers/adk.py (depends D1, D2)
+Batch 3 (parallel): P3.D4, P3.D5
+  D4: Event schema + publisher — app/gateway/models/events.py, app/events/publisher.py (depends D1, D3)
+  D5: ADK engine setup — app/workers/adk.py (depends D1, D2)
 
-Batch 4: P3.D5
-  D5: Worker pipeline bridge — app/workers/tasks.py, app/workers/settings.py (depends D3, D4)
+Batch 4: P3.D6
+  D6: Worker pipeline bridge + migration — app/workers/tasks.py, app/workers/settings.py, app/db/models.py (depends D3, D4, D5)
 
-Batch 5: P3.D7
-  D7: Test suite — tests/ (depends D5, D6)
+Batch 5: P3.D8
+  D8: Test suite — tests/ (depends D6, D7)
 ```
 
 ## Completion Contract Traceability
 
+### Contract Coverage
+
 | # | Roadmap Completion Contract Item | Covered By | Validation |
 |---|---|---|---|
-| 1 | Can enqueue a workflow job from gateway, have worker execute an ADK pipeline | P3.D5, P3.D6, P3.D7 | `POST /workflows/run` returns 202; worker processes job; workflow status updates to COMPLETED |
-| 2 | LLM Router selects correct model per task type | P3.D2, P3.D7 | Router unit tests verify correct model for each TaskType; fallback chains resolve correctly |
-| 3 | Claude responds reliably via LiteLLM through ADK | P3.D4, P3.D5, P3.D7 | EchoAgent receives prompt, produces response via LiteLLM; `agent_response` key in session state |
-| 4 | Session state persists across worker invocations | P3.D4, P3.D5, P3.D7 | Integration test: first invocation writes state via output_key; second invocation reads persisted state from DatabaseSessionService |
-| 5 | ADK events translate to gateway events in Redis Streams | P3.D3, P3.D5, P3.D7 | Events appear in Redis Stream `workflow:{id}:events` with PipelineEventType enum values; no ADK types in published events |
+| 1 | Can enqueue a workflow job from gateway, have worker execute an ADK pipeline | P3.D6, P3.D7, P3.D8 | `POST /workflows/run` returns 202; worker processes job; workflow status updates to COMPLETED |
+| 2 | LLM Router selects correct model per task type | P3.D2, P3.D8 | Router unit tests verify correct model for each TaskType; fallback chains resolve correctly; `before_model_callback` overrides model at runtime |
+| 3 | Claude responds reliably via LiteLLM through ADK | P3.D5, P3.D6, P3.D8 | EchoAgent receives prompt, produces response via LiteLLM; `agent_response` key in session state |
+| 4 | Session state persists across worker invocations | P3.D5, P3.D6, P3.D8 | Integration test: first invocation writes state via output_key; second invocation reads persisted state from DatabaseSessionService |
+| 5 | ADK events translate to gateway events in Redis Streams | P3.D4, P3.D6, P3.D8 | Events appear in Redis Stream `workflow:{id}:events` with PipelineEventType enum values; no ADK types in published events |
+
+### BOM Coverage
+
+| BOM ID | Component | Deliverable |
+|---|---|---|
+| G21 | Anti-corruption translation layer | P3.D4 (outbound), P3.D6 (inbound) |
+| D04 | `sessions` table (ADK) | P3.D5 |
+| D11 | Job metadata table (ARQ tracking) | P3.D6 |
+| E01 | `App` container (`autobuilder`) | P3.D5 |
+| E04 | `EventsCompactionConfig` | P3.D5 |
+| E05 | `LlmEventSummarizer` (haiku model) | P3.D5 |
+| E06 | `ResumabilityConfig` | P3.D5 |
+| E07 | `context_cache_config` | P3.D5 |
+| E09 | `LoggingPlugin` | P3.D5 |
+| E12 | `DatabaseSessionService` integration | P3.D5 |
+| E13 | 4-scope state system | P3.D6, P3.D8 |
+| E14 | `app:` scope initialization | P3.D6 |
+| E15 | App lifecycle hooks (`on_startup`/`on_shutdown`) | P3.D6 |
+| W03 | `run_workflow()` ARQ job function | P3.D6 |
+| W04 | `create_adk_runner()` factory | P3.D5 |
+| W05 | `create_or_resume_session()` | P3.D6 |
+| W06 | `translate_event()` | P3.D4 |
+| W07 | `publish_to_stream()` | P3.D4 |
+| W08 | `update_workflow_state()` | P3.D6 |
+| V01 | Per-workflow Redis Stream publishing | P3.D4 |
+| V02 | Redis Stream naming convention | P3.D3 |
+| R01 | `LlmRouter` module | P3.D2 |
+| R02 | Routing rules (static config) | P3.D1, P3.D2 |
+| R03 | Fallback chain resolution (3-step) | P3.D2 |
+| R04 | `before_model_callback` model override | P3.D2 |
+| A44 | `before_model_callback` LLM Router override | P3.D2 |
+| A71 | Work session model (long-running ARQ job) | P3.D6 |
+| M01 | `temp:` scope handling | P3.D6, P3.D8 |
+| M02 | `user:` scope handling | P3.D6, P3.D8 |
+| M03 | `app:` scope handling | P3.D6, P3.D8 |
+| M04 | Session (no prefix) scope handling | P3.D6, P3.D8 |
+| M22 | Routing config cache (long TTL) | P3.D2, P3.D6 |
+| M25 | Redis cache helpers (~100 LOC) | P3.D3 |
+| M26 | Redis Stream publishers (~100 LOC) | P3.D3 |
+| O04 | Context compression (sliding window summarization) | P3.D5 |
+
+*All 35 BOM components assigned to Phase 3 in `07-COMPONENTS.md` are mapped above. Zero unmapped.*
 
 ## Research Notes
 
-### ADK Import Paths (Verified)
+### ADK Import Paths (Verified against installed package)
 ```python
 # Agents
 from google.adk.agents import LlmAgent, BaseAgent, SequentialAgent, ParallelAgent, LoopAgent
@@ -304,14 +453,70 @@ from google.adk.apps import App
 from google.adk.apps.app import EventsCompactionConfig, ResumabilityConfig
 from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
 
+# Context Cache Config
+from google.adk.agents.context_cache_config import ContextCacheConfig
+
+# Plugins
+from google.adk.plugins.base_plugin import BasePlugin
+
+# Callbacks
+from google.adk.agents.callback_context import CallbackContext
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
+
 # Content types (for messages)
 from google.genai.types import Content, Part
 ```
 
+### Verified API Signatures (from installed package)
+
+**Runner constructor:**
+```python
+Runner(
+    *,
+    app: Optional[App] = None,
+    app_name: Optional[str] = None,
+    agent: Optional[BaseAgent] = None,
+    plugins: Optional[List[BasePlugin]] = None,
+    artifact_service: Optional[BaseArtifactService] = None,
+    session_service: BaseSessionService,
+    memory_service: Optional[BaseMemoryService] = None,
+    credential_service: Optional[BaseCredentialService] = None,
+    plugin_close_timeout: float = 5.0,
+    auto_create_session: bool = False,
+)
+```
+
+**App fields:** `name`, `root_agent`, `plugins`, `events_compaction_config`, `context_cache_config`, `resumability_config`
+
+**EventsCompactionConfig fields:** `summarizer`, `compaction_interval`, `overlap_size`, `token_threshold`, `event_retention_size`
+
+**ResumabilityConfig fields:** `is_resumable`
+
+**ContextCacheConfig fields:** `cache_intervals`, `ttl_seconds`, `min_tokens`
+
+**LlmEventSummarizer constructor:** `LlmEventSummarizer(llm: BaseLlm, prompt_template: Optional[str] = None)`
+
+**DatabaseSessionService constructor:** `DatabaseSessionService(db_url: str)`
+
+**before_model_callback signature:**
+```python
+def before_model_callback(
+    callback_context: CallbackContext,
+    llm_request: LlmRequest,
+) -> Optional[LlmResponse]:
+    # Return None → proceed normally
+    # Return LlmResponse → skip LLM call
+```
+
+**CallbackContext attributes:** `agent_name`, `state`, `session`, `user_content`, `invocation_id`, `run_config`, `user_id`
+
+**LlmRequest fields (mutable):** `model`, `contents`, `config`, `tools_dict`, `cache_config`, `cache_metadata`
+
 ### Critical ADK Patterns (Phase 1 Findings)
 1. **State writes**: Only `Event(actions=EventActions(state_delta={...}))` persists state. Direct `ctx.session.state["key"] = val` does NOT persist.
 2. **State reads**: `ctx.session.state.get("key")` works within the same execution.
-3. **InMemoryRunner quirk**: `runner.auto_create_session = True` must be set after construction. Verify if this applies to Runner with DatabaseSessionService.
+3. **InMemoryRunner quirk**: `runner.auto_create_session = True` must be set after construction. Runner with `auto_create_session=False` (default) requires explicit session creation.
 4. **BaseAgent override**: `_run_async_impl` needs `# type: ignore[override]` for pyright strict.
 5. **FunctionTool import**: `from google.adk.tools.function_tool import FunctionTool` (not `from google.adk.tools`).
 
@@ -325,8 +530,6 @@ Multi-session architecture: chat sessions for CEO interaction, work sessions per
 
 Project config is a DB entity -- no new ADK scope. Existing 4 ADK scopes are sufficient: `app:` = global, `user:` = CEO prefs + Director personality, session = per-session, `temp:` = scratch.
 
-`AutoBuilderToolset(BaseToolset)` for per-role tool vending via ADK-native `get_tools(readonly_context)`. Tools organized by function type in `app/tools/`. Cascading permission config CEO->Director->PM->Worker.
-
 The `create_app_container(root_agent)` factory in Phase 3 accommodates this -- Phase 5 passes Director instead of EchoAgent. See `.discussion/260214_hierarchical-supervision.md`, `.discussion/260216_terminology-skills-pm.md`.
 
 ### Runner Execution Pattern
@@ -338,7 +541,8 @@ session_service = DatabaseSessionService(db_url=settings.db_url)
 router = LlmRouter.from_settings(settings)
 
 # Per-execution (in run_workflow)
-echo_agent = create_echo_agent(model=router.select_model(TaskType.FAST))
+callback = create_model_override_callback(router)
+echo_agent = create_echo_agent(model=router.select_model(TaskType.FAST), before_model_callback=callback)
 app = create_app_container(root_agent=echo_agent)
 runner = Runner(app=app, session_service=session_service)
 
@@ -357,48 +561,8 @@ async for event in runner.run_async(
     user_id="system", session_id=session.id, new_message=message
 ):
     translated = publisher.translate(event, workflow_id)
-    await publisher.publish(translated)
-```
-
-### Runner Constructor
-```python
-# Runner accepts app= parameter, extracts configs from App
-runner = Runner(
-    app=app_instance,              # Gets root_agent, compaction, resumability from App
-    session_service=session_svc,   # PostgreSQL-backed session persistence
-)
-
-# Or without App (no compaction/resumability)
-runner = Runner(
-    agent=my_agent,
-    app_name="autobuilder",
-    session_service=session_svc,
-)
-```
-
-### ADK Event Object Structure
-```python
-class Event:
-    id: str                          # Unique event ID
-    author: str                      # 'user' or agent name
-    invocation_id: str               # Tracks full interaction cycle
-    timestamp: float                 # POSIX timestamp
-    content: Content | None          # Text, function calls, or results
-    partial: bool | None             # Streaming incomplete
-    turn_complete: bool | None       # LLM turn complete
-    actions: EventActions            # Side effects (state_delta, etc.)
-    usage_metadata: UsageMetadata | None  # Token counts
-    error_code: str | None
-    error_message: str | None
-
-class EventActions:
-    state_delta: dict[str, object]   # State updates
-    artifact_delta: dict[str, int]   # Artifact changes
-    transfer_to_agent: str | None    # Agent transfer
-    escalate: bool | None            # Escalation flag
-
-# Useful method
-event.is_final_response()  # True if this is the agent's final output
+    if translated is not None:
+        await publisher.publish(translated)
 ```
 
 ### DatabaseSessionService Tables (Auto-Created)
@@ -418,7 +582,14 @@ async def startup(ctx: dict[str, object]) -> None:
     setup_logging(get_settings().log_level)
     settings = get_settings()
     ctx["session_service"] = DatabaseSessionService(db_url=settings.db_url)
-    ctx["llm_router"] = LlmRouter.from_settings(settings)
+    router = LlmRouter.from_settings(settings)
+    ctx["llm_router"] = router
+    # Cache routing config (M22)
+    redis = cast(ArqRedis, ctx["redis"])
+    await router.cache_to_redis(redis)
+    # Initialize app: scope (E14) — idempotent
+    session_service = cast(DatabaseSessionService, ctx["session_service"])
+    # ... initialize app:skill_index, app:workflow_registry if not present
 
 async def shutdown(ctx: dict[str, object]) -> None:
     """Worker on_shutdown — cleanup."""
@@ -445,22 +616,6 @@ await arq_pool.aclose()
 
 # In route handler
 await arq_pool.enqueue_job("run_workflow", workflow_id=str(workflow.id))
-```
-
-### Redis Streams Commands
-```python
-# Publish event
-await redis.xadd(
-    f"workflow:{workflow_id}:events",
-    {"data": event.model_dump_json()},
-)
-
-# Read events (for future SSE/consumer use)
-events = await redis.xrange(
-    f"workflow:{workflow_id}:events",
-    min=last_event_id or "-",
-    max="+",
-)
 ```
 
 ### Existing Patterns to Follow

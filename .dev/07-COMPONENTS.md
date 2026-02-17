@@ -308,7 +308,7 @@ Source: `architecture/agents.md §11`, `architecture/tools.md §6`
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
 | R01 | `LlmRouter` module | module | 3 | agents.md §11 | LiteLLM |
-| R02 | Routing rules (static YAML config) | config | 3 | agents.md §11 | — |
+| R02 | Routing rules (static config) | config | 3 | agents.md §11 | — |
 | R03 | Fallback chain resolution (3-step) | mechanism | 3 | agents.md §11 | Provider availability |
 | R04 | `before_model_callback` model override | callback | 3 | agents.md §11 | LlmRouter |
 | R05 | Adaptive router (cost-aware, latency-aware) | mechanism | 11 | agents.md §11 | Token tracking |
@@ -520,7 +520,7 @@ Components removed from the registry as unnecessary or over-engineered:
 | Assigned (with phase) | 270 |
 | **Unassigned (gaps)** | **0** |
 | Phase 0-2 (done) | 19 |
-| Phase 3 | 34 |
+| Phase 3 | 35 |
 | Phase 4 | 33 |
 | Phase 5 | 50 |
 | Phase 6 | 23 |
