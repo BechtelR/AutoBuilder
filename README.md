@@ -4,7 +4,7 @@ Autonomous agentic workflow system that orchestrates multi-agent teams alongside
 
 ## Overview
 
-AutoBuilder takes a specification and runs it through pluggable workflows (auto-code, auto-design, auto-research) using LLM agents for judgment tasks and deterministic agents for guaranteed steps, producing verified output with optional human-in-the-loop intervention. The system exposes an API-first FastAPI gateway with out-of-process worker execution via ARQ and Redis.
+AutoBuilder takes a specification and runs it through pluggable workflows (auto-code, auto-design, auto-research) using LLM agents for judgment tasks and custom (deterministic) agents for guaranteed steps, producing verified output with optional human-in-the-loop intervention. The system exposes an API-first FastAPI gateway with out-of-process worker execution via ARQ and Redis.
 
 ## Quick Start
 

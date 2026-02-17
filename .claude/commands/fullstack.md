@@ -30,7 +30,7 @@ Senior full stack engineer for AutoBuilder. Discuss, document, debug, or impleme
 - `app/db/` — SQLAlchemy models (source of truth for types)
 - `app/gateway/` — FastAPI routes, SSE endpoints, Pydantic models
 - `app/workers/` — ARQ task definitions
-- `app/agents/` — ADK agents (deterministic/ and llm/)
+- `app/agents/` — ADK agents (custom/ and llm/)
 - `app/events/` — Redis Streams publishers/consumers
 - `app/config/` — configuration loading
 - `dashboard/` — React 19 SPA (TanStack Query, Zustand, Tailwind v4)

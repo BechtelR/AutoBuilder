@@ -82,7 +82,7 @@ Standing up a working empty project that builds, lints, type-checks, and tests c
 **Acceptance criteria:**
 - [x] `app/__init__.py` exists
 - [x] `app/__main__.py` exists (minimal: `print("AutoBuilder CLI — not yet implemented")`)
-- [x] All `app/` subdirectories from `03-STRUCTURE.md` exist with `__init__.py`: `gateway/`, `gateway/routes/`, `gateway/models/`, `gateway/middleware/`, `workers/`, `events/`, `models/`, `lib/`, `utils/`, `agents/`, `agents/deterministic/`, `agents/llm/`, `tools/`, `skills/`, `workflows/`, `router/`, `memory/`, `orchestrator/`, `db/`, `config/`
+- [x] All `app/` subdirectories from `03-STRUCTURE.md` exist with `__init__.py`: `gateway/`, `gateway/routes/`, `gateway/models/`, `gateway/middleware/`, `workers/`, `events/`, `models/`, `lib/`, `utils/`, `agents/`, `agents/custom/`, `agents/llm/`, `tools/`, `skills/`, `workflows/`, `router/`, `memory/`, `orchestrator/`, `db/`, `config/`
 - [x] `tests/conftest.py` exists (empty or minimal docstring)
 - [x] `tests/gateway/`, `tests/workers/`, `tests/agents/` exist
 - [x] `scripts/` directory exists

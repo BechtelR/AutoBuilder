@@ -108,7 +108,7 @@ async for event in runner.run_async(
 
 ---
 
-### P1.D3: Prototype 2 — Mixed Agent Coordination (LLM + Deterministic)
+### P1.D3: Prototype 2 — Mixed Agent Coordination (LLM + Custom)
 
 **Files:** `tests/phase1/test_p2_mixed_agents.py`
 **Depends on:** P1.D2

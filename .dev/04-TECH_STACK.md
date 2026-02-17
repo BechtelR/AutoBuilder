@@ -32,7 +32,7 @@ This document is the definitive tech stack reference. Every technology choice is
 
 **Choice**: Google Agent Development Kit (ADK) v1.25.0 — **COMMITTED (Phase 1 validated)**
 
-**Rationale**: AutoBuilder needs two fundamentally different types of tool execution: LLM-discretionary ("use search if you need info") and deterministic ("run validator, run tests, check constraints"). ADK is the only evaluated framework where deterministic tools are first-class citizens via `CustomAgent` (inheriting `BaseAgent`). They participate in the same state system as LLM agents, appear in the same event stream for observability, cannot be skipped by LLM judgment, and compose naturally with LLM agents in Sequential/Parallel/Loop workflows.
+**Rationale**: AutoBuilder needs two fundamentally different types of tool execution: LLM-discretionary ("use search if you need info") and deterministic ("run validator, run tests, check constraints"). ADK is the only evaluated framework where deterministic agents are first-class citizens via `CustomAgent` (inheriting `BaseAgent`). They participate in the same state system as LLM agents, appear in the same event stream for observability, cannot be skipped by LLM judgment, and compose naturally with LLM agents in Sequential/Parallel/Loop workflows.
 
 AutoBuilder is fundamentally an orchestration problem where LLM agents are one component alongside deterministic tooling. This applies whether the output is code, research, design assets, or marketing content. ADK treats this as the core design principle.
 

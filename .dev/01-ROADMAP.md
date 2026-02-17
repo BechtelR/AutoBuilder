@@ -82,7 +82,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [x] **Validates**: Claude reliability through LiteLLM, latency, token counting accuracy
 - [x] **Pass criteria**: Claude responds reliably, tools execute correctly, token counts are accurate
 
-#### P2: Mixed Agent Coordination (LLM + Deterministic)
+#### P2: Mixed Agent Coordination (LLM + Custom)
 - [x] `plan_agent` (LlmAgent) + `linter_agent` (CustomAgent)
 - [x] `SequentialAgent` pipeline wiring
 - [x] State passing via `output_key` → state read
@@ -277,7 +277,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ## Phase 5: Agent Definitions `L`
 
-**Goal**: All agents defined — Director, PMs, and worker-tier LLM/deterministic agents — composable via ADK primitives in a hierarchical supervision model.
+**Goal**: All agents defined — Director, PMs, and worker-tier LLM/custom agents — composable via ADK primitives in a hierarchical supervision model.
 
 **Status**: PLANNED
 
@@ -303,7 +303,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] `review_agent` — evaluate code quality against standards (read-only tools)
 - [ ] `fix_agent` — apply targeted fixes from review feedback (full tools)
 
-#### Worker-Tier Deterministic Agents (CustomAgent / BaseAgent)
+#### Worker-Tier Custom (Deterministic) Agents (CustomAgent / BaseAgent)
 - [ ] `SkillLoaderAgent` — resolve and load relevant skills into state
 - [ ] `LinterAgent` — run project linter, write structured results to state
 - [ ] `TestRunnerAgent` — run test suite, write results to state

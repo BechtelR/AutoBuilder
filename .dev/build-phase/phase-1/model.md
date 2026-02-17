@@ -86,7 +86,7 @@ def bash_exec(command: str) -> dict[str, str]:
 ### CustomAgent Pattern (BaseAgent subclass)
 
 ```python
-class DeterministicAgent(BaseAgent):
+class CustomAgentBase(BaseAgent):
     """Base pattern for all deterministic agents.
 
     - Inherits BaseAgent (Pydantic v2 model)
@@ -267,7 +267,7 @@ stateDiagram-v2
     AssertTokens --> [*]: Test passes
 ```
 
-### P1.D3 — Sequential Pipeline (LLM + Deterministic)
+### P1.D3 — Sequential Pipeline (LLM + Custom)
 
 ```mermaid
 stateDiagram-v2
@@ -384,7 +384,7 @@ flowchart LR
 | Extension Point | Future Phase | Preparation |
 |----------------|-------------|-------------|
 | FunctionTool pattern (file_read, file_write, bash_exec) | Phase 4 (Production Tools) | Phase 1 validates the `FunctionTool` wrapping pattern; Phase 4 adds sandboxing, security, and full tool suite |
-| CustomAgent `_run_async_impl` pattern | Phase 3+ (Deterministic Agents) | Phase 1 proves `LinterAgent` pattern; production agents (SkillLoader, TestRunner, Formatter) follow same contract |
+| CustomAgent `_run_async_impl` pattern | Phase 3+ (Custom Agents) | Phase 1 proves `LinterAgent` pattern; production agents (SkillLoader, TestRunner, Formatter) follow same contract |
 | `BatchOrchestrator` dynamic composition | Phase 5+ (Orchestrator) | Phase 1 validates dynamic `ParallelAgent` batch construction; production adds checkpointing, regression tests, event-sourced state |
 | `SequentialAgent` pipeline composition | Phase 3+ (DeliverablePipeline) | Phase 1 proves LLM → Deterministic sequencing; production pipeline adds LoopAgent review cycles |
 | `output_key` state communication | Phase 3+ (Agent Communication) | Phase 1 validates `output_key` → `{key}` template reading; production adds `InstructionProvider` and `before_model_callback` |

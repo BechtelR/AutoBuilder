@@ -13,7 +13,7 @@
 4. [PM Agent](#pm-agent)
 5. [Execution Environment](#execution-environment)
 6. [Worker-Tier LLM Agents](#worker-tier-llm-agents)
-7. [Worker-Tier Deterministic Agents (CustomAgents)](#worker-tier-deterministic-agents-customagents)
+7. [Worker-Tier Custom Agents (Deterministic)](#worker-tier-custom-agents)
 8. [Plan/Execute Separation](#planexecute-separation)
 9. [Agent Tool Restrictions](#agent-tool-restrictions)
 10. [LLM Router](#llm-router)
@@ -28,7 +28,7 @@ AutoBuilder uses a **three-tier hierarchical supervision model** (CEO -> Directo
 | Agent Type | ADK Primitive | Execution Model | Examples |
 |------------|---------------|-----------------|----------|
 | **LLM Agents** | `LlmAgent` | Probabilistic -- LLM decides approach | Director, PM, `plan_agent`, `code_agent`, `review_agent`, `fix_agent` |
-| **Deterministic Agents** | `CustomAgent` (inherits `BaseAgent`) | Guaranteed -- runs exactly as coded | `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`, `FormatterAgent`, `DependencyResolverAgent`, `RegressionTestAgent`, `ContextBudgetAgent` |
+| **Custom Agents** | `CustomAgent` (inherits `BaseAgent`) | Guaranteed -- runs exactly as coded | `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`, `FormatterAgent`, `DependencyResolverAgent`, `RegressionTestAgent`, `ContextBudgetAgent` |
 
 Both types participate in the same state system, emit events into the same unified event stream, and compose naturally with ADK's `SequentialAgent`, `ParallelAgent`, and `LoopAgent` workflow primitives. This is the decisive architectural advantage of Google ADK over alternatives: deterministic agents are first-class workflow citizens, not shadow functions called outside the framework.
 
@@ -296,7 +296,7 @@ All LLM agents receive instructions through a layered mechanism:
 
 ---
 
-## Worker-Tier Deterministic Agents (CustomAgents)
+## Worker-Tier Custom Agents
 
 Worker-tier deterministic agents inherit from ADK's `BaseAgent` and implement `_run_async_impl`. They execute guaranteed workflow steps that must not be skippable by LLM judgment. Each emits events into the unified event stream and writes results to session state.
 

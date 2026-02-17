@@ -49,7 +49,7 @@ AutoBuilder/
 │   │   └── hashing.py              # Hashing, checksums
 │   │
 │   ├── agents/                     # Agent definitions
-│   │   ├── deterministic/          # CustomAgent subclasses (linter, test runner, skill loader)
+│   │   ├── custom/                 # CustomAgent subclasses (linter, test runner, skill loader)
 │   │   └── llm/                    # LlmAgent definitions (planner, coder, reviewer)
 │   │
 │   ├── tools/                      # FunctionTool wrappers (filesystem, bash, git, web, todo)
