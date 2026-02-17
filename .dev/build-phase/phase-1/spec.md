@@ -36,7 +36,7 @@ Prototypes are structured as pytest integration tests in `tests/phase1/`. They u
 | 6 | P4 test features | Synthetic text-generation tasks | Validates orchestration without real code generation |
 | 7 | Event collection | List accumulation from `run_async()` | Collect all events into list for assertions |
 | 8 | BaseAgent subclasses | Pydantic v2 model fields | ADK BaseAgent is a Pydantic model — custom attrs must be model fields, not `__init__` params |
-| 9 | State writes in CustomAgent | `Event(actions=EventActions(state_delta={...}))` | **REVISED**: Direct `ctx.session.state` writes do NOT persist. All CustomAgent state writes must use `state_delta`. Discovered during live testing. |
+| 9 | State writes in CustomAgent | `Event(actions=EventActions(state_delta={...}))` | **REVISED**: Direct `ctx.session.state` writes do NOT persist. All CustomAgent state writes must use `state_delta`. |
 | 10 | Alternate provider testing | Cheapest models per provider, per-provider skip markers | Validates LiteLLM translation layer works for tool calling + response parsing across all 3 providers. Uses cheapest tier to minimize cost. |
 | 11 | Gemini via LiteLlm (not native) | `LiteLlm(model="gemini/...")` | AutoBuilder routes everything through LiteLLM for consistency. Must validate Gemini through LiteLlm wrapper, not native ADK Gemini support. |
 
@@ -183,7 +183,7 @@ parallel = ParallelAgent(name="parallel_test", sub_agents=agents)
 **Files:** `tests/phase1/test_p4_outer_loop.py`
 **Depends on:** P1.D2, P1.D3, P1.D4
 
-**Description:** Validate the core orchestration pattern: a `CustomAgent` (BaseAgent subclass) that dynamically constructs `ParallelAgent` batches based on feature dependencies, runs them in a "while incomplete features exist" loop. Tests with 5 synthetic features forming a dependency DAG. This is the most complex prototype and validates the production `BatchOrchestrator` pattern.
+**Description:** Validate the core orchestration pattern: a `CustomAgent` (BaseAgent subclass) that dynamically constructs `ParallelAgent` batches based on feature dependencies, runs them in a "while incomplete features exist" loop. Tests with 5 synthetic features forming a dependency DAG. This is the most complex prototype and validates the dynamic batch composition pattern. In production, PM (LlmAgent) absorbs this orchestration role with mechanical batch parts as PM tools.
 
 **Feature DAG:**
 ```
@@ -204,7 +204,7 @@ class Feature(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
     prompt: str
 
-class BatchOrchestrator(BaseAgent):
+class OuterLoopAgent(BaseAgent):
     """Pydantic v2 model — features stored as model field."""
     features: list[Feature] = Field(default_factory=list)
 
@@ -241,7 +241,7 @@ class BatchOrchestrator(BaseAgent):
 - [x] Loop terminates when all 5 features have completed
 - [x] Each feature's output is written to state under `feature_{name}_output`
 - [x] If a feature is simulated as "failed", independent features still execute (e.g., B fails → C,D still run since they depend on A, not B)
-- [x] Orchestrator state contains `all_completed`, `completed_features`, `total_batches`
+- [x] Outer loop agent state contains `all_completed`, `completed_features`, `total_batches`
 
 **Validation:** `uv run pytest tests/phase1/test_p4_outer_loop.py -v`
 
@@ -252,7 +252,7 @@ class BatchOrchestrator(BaseAgent):
 **Files:** `.dev/.discussion/phase1-decision.md`
 **Depends on:** P1.D2, P1.D3, P1.D4, P1.D5
 
-**Description:** After running all prototypes, capture results in the decision table format from the roadmap. Document any ADK quirks, workarounds, or unexpected behaviors discovered during implementation. Record the go/no-go decision with rationale.
+**Description:** After running all prototypes, capture results in the decision table format from the roadmap. Document any ADK quirks, workarounds, or unexpected behaviors found during implementation. Record the go/no-go decision with rationale.
 
 **Acceptance criteria:**
 - [x] Decision table filled out with pass/fail for each prototype (P1–P4)

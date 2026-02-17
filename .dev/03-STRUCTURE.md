@@ -52,7 +52,14 @@ AutoBuilder/
 │   │   ├── custom/                 # CustomAgent subclasses (linter, test runner, skill loader)
 │   │   └── llm/                    # LlmAgent definitions (planner, coder, reviewer)
 │   │
-│   ├── tools/                      # FunctionTool wrappers (filesystem, bash, git, web, todo)
+│   ├── tools/                      # FunctionTool wrappers + AutoBuilderToolset
+│   │   ├── toolset.py              # AutoBuilderToolset(BaseToolset) — per-role tool vending
+│   │   ├── filesystem.py           # file_read, file_write, file_edit, file_search, directory_list
+│   │   ├── execution.py            # bash_exec
+│   │   ├── git.py                  # git_status, git_commit, git_branch, git_diff
+│   │   ├── web.py                  # web_search, web_fetch
+│   │   ├── task.py                 # todo_read, todo_write, todo_list
+│   │   └── project.py              # select_ready_batch, enqueue_ceo_item
 │   │
 │   ├── skills/                     # Global skill files (Markdown + YAML frontmatter)
 │   │   ├── code/                   # Code-generation skills
@@ -70,7 +77,6 @@ AutoBuilder/
 │   │
 │   ├── router/                     # LLM Router (task_type to model mapping)
 │   ├── memory/                     # Memory service (PostgreSQL tsvector + pgvector)
-│   ├── orchestrator/               # BatchOrchestrator (outer loop CustomAgent)
 │   │
 │   ├── db/                         # Database layer
 │   │   ├── engine.py               # AsyncEngine + AsyncSession factory
@@ -162,12 +168,11 @@ AutoBuilder/
 | `app/lib/` | Shared libraries — logging, exceptions, decorators, base classes |
 | `app/utils/` | Stateless utility functions — string helpers, token counting, hashing |
 | `app/agents/` | ADK agent definitions (deterministic and LLM) |
-| `app/tools/` | FunctionTool wrappers exposed to LLM agents |
+| `app/tools/` | FunctionTool wrappers organized by type + `AutoBuilderToolset(BaseToolset)` for per-role vending |
 | `app/skills/` | Markdown skill files with YAML frontmatter |
 | `app/workflows/` | Pluggable workflow definitions (each a self-contained directory) |
 | `app/router/` | LLM model routing (task type to provider/model) |
 | `app/memory/` | Cross-session searchable memory (PostgreSQL tsvector + pgvector) |
-| `app/orchestrator/` | Outer-loop batch orchestration (CustomAgent) |
 | `app/db/` | Database engine, ORM models, Alembic migrations |
 | `app/config/` | Configuration loading, validation, defaults |
 | `dashboard/` | React 19 SPA — pure API consumer, static build |
@@ -186,5 +191,5 @@ AutoBuilder/
 
 ---
 
-*Document Version: 1.2*
-*Last Updated: 2026-02-14*
+*Document Version: 1.4*
+*Last Updated: 2026-02-16*

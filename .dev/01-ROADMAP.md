@@ -1,5 +1,5 @@
 # AutoBuilder Project Roadmap
-*Version: 1.4.0*
+*Version: 1.7.1*
 
 **Single source of truth for project status and phased delivery.**
 
@@ -254,23 +254,31 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 #### Task Management Tools
 - [ ] `todo_read()`, `todo_write(action, task_id, content)`, `todo_list(filter)`
 
-#### PM-Level Tools (Phase 5 Integration)
-- [ ] `select_ready_batch()` — dependency-aware batch selection (topological sort of deliverables)
-- [ ] `run_regression_tests()` — cross-deliverable regression suite at batch boundary
-- [ ] `checkpoint_project()` — persist project state for resume/recovery
+#### PM-Level Tools & Safety Mechanisms (Phase 5 Integration)
+- [ ] `select_ready_batch()` — FunctionTool: dependency-aware batch selection (topological sort of deliverables)
+- [ ] `enqueue_ceo_item()` — FunctionTool: push notifications/approvals/escalations to unified CEO queue
+- [ ] `checkpoint_project` — `after_agent_callback` on DeliverablePipeline; fires after each deliverable completes, persists state via `CallbackContext`
+- [ ] `run_regression_tests` — `RegressionTestAgent` (CustomAgent) wired into pipeline after each batch; reads PM regression policy from session state, runs tests when policy says to, no-ops otherwise; always present (not skippable), policy-aware
 
-> **Note:** These FunctionTools are defined here as part of the core toolset but consumed by the PM agent (Phase 5). The PM calls these tools to manage the batch loop — they replace what was previously envisioned as a separate BatchOrchestrator agent.
+> **Note:** `select_ready_batch` and `enqueue_ceo_item` are FunctionTools the PM calls with LLM judgment. `checkpoint_project` and `run_regression_tests` are **not** LLM-discretionary -- they fire automatically per policy (not skippable). `checkpoint_project` is an `after_agent_callback` on DeliverablePipeline. `run_regression_tests` is a `RegressionTestAgent` (CustomAgent) always present in the pipeline.
 
-#### Tool Registry
-- [ ] Central `FunctionTool` registration
+#### Tool Implementation
+- [ ] All tools implemented as `FunctionTool` wrappers with typed signatures
+- [ ] Tool schemas auto-generated from type hints + docstrings
+- [ ] Basic tool grouping by category (filesystem, execution, git, web, task, PM-level)
+
+#### Tool Registry (AutoBuilderToolset)
+- [ ] `AutoBuilderToolset(BaseToolset)` — ADK-native per-role tool vending via `get_tools(readonly_context)`
+- [ ] Tools organized by function type in `app/tools/` (filesystem, git, execution, web, task, project)
+- [ ] Cascading permission config (CEO restricts Director, Director restricts PM, PM restricts Worker)
+- [ ] Role-based scoping (e.g., `plan_agent` gets read-only tools; `code_agent` gets full tools)
 - [ ] Per-workflow tool subset selection (from `WORKFLOW.yaml` required_tools)
-- [ ] `BaseToolset.get_tools()` for role-based filtering
 
 ### Completion Contract
 
 - [ ] All tools callable from within an ADK LlmAgent
 - [ ] Tool schemas auto-generated from type hints + docstrings
-- [ ] plan_agent gets read-only tools; code_agent gets full tools
+- [ ] AutoBuilderToolset vends correct tool subsets per role configuration
 - [ ] bash_exec handles timeout, output capture, error reporting
 
 ---
@@ -286,11 +294,17 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 ### Deliverables
 
 #### Supervision Hierarchy (Director + PM)
-- [ ] `Director` agent (LlmAgent, opus) — permanent root_agent of App; cross-project governance, CEO (user) liaison, resource allocation
-- [ ] `PM` agent (LlmAgent, sonnet) — per-project autonomous manager; PM IS the outer loop (no separate BatchOrchestrator). Uses tools (`select_ready_batch`, `run_regression_tests`, `checkpoint_project`) for mechanical operations and `after_agent_callback` for intra-batch oversight. PM reasons between batches to decide retry/skip/reorder/escalate.
-- [ ] Director → PM delegation via `transfer_to_agent` or `AgentTool`
+- [ ] `Director` agent (LlmAgent, opus) — root_agent of App; stateless config recreated per invocation, all state in DB; personality in `user:` scope; multi-session model (chat sessions for CEO interaction + work sessions per project for delegation)
+- [ ] `PM` agent (LlmAgent, sonnet) — per-project autonomous manager; stateless config (same lifecycle as Director); PM IS the outer loop, managing batches through tools and callbacks. Uses tools (`select_ready_batch`, `enqueue_ceo_item`) for LLM-discretionary operations; `after_agent_callback` for `verify_batch_completion`; `checkpoint_project` as `after_agent_callback` on DeliverablePipeline (persists state via `CallbackContext`); `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state). PM reasons between batches to decide retry/skip/reorder/escalate.
+- [ ] Director → PM delegation via `sub_agents` + `transfer_to_agent` (ADK native primitives)
 - [ ] Hard limits cascade: CEO → Director → PM → Workers
 - [ ] Supervision hooks (`before_agent_callback` / `after_agent_callback`) for Director observability over PM, and PM observability over DeliverablePipeline workers
+
+#### Unified CEO Queue
+- [ ] DB-backed queue for all items requiring CEO attention (approvals, escalations, questions, status reports)
+- [ ] Typed queue items with metadata (priority, source agent, context)
+- [ ] SSE push for real-time notification to connected clients
+- [ ] CEO can respond via chat session; Director routes response to appropriate PM/context
 
 #### PM Loop Prototype
 - [ ] Validate that LlmAgent PM reliably manages batch loop with tools + callbacks (similar to P4 validation of the mechanical pattern)
@@ -308,9 +322,11 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] `LinterAgent` — run project linter, write structured results to state
 - [ ] `TestRunnerAgent` — run test suite, write results to state
 - [ ] `FormatterAgent` — run code formatter (auto-corrective)
-- [ ] `DependencyResolverAgent` — topological sort of features
-- [ ] `RegressionTestAgent` — cross-feature regression at batch boundary
-- [ ] `ContextBudgetAgent` — token-count `LlmRequest`, write usage % to state (~50 LOC)
+- [ ] `DependencyResolverAgent` — topological sort of deliverables
+- [ ] `RegressionTestAgent` — CustomAgent wired into pipeline after each batch; reads PM regression policy from session state, runs cross-deliverable regression when policy says to, no-ops otherwise
+
+#### Context Budget Monitor (`before_model_callback`)
+- [ ] Token-count assembled `LlmRequest`, write usage % to state (~50 LOC, not a standalone agent)
 
 #### Agent Communication
 - [ ] Hierarchical delegation (Director → PM → Workers) via ADK primitives
@@ -325,14 +341,14 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ### Completion Contract
 
-- [ ] Director agent operates as permanent root_agent
-- [ ] PM agent manages a project autonomously via tool-driven batch loop, escalating only when necessary
+- [ ] Director agent operates as root_agent (stateless config, recreated per invocation)
+- [ ] PM agent manages a project autonomously via tools + deterministic safety mechanisms (`checkpoint_project`, `verify_batch_completion`, `run_regression_tests`), escalating only when necessary
 - [ ] PM loop prototype validates reliable inter-batch reasoning with tools + callbacks
 - [ ] Can run a single deliverable through the full DeliverablePipeline
 - [ ] Plan agent produces structured plan; code agent implements it
 - [ ] Lint/test agents produce structured results in state
 - [ ] Review cycle loops on failure, terminates on approval or max iterations
-- [ ] ContextBudgetAgent reports token usage percentage
+- [ ] Context budget `before_model_callback` reports token usage percentage
 
 ---
 
@@ -378,7 +394,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ### Completion Contract
 
-- [ ] `SkillLoaderAgent` loads relevant skills for a given feature context
+- [ ] `SkillLoaderAgent` loads relevant skills for a given deliverable context
 - [ ] Skills appear in unified event stream
 - [ ] `loaded_skill_names` in state shows exactly which skills loaded
 - [ ] Project-local skills override globals with same name
@@ -405,7 +421,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] Custom workflow override support
 
 #### WORKFLOW.yaml Manifest Format
-- [ ] Fields: name, description, triggers, required_tools, optional_tools, default_models, pipeline_type, supports_features, supports_parallel
+- [ ] Fields: name, description, triggers, required_tools, optional_tools, default_models, pipeline_type, supports_deliverables, supports_parallel
 - [ ] Trigger types: keywords, explicit
 
 #### auto-code Workflow
@@ -440,10 +456,10 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] Deliverable status enum: PENDING, IN_PROGRESS, COMPLETED, FAILED, BLOCKED
 
 #### PM Outer Loop (Batch Execution)
-- [ ] PM (LlmAgent) drives the "while incomplete deliverables exist" loop — no separate BatchOrchestrator agent
+- [ ] PM (LlmAgent) drives the "while incomplete deliverables exist" loop
 - [ ] PM calls `select_ready_batch()` tool for dependency-aware deliverable selection (topological sort, dynamic `ParallelAgent` construction)
-- [ ] PM calls `run_regression_tests()` tool at batch boundary for cross-deliverable regression
-- [ ] PM calls `checkpoint_project()` tool for resume/recovery persistence
+- [ ] `run_regression_tests` — `RegressionTestAgent` (CustomAgent) in pipeline after each batch; reads PM regression policy from session state, system-enforced
+- [ ] `checkpoint_project` — `after_agent_callback` on DeliverablePipeline; fires after each deliverable completes, persists state via `CallbackContext`
 - [ ] Concurrency limits (configurable max parallel deliverables, cascaded from Director)
 - [ ] `after_agent_callback` on each `DeliverablePipeline` — monitors completion, flags critical failures
 - [ ] `before_agent_callback` — injects context, verifies preconditions
@@ -458,14 +474,14 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 #### Git Worktree Isolation
 - [ ] Worktree creation per parallel deliverable
-- [ ] Filesystem isolation between concurrent features
+- [ ] Filesystem isolation between concurrent deliverables
 - [ ] Merge on deliverable completion
 - [ ] Cleanup on pipeline completion
 
 ### Completion Contract
 
 - [ ] Can submit a spec, have it decomposed into deliverables
-- [ ] Director delegates project to PM; PM drives batch loop autonomously via tools
+- [ ] Director delegates project to PM; PM drives batch loop autonomously via tools + deterministic safety mechanisms
 - [ ] PM constructs dependency-aware parallel batches via `select_ready_batch()` tool
 - [ ] Loop continues autonomously until all deliverables complete
 - [ ] Failed deliverables don't block independent work
@@ -495,7 +511,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] Memory context injected into agent instructions via `{memory_context}`
 
 #### Ingestion Strategy
-- [ ] Memory ingestion at session completion (configurable: per-feature, per-batch, or session end)
+- [ ] Memory ingestion at session completion (configurable: per-deliverable, per-batch, or session end)
 
 ### Completion Contract
 
@@ -564,12 +580,12 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] Prompt tracking, latency analysis, quality scoring
 
 #### Cost & Token Tracking
-- [ ] `TokenTrackingPlugin` — per-feature and per-agent token/cost metrics
+- [ ] `TokenTrackingPlugin` — per-deliverable and per-agent token/cost metrics
 - [ ] Context budget awareness — reactive compression/pruning at threshold
 - [ ] Extended API: `GET /metrics`, `GET /costs`, `GET /memory`
 
 #### Crash Recovery
-- [ ] PM checkpoint recovery — resume batch loop from last `checkpoint_project()` state
+- [ ] PM checkpoint recovery — resume batch loop from last checkpoint state
 - [ ] ADK session resume with `ResumabilityConfig`
 - [ ] Tool idempotency validation (re-run safety)
 
@@ -585,7 +601,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 ### Completion Contract
 
 - [ ] Langfuse dashboard shows per-prompt metrics
-- [ ] Token costs visible per feature, per agent, per model
+- [ ] Token costs visible per deliverable, per agent, per model
 - [ ] Pipeline resumes correctly after simulated crash
 - [ ] Adaptive router selects models based on cost/latency data
 - [ ] Context budget triggers compression before window exhaustion
@@ -690,14 +706,14 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 | 7 | Web search provider (SearXNG vs Brave vs Tavily) | Open | Phase 4 |
 | 8 | Agent-browser integration approach for UI testing | Open | Phase 4 |
 | 9 | Durable execution — native ADK resume sufficient or need Temporal? | Likely sufficient | Phase 11 |
-| 10 | Memory ingestion — after each feature, each batch, or session end? | Open | Phase 9 |
-| 11 | pgvector embedding strategy for semantic memory | Decided: tsvector for keyword search; pgvector available when needed | Phase 9 |
-| 12 | Quote style — double vs single for Python | Decided: double quotes (ruff default) | Phase 0 |
+| 10 | Memory ingestion — after each deliverable, each batch, or session end? | Open | Phase 9 |
+| 11 | pgvector embedding strategy for semantic memory | Closed: tsvector for keyword search; pgvector available when needed | Phase 9 |
+| 12 | Quote style — double vs single for Python | Closed: double quotes (ruff default) | Phase 0 |
 | 13 | Auth strategy for gateway API | TBD | Phase 11 |
-| 14 | Docker configuration details | Decided: docker-compose with PostgreSQL + Redis | Phase 0 |
-| 15 | Director persistence model — how does Director state survive worker restarts? | Open | Phase 5 |
-| 16 | PM batch tool design — exact signatures for `select_ready_batch`, `run_regression_tests`, `checkpoint_project` | Open | Phase 5 |
-| 17 | Agent Skills standard mapping — which frontmatter fields from agentskills.io map to our trigger system | Open | Phase 6 |
+| 14 | Docker configuration details | Closed: docker-compose with PostgreSQL + Redis | Phase 0 |
+| 15 | Director persistence model — how does Director state survive worker restarts? | Closed: Stateless. Agent config recreated per invocation, all state in DB. Personality in `user:` scope. | Phase 5 |
+| 16 | PM batch operations — `select_ready_batch` (FunctionTool), `checkpoint_project` (automatic), `run_regression_tests` (PM-defined policy) | Closed: `checkpoint_project` = `after_agent_callback` on DeliverablePipeline (persists state via `CallbackContext`); `run_regression_tests` = `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state) | Phase 5 |
+| 17 | Agent Skills standard mapping — which frontmatter fields from agentskills.io map to our trigger system | Closed: mapping defined | Phase 6 |
 
 ---
 
@@ -769,9 +785,17 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 | 1.1.0 | 2026-02-12 | Renumbered all phases to sequential whole numbers (eliminated sub-phases) |
 | 1.2.0 | 2026-02-12 | Phase 0 verified COMPLETE — all deliverables and completion contract pass |
 | 1.3.0 | 2026-02-14 | Hierarchical supervision (Director → PM → Workers) integrated into Phase 5, 8 |
-| 1.4.0 | 2026-02-16 | PM absorbs BatchOrchestrator; tool/agent terminology aligned; Agent Skills standard adopted |
+| 1.4.0 | 2026-02-16 | PM IS the outer loop; tool/agent terminology aligned; Agent Skills standard adopted |
+| 1.5.0 | 2026-02-16 | Resolved Q15/Q16/Q17; Phase 5 updated with stateless agents, CEO queue, tool registry, deterministic safety ops |
+| 1.5.1 | 2026-02-16 | Aligned tool/callback distinction (checkpoint + regression are not FunctionTools); added enqueue_ceo_item to PM tools |
+| 1.5.2 | 2026-02-16 | Reclassified ContextBudgetAgent as `before_model_callback` (not standalone agent) to match architecture doc |
+| 1.6.0 | 2026-02-16 | Revised Decision #46: replaced file-based directory-scoped tool registry with ADK-native AutoBuilderToolset(BaseToolset) pattern |
+| 1.6.1 | 2026-02-16 | Replaced vague "deterministic callback" terminology with exact ADK mechanisms: checkpoint_project = after_agent_callback, RegressionTestAgent = CustomAgent |
+| 1.6.2 | 2026-02-16 | Flagged unverified ADK mechanism claims as TBD: checkpoint_project and run_regression_tests behavior is decided, exact ADK wiring deferred to Phase 5 prototype |
+| 1.7.0 | 2026-02-16 | Resolved all TBD flags: checkpoint_project = `after_agent_callback` on DeliverablePipeline (persists state via CallbackContext); run_regression_tests = `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state) |
+| 1.7.1 | 2026-02-17 | Moved AutoBuilderToolset from Phase 5 to Phase 4; removed redundant Deterministic Safety section; fixed Phase 4 completion contract to be verifiable in Phase 4 |
 
 ---
 
-*Document Version: 1.4.0*
-*Last Updated: 2026-02-16*
+*Document Version: 1.7.1*
+*Last Updated: 2026-02-17*

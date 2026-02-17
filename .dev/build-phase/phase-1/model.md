@@ -37,10 +37,10 @@ flowchart TB
         end
 
         subgraph AGENTS_D5["P1.D5 — Dynamic Outer Loop"]
-            BatchOrch["BatchOrchestrator\n(CustomAgent / BaseAgent)"]
+            OuterLoop["OuterLoopAgent\n(CustomAgent / BaseAgent)"]
             DynParallel["ParallelAgent\n(dynamically constructed)"]
             FeatureAgents["Feature LlmAgents\n(1 per feature)"]
-            BatchOrch -->|"while incomplete"| DynParallel --> FeatureAgents
+            OuterLoop -->|"while incomplete"| DynParallel --> FeatureAgents
         end
 
         subgraph STATE["Shared State"]
@@ -102,11 +102,15 @@ class CustomAgentBase(BaseAgent):
         ...
 ```
 
-### BatchOrchestrator Pattern (Dynamic Composition)
+### Outer Loop Agent Pattern (Dynamic Composition — Test Prototype)
 
 ```python
-class BatchOrchestrator(BaseAgent):
-    """Outer loop that dynamically constructs ParallelAgent batches.
+class OuterLoopAgent(BaseAgent):
+    """Test prototype for dynamic outer loop agent pattern.
+
+    Validates the pattern of dynamically constructing ParallelAgent batches
+    from a dependency graph. In production, PM (LlmAgent) absorbs this
+    orchestration role — mechanical batch parts are PM tools.
 
     - Pydantic v2 model fields for configuration (e.g., features list)
     - Reads dependency graph from model fields
@@ -200,9 +204,9 @@ class AgentRole(str, enum.Enum):
 | P1.D4 | `agent_2_output` | `str` | `mountain_agent` via `output_key` |
 | P1.D4 | `agent_3_output` | `str` | `forest_agent` via `output_key` |
 | P1.D5 | `feature_{name}_output` | `str` | Per-feature `LlmAgent` via `output_key` |
-| P1.D5 | `all_completed` | `bool` | `BatchOrchestrator` direct write |
-| P1.D5 | `completed_features` | `list[str]` | `BatchOrchestrator` direct write |
-| P1.D5 | `total_batches` | `int` | `BatchOrchestrator` direct write |
+| P1.D5 | `all_completed` | `bool` | `OuterLoopAgent` direct write |
+| P1.D5 | `completed_features` | `list[str]` | `OuterLoopAgent` direct write |
+| P1.D5 | `total_batches` | `int` | `OuterLoopAgent` direct write |
 
 ## Data Flow
 
@@ -300,11 +304,11 @@ stateDiagram-v2
     AssertConcurrency --> [*]: Total time < 3x slowest
 ```
 
-### P1.D5 — Dynamic Outer Loop (BatchOrchestrator)
+### P1.D5 — Dynamic Outer Loop (OuterLoopAgent)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Init: BatchOrchestrator starts
+    [*] --> Init: OuterLoopAgent starts
     Init --> SelectBatch: Find features with all deps met
 
     state SelectBatch {
@@ -368,7 +372,7 @@ flowchart LR
 | `app.models.enums` | Python imports | Phase 0 enums referenced conceptually (not directly used in prototype tests) |
 | `app.models.base.BaseModel` | Pydantic base class | `Feature` model inherits from Pydantic `BaseModel` |
 | `app.config.settings.Settings` | Pydantic Settings | Not directly used — prototypes use `InMemoryRunner` (no infra) |
-| `google.adk.agents.BaseAgent` | `_run_async_impl(ctx)` | `LinterAgent` and `BatchOrchestrator` subclass this |
+| `google.adk.agents.BaseAgent` | `_run_async_impl(ctx)` | `LinterAgent` and `OuterLoopAgent` subclass this |
 | `google.adk.agents.LlmAgent` | ADK constructor (model, instruction, tools, output_key) | All LLM agents in P1.D2–D5 |
 | `google.adk.agents.SequentialAgent` | ADK constructor (sub_agents) | P1.D3 pipeline |
 | `google.adk.agents.ParallelAgent` | ADK constructor (sub_agents) | P1.D4 static, P1.D5 dynamic |
@@ -385,12 +389,12 @@ flowchart LR
 |----------------|-------------|-------------|
 | FunctionTool pattern (file_read, file_write, bash_exec) | Phase 4 (Production Tools) | Phase 1 validates the `FunctionTool` wrapping pattern; Phase 4 adds sandboxing, security, and full tool suite |
 | CustomAgent `_run_async_impl` pattern | Phase 3+ (Custom Agents) | Phase 1 proves `LinterAgent` pattern; production agents (SkillLoader, TestRunner, Formatter) follow same contract |
-| `BatchOrchestrator` dynamic composition | Phase 5+ (Orchestrator) | Phase 1 validates dynamic `ParallelAgent` batch construction; production adds checkpointing, regression tests, event-sourced state |
+| Dynamic batch composition (outer loop agent) | Phase 5 (PM owns orchestration) | Phase 1 validates dynamic `ParallelAgent` batch construction; production PM manages batches via tools (`select_ready_batch`), `after_agent_callback` (`verify_batch_completion`), and deterministic safety mechanisms (`checkpoint_project` as `after_agent_callback` on DeliverablePipeline, `RegressionTestAgent` as CustomAgent in pipeline after each batch) |
 | `SequentialAgent` pipeline composition | Phase 3+ (DeliverablePipeline) | Phase 1 proves LLM → Deterministic sequencing; production pipeline adds LoopAgent review cycles |
 | `output_key` state communication | Phase 3+ (Agent Communication) | Phase 1 validates `output_key` → `{key}` template reading; production adds `InstructionProvider` and `before_model_callback` |
 | Token usage tracking (`usage_metadata`) | Phase 2+ (Observability) | Phase 1 validates token counts are reported; production adds ContextBudgetAgent and cost tracking |
 | State delta pattern (event-sourced) | Phase 3+ (Production Agents) | Phase 1 uses direct state writes (D9 decision); production agents MUST use `state_delta` for auditability |
-| `InMemoryRunner` → `DatabaseSessionService` | Phase 2 (Infrastructure) | Phase 1 uses in-memory; production uses `DatabaseSessionService` with PostgreSQL persistence |
+| `InMemoryRunner` → `DatabaseSessionService` | Phase 3 (ADK Engine Integration) | Phase 1 uses in-memory; production uses `DatabaseSessionService` with PostgreSQL persistence |
 
 ## Notes
 

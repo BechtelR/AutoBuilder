@@ -328,7 +328,7 @@ flowchart TB
     Start([run_workflow called])
     ReadWf[Read workflow from DB]
     Found{Workflow found?}
-    RaiseNotFound[Raise WorkerError\ncode=NOT_FOUND]
+    RaiseNotFound[Raise NotFoundError]
     SetRunning[Update status → RUNNING\nSet started_at]
     PubStarted[Publish WORKFLOW_STARTED]
     GetSession{Session exists?}
@@ -456,10 +456,10 @@ flowchart LR
 | `before_model_callback` integration | Phase 5 | Router method signature ready; callback wiring deferred until real agents exist |
 | `PipelineEvent` schema | Phase 10 (SSE) | SSE endpoint reads from Redis Streams and pushes `PipelineEvent` JSON to clients |
 | `EventPublisher.translate()` mapping | Phase 5+ | Translation handles all ADK event types; new agent types produce events that map through existing classification |
-| Redis Stream key pattern | Phase 10 (SSE), Phase 6 (Webhooks) | `workflow:{id}:events` stream is the shared event bus; SSE and webhook consumers read from it |
-| `run_workflow` task | Phase 5 (Director + Agents) | EchoAgent replaced with Director (permanent root_agent) with PM sub-agents (each PM IS the outer loop for its project, managing batches via tools); factory pattern in `create_app_container()` supports this |
-| `create_app_container()` | Phase 5 (Director) | Accepts any `BaseAgent` as root; Phase 5 passes Director agent (permanent root_agent) — App lifecycle changes from per-execution to per-worker-startup |
-| `DatabaseSessionService` | Phase 8 (State/Memory) | Session state persistence operational; future phases use 4-scope state (user:, app:, temp:) |
+| Redis Stream key pattern | Phase 10 (SSE + Webhooks) | `workflow:{id}:events` stream is the shared event bus; SSE and webhook consumers read from it |
+| `run_workflow` task | Phase 5 (Director + Agents) | EchoAgent replaced with Director (stateless config object, recreated per invocation) with PM sub-agents via `sub_agents` + `transfer_to_agent`; each PM IS the outer loop for its project, managing batches via tools; factory pattern in `create_app_container()` supports this |
+| `create_app_container()` | Phase 5 (Director) | Accepts any `BaseAgent` as root; Phase 5 passes Director agent (stateless, recreated per invocation) |
+| `DatabaseSessionService` | Phase 5+ (State/Memory) | Session state persistence operational; multi-session architecture: chat sessions for CEO interaction, work sessions per project; existing 4 ADK scopes sufficient: `app:` = global, `user:` = CEO prefs + Director personality, session = per-session, `temp:` = scratch |
 | `WorkflowRunRequest.params` | Phase 5+ | Optional params dict passed through to worker; future phases define workflow-specific param schemas |
 | Worker context pattern | Phase 5+ | `ctx["session_service"]` and `ctx["llm_router"]` pattern extensible for new shared resources |
 | ArqRedis pool | Phase 10 (SSE) | Gateway SSE endpoint reads streams via the same ArqRedis pool |
@@ -490,4 +490,4 @@ flowchart LR
 
 - **Worker context casting**: ARQ provides `ctx` as `dict[str, object]`. Worker code uses `cast()` to recover typed references (`cast(DatabaseSessionService, ctx["session_service"])`). This is an accepted `Any`-adjacent pattern per the common-errors exceptions list (ARQ framework constraint).
 
-- **Hierarchical supervision**: Phase 3 uses EchoAgent as root_agent for infrastructure validation. The production architecture (Phase 5+) uses Director (LlmAgent, opus) as the permanent root_agent, with PM sub-agents (LlmAgent, sonnet) per project. Each PM IS the outer loop for its project — managing batch execution via tools (`select_ready_batch`, `run_regression_tests`, `checkpoint_project`) and deterministic callbacks, with no separate BatchOrchestrator agent. Workers (LlmAgent + CustomAgent) execute beneath PMs. The `create_app_container(root_agent: BaseAgent)` factory supports this transition with zero API changes — only the root_agent argument changes. See `.discussion/260214_hierarchical-supervision.md`, `.discussion/260216_terminology-skills-pm.md`.
+- **Hierarchical supervision**: Phase 3 uses EchoAgent as root_agent for infrastructure validation. The production architecture (Phase 5+) uses Director (LlmAgent, opus) as root_agent -- a stateless config object recreated per invocation, with personality in `user:` scope. Director delegates to PM sub-agents via `sub_agents` + `transfer_to_agent`. PM (LlmAgent, sonnet) per project, also a stateless config object. Each PM IS the outer loop via tools (`select_ready_batch`), `after_agent_callback` (`verify_batch_completion`), `checkpoint_project` (`after_agent_callback` on DeliverablePipeline, persists state via `CallbackContext`), and `run_regression_tests` (`RegressionTestAgent` CustomAgent in pipeline after each batch, reads PM regression policy from session state). Multi-session architecture: chat sessions for CEO interaction, work sessions per project. Project config is a DB entity, no new ADK scope. `AutoBuilderToolset(BaseToolset)` for per-role tool vending with cascading permission config. Workers (LlmAgent + CustomAgent) execute beneath PMs. The `create_app_container(root_agent: BaseAgent)` factory supports this transition with zero API changes -- only the root_agent argument changes. See `.discussion/260214_hierarchical-supervision.md`, `.discussion/260216_terminology-skills-pm.md`.

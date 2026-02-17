@@ -340,14 +340,14 @@ pipeline = SequentialAgent(
 )
 ```
 
-### Batch Orchestration
+### Outer Loop Pattern
 
 ```python
-outer_loop = BatchOrchestrator(  # CustomAgent
+outer_loop = OuterLoopAgent(  # CustomAgent - project orchestration
     inner_pipeline=ParallelAgent(
         name="batch_executor",
         sub_agents=[
-            # Dynamically created feature pipelines
+            # Dynamically created deliverable pipelines
         ]
     )
 )

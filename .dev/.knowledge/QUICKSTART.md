@@ -73,7 +73,7 @@ Multi-model routing, resumability, memory.
 
 | Building... | Read |
 |-------------|------|
-| **BatchOrchestrator** | [agents/custom-agents.md](adk/agents/custom-agents.md), [runtime/event-loop.md](adk/runtime/event-loop.md), [components/sessions-state.md](adk/components/sessions-state.md), [agents/multi-agents.md](adk/agents/multi-agents.md) |
+| **Batch Manager Agents** | [agents/custom-agents.md](adk/agents/custom-agents.md), [runtime/event-loop.md](adk/runtime/event-loop.md), [components/sessions-state.md](adk/components/sessions-state.md), [agents/multi-agents.md](adk/agents/multi-agents.md) |
 | **Feature pipeline** | [agents/sequential-agents.md](adk/agents/sequential-agents.md), [agents/loop-agents.md](adk/agents/loop-agents.md) |
 | **LLM agents** (planner, coder, reviewer) | [agents/llm-agents.md](adk/agents/llm-agents.md), [google-adk-agents-LlmAgent.md](python-adk/google-adk-agents-LlmAgent.md), [tools/function-tools.md](adk/tools/function-tools.md) |
 | **Deterministic agents** (linter, test runner) | [agents/custom-agents.md](adk/agents/custom-agents.md), [google-adk-agents.md](python-adk/google-adk-agents.md), [components/sessions-state.md](adk/components/sessions-state.md) |

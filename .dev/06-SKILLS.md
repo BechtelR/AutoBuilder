@@ -26,7 +26,7 @@ The naive approach is "give the agent all the context." This fails at scale: an 
 
 The solution is **progressive disclosure**: agents see a lightweight index of available skills and load full content only when relevant to the current task. The skill system is the mechanism for this.
 
-Skills are a Phase 1 component (Architecture Decision #14) because agents without skills are generic. Skills produce workflow-appropriate and project-appropriate output from day one.
+Skills are a Phase 1 component because agents without skills are generic. Skills produce workflow-appropriate and project-appropriate output from day one.
 
 ---
 
@@ -50,7 +50,7 @@ Global skills ship with AutoBuilder (workflow-agnostic best practices). Project-
 
 ### 5. Composable
 
-Multiple skills can apply to a single task. An API endpoint feature might match `api-endpoint`, `authentication-middleware`, and `error-handling` skills simultaneously. All matched skills load into context.
+Multiple skills can apply to a single task. An API endpoint deliverable might match `api-endpoint`, `authentication-middleware`, and `error-handling` skills simultaneously. All matched skills load into context.
 
 ### 6. No LLM in Matching
 
@@ -66,7 +66,7 @@ The skill file format follows the [Agent Skills open standard](https://agentskil
 
 Each skill is a `SKILL.md` file (per the Agent Skills open standard) with YAML frontmatter. The format follows the standard's three-level progressive disclosure model:
 
-- **L1 (Frontmatter metadata):** Lightweight index fields -- name, description, triggers, tags. Parsed for matching without reading the body.
+- **L1 (Frontmatter metadata):** Lightweight index fields. Standard fields (`name`, `description`) at top level; AutoBuilder extensions (`triggers`, `tags`, `applies_to`, `priority`) under `metadata`. Parsed for matching without reading the body.
 - **L2 (Instructions/body):** Full markdown content -- conventions, patterns, examples. Loaded into agent context only on match.
 - **L3 (References/assets):** Optional supporting files in `references/` and `assets/` subdirectories alongside the skill file.
 
@@ -74,12 +74,13 @@ Each skill is a `SKILL.md` file (per the Agent Skills open standard) with YAML f
 ---
 name: fastapi-endpoint
 description: How to implement a REST API endpoint following project conventions
-triggers:
-  - deliverable_type: api_endpoint
-  - file_pattern: "*/routes/*.py"
-tags: [api, http, routing, fastapi]
-applies_to: [code_agent, review_agent]
-priority: 10
+metadata:
+  triggers:
+    - deliverable_type: api_endpoint
+    - file_pattern: "*/routes/*.py"
+  tags: [api, http, routing, fastapi]
+  applies_to: [code_agent, review_agent]
+  priority: 10
 ---
 
 ## API Endpoint Implementation
@@ -122,18 +123,27 @@ Every endpoint requires:
 
 ### Frontmatter Fields
 
+**Standard fields** (top-level, per [Agent Skills spec](https://agentskills.io/specification)):
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | Unique identifier. Project-local skills with the same name as a global skill override it. |
-| `description` | string | Yes | Human-readable summary. Included in skill index for debugging. |
-| `triggers` | list | Yes | One or more trigger conditions. Skill matches if ANY trigger matches (OR logic). |
-| `tags` | list of strings | No | Additional matching keywords for `tag_match` trigger type. |
-| `applies_to` | list of strings | No | Which agents receive this skill's content. If omitted, applies to all agents. |
-| `priority` | integer | No | Higher priority skills load first when multiple skills match. Default: 0. |
+| `description` | string | Yes | Human-readable summary. Included in skill index for debugging. Also used as keyword fallback for trigger matching when `metadata.triggers` is absent (see [Interoperability](#interoperability)). |
+
+**Extension fields** (under `metadata`, AutoBuilder-specific):
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `metadata.triggers` | list | Yes* | One or more trigger conditions. Skill matches if ANY trigger matches (OR logic). *Not required for third-party skills -- see [Interoperability](#interoperability). |
+| `metadata.tags` | list of strings | No | Additional matching keywords for `tag_match` trigger type. |
+| `metadata.applies_to` | list of strings | No | Which agents receive this skill's content. If omitted, applies to all agents. |
+| `metadata.priority` | integer | No | Higher priority skills load first when multiple skills match. Default: 0. |
 
 ---
 
 ## Trigger Matching
+
+Triggers are read from `metadata.triggers` in the skill frontmatter. Skills without `metadata.triggers` fall back to `description` keyword matching (see [Interoperability](#interoperability)).
 
 ### Trigger Types
 
@@ -143,19 +153,24 @@ Every endpoint requires:
 | `file_pattern` | Any file in `state["target_files"]` | Glob pattern match |
 | `tag_match` | Any tag in `state["deliverable_tags"]` | Set intersection (any overlap) |
 | `explicit` | `state["requested_skills"]` | Named request (agent or user requested this skill by name) |
-| `always` | Always matches for specified agents | Unconditional — the skill loads on every invocation for the agents listed in `applies_to` |
+| `always` | Always matches for specified agents | Unconditional — the skill loads on every invocation for the agents listed in `metadata.applies_to` |
 
 ### OR Logic
 
 A skill matches if **any** of its triggers match. This is intentional: triggers describe the different contexts where a skill is relevant. An API endpoint skill might trigger on both `deliverable_type: api_endpoint` AND `file_pattern: "*/routes/*.py"` because either condition means the skill is relevant.
 
 ```yaml
-triggers:
-  - deliverable_type: api_endpoint       # Matches if deliverable type is "api_endpoint"
-  - file_pattern: "*/routes/*.py"        # OR if any target file is in a routes directory
+metadata:
+  triggers:
+    - deliverable_type: api_endpoint       # Matches if deliverable type is "api_endpoint"
+    - file_pattern: "*/routes/*.py"        # OR if any target file is in a routes directory
 ```
 
 If the deliverable type is `api_endpoint` but no target files exist yet (initial generation), the skill still matches via the first trigger. If the deliverable type is `refactor` but the target files are in `routes/`, the skill still matches via the second trigger.
+
+### Interoperability
+
+Third-party skills following the standard [Agent Skills](https://agentskills.io/specification) format may not include `metadata.triggers`. When `metadata.triggers` is absent, `SkillLoaderAgent` falls back to keyword matching against the skill's `description` field. This allows community-authored skills to work out of the box without modification, though explicit triggers provide more precise matching.
 
 ### Override Rules
 
@@ -197,7 +212,7 @@ class SkillLoaderAgent(BaseAgent):
 
 | Requirement | How SkillLoaderAgent Satisfies It |
 |---|---|
-| **Observable** | Skill resolution appears in the event stream. You can see exactly which skills loaded for any feature execution. |
+| **Observable** | Skill resolution appears in the event stream. You can see exactly which skills loaded for any deliverable execution. |
 | **Deterministic** | Cannot be skipped by LLM judgment. It is a workflow step, not a suggestion. |
 | **Load once, use many** | Skills load into session state once. All subsequent agents in the pipeline (`plan_agent`, `code_agent`, `review_agent`) read from `{loaded_skills}`. |
 | **Debuggable** | If an agent produces poor output, check `loaded_skill_names` in state to verify the right skills were loaded. |
@@ -211,7 +226,7 @@ Downstream LLM agents read skills from state via template injection in their ins
 code_agent = LlmAgent(
     name="code_agent",
     instruction="""
-    Implement the feature according to the plan.
+    Implement the deliverable according to the plan.
 
     Implementation plan:
     {implementation_plan}
@@ -226,7 +241,7 @@ code_agent = LlmAgent(
 )
 ```
 
-The `applies_to` field in skill frontmatter controls which agents receive the skill. If a skill specifies `applies_to: [code_agent, review_agent]`, the `InstructionProvider` filters loaded skills to only include those relevant to the current agent.
+The `metadata.applies_to` field in skill frontmatter controls which agents receive the skill. If a skill specifies `metadata.applies_to: [code_agent, review_agent]`, the `InstructionProvider` filters loaded skills to only include those relevant to the current agent.
 
 ---
 
@@ -356,6 +371,6 @@ This is disproportionate value for the effort. Skills transform agents from gene
 
 ---
 
-**Document Version:** 2.1
+**Document Version:** 2.3
 **Last Updated:** 2026-02-16
 **Status:** Framework Validated -- Prototyping Phase

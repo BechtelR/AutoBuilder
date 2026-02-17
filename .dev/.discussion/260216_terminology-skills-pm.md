@@ -49,13 +49,13 @@ We designed a custom skills system (`06-SKILLS.md`). ADK has its own experimenta
 
 ---
 
-## 3. PM Absorbs BatchOrchestrator
+## 3. PM IS the Outer Loop
 
 ### Problem
-After the hierarchical supervision decision (#29-35), the docs described BatchOrchestrator as "PM-Level Outer Loop" which was ambiguous — does BatchOrchestrator = PM? Is it a sub-agent of PM?
+After the hierarchical supervision decision (#29-35), the docs described a separate batch orchestration layer beneath the PM, which was ambiguous and created unnecessary indirection.
 
 ### Analysis
-BatchOrchestrator's loop is purely mechanical:
+The outer loop operations are:
 ```
 while incomplete deliverables exist:
     select ready batch (topological sort)
@@ -66,21 +66,21 @@ while incomplete deliverables exist:
     checkpoint
 ```
 
-Making this a separate `CustomAgent` beneath the PM creates problems:
-1. If BatchOrchestrator runs the entire loop, PM never reasons between batches — defeating the purpose of an LlmAgent PM
+Making this a separate orchestrator agent beneath the PM creates problems:
+1. If the orchestrator runs the entire loop, PM never reasons between batches — defeating the purpose of an LlmAgent PM
 2. If it runs one batch at a time, it's a glorified function call with extra indirection
 3. It's a single-use abstraction (violates "abstract only after third occurrence")
 
 ### Decision
-**PM IS the outer loop.** No separate BatchOrchestrator agent.
+**PM IS the outer loop.** No separate orchestrator agent.
 
-The mechanical operations become **tools** the PM calls:
-- `select_ready_batch()` — dependency-aware batch selection (topological sort)
-- `run_regression_tests()` — cross-deliverable regression suite
-- `checkpoint_project()` — persist project state for resume
+The mechanical operations become **tools** and **agents** the PM uses:
+- `select_ready_batch()` — FunctionTool: dependency-aware batch selection (topological sort)
+- `run_regression_tests` — `RegressionTestAgent` (CustomAgent) wired into pipeline after each batch; reads PM regression policy from session state, runs tests when policy says to, no-ops otherwise; always present, policy-aware
 
-Deterministic safety via **callbacks**, not a separate agent:
-- `after_agent_callback` on each `DeliverablePipeline` — monitors completion, flags critical failures
+Deterministic safety via **`after_agent_callback`** on DeliverablePipeline:
+- `checkpoint_project` — `after_agent_callback` on DeliverablePipeline; fires after each deliverable completes, persists state via `CallbackContext`
+- `verify_batch_completion` — monitors completion, flags critical failures (`after_agent_callback`)
 - `before_agent_callback` — injects context, verifies preconditions
 
 ### Oversight Model
@@ -96,8 +96,10 @@ Deterministic safety via **callbacks**, not a separate agent:
 ```
 Director (LlmAgent, opus) — root_agent
   └── PM (LlmAgent, sonnet) — per-project, IS the outer loop
-        ├── tools: select_ready_batch, run_regression, checkpoint
+        ├── tools: select_ready_batch (FunctionTool)
         ├── after_agent_callback: verify_batch_completion
+        ├── checkpoint_project: after_agent_callback on DeliverablePipeline (persists state via CallbackContext)
+        ├── run_regression_tests: RegressionTestAgent (CustomAgent) in pipeline after each batch (reads PM regression policy from session state)
         └── sub_agents: DeliverablePipeline instances (workers)
 ```
 
@@ -105,7 +107,7 @@ Director (LlmAgent, opus) — root_agent
 P4 validated that dynamic `ParallelAgent` batch construction with dependency ordering works. This pattern is still used — it's the implementation technique the PM employs via tools. P4's validation holds; it just maps to PM's tool usage, not a separate agent.
 
 ### Phase 5 Prototype
-Add a PM prototype to Phase 5 spec: validate that an LlmAgent PM reliably manages a batch loop with tools + callbacks. Similar to how P4 validated the mechanical pattern.
+Add a PM prototype to Phase 5 spec: validate that an LlmAgent PM reliably manages a batch loop with tools + deterministic safety mechanisms (`checkpoint_project` as `after_agent_callback` on DeliverablePipeline, `verify_batch_completion` as `after_agent_callback`, `RegressionTestAgent` as CustomAgent in pipeline). Similar to how P4 validated the mechanical pattern.
 
 ---
 
@@ -115,5 +117,5 @@ Add a PM prototype to Phase 5 spec: validate that an LlmAgent PM reliably manage
 |---|----------|-----------|
 | 36 | Tool/Agent terminology aligned with ADK taxonomy | ADK separates tools (passive, LLM-discretionary) from agents (active, pipeline-structured); our docs conflated them |
 | 37 | Skills system adopts Agent Skills open standard file format | Interoperability with emerging standard; our deterministic runtime stays custom |
-| 38 | PM absorbs BatchOrchestrator — no separate orchestrator agent | Single-use abstraction; PM needs inter-batch reasoning; mechanical parts become tools |
-| 39 | Batch oversight via PM tools + deterministic callbacks | PM manages strategy; `after_agent_callback` provides intra-batch safety net |
+| 38 | PM IS the outer loop — no separate orchestrator agent | Single-use abstraction; PM needs inter-batch reasoning; mechanical parts become tools |
+| 39 | Batch oversight via PM tools + deterministic safety mechanisms | PM manages strategy; `after_agent_callback` for `verify_batch_completion`; `checkpoint_project` = `after_agent_callback` on DeliverablePipeline (persists state via `CallbackContext`); `run_regression_tests` = `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state) |

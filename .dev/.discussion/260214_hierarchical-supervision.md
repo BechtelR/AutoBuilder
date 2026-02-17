@@ -9,7 +9,7 @@
 
 The original vision (260114_plan-shaping.md, Problem #9) explicitly called for "lightweight agentic-team coordination patterns; director->workers, specialists, reflectors, reviewers, security, etc." ADK was chosen specifically because it supports hierarchical agent composition via `App` → `root_agent` → `sub_agents` tree, with native primitives for Coordinator/Dispatcher patterns and Hierarchical Task Decomposition.
 
-However, when the architecture was formalized into `02-ARCHITECTURE.md` and `05-AGENTS.md`, this hierarchy was flattened into a sequential pipeline model: `App(root_agent=batch_orchestrator)` where the `BatchOrchestrator` directly manages deliverable batches. There is no supervisory layer between the user (CEO) and the execution pipeline. This contradicts the original vision and underutilizes ADK's native hierarchy capabilities.
+However, when the architecture was formalized into `02-ARCHITECTURE.md` and `05-AGENTS.md`, this hierarchy was flattened into a sequential pipeline model with no supervisory layer between the user (CEO) and the execution pipeline. This contradicts the original vision and underutilizes ADK's native hierarchy capabilities.
 
 ## Decision
 
@@ -18,12 +18,10 @@ Introduce a **three-tier hierarchical supervision model** that maps directly to 
 ```
 CEO (dev user / human)
   └── Director (LlmAgent, opus) — root_agent of App
-        ├── PM: Project Alpha (LlmAgent, sonnet) — per-project autonomous manager
-        │     ├── BatchOrchestrator (CustomAgent) — dynamic batch construction
-        │     │     └── DeliverablePipeline(s) — workers execute deliverables
-        │     └── [other project-level agents as needed]
+        ├── PM: Project Alpha (LlmAgent, sonnet) — per-project autonomous manager (IS the outer loop)
+        │     └── DeliverablePipeline(s) — workers execute deliverables
         ├── PM: Project Beta (LlmAgent, sonnet)
-        │     └── ...
+        │     └── DeliverablePipeline(s) — workers execute deliverables
         └── [cross-project agents as needed]
 ```
 
@@ -45,7 +43,7 @@ Each tier handles problems autonomously. Escalation is the exception, not the no
 - CEO handles only what Director truly cannot resolve (rare, due to accumulated memory)
 
 **2. Director as root_agent**
-The Director is the **permanent** root_agent of the ADK `App`. It is NOT created per execution — it is the persistent governance layer. This changes DD-2 in Phase 3: the App container with Director as root_agent is created at worker startup, not per workflow execution.
+~~The Director is the **permanent** root_agent of the ADK `App`. It is NOT created per execution — it is the persistent governance layer. This changes DD-2 in Phase 3: the App container with Director as root_agent is created at worker startup, not per workflow execution.~~ **Superseded by decision #40 (260216)**: Director is a stateless config object recreated per invocation. All state lives in DB via DatabaseSessionService. Personality in `user:` scope.
 
 **3. PMs Need LLM Reasoning**
 PMs are `LlmAgent` (sonnet), NOT `CustomAgent`. They need reasoning to:
@@ -107,7 +105,7 @@ Follows the original 6-level memory architecture (260211_plan-shaping.md §11), 
 ## Impact on Existing Architecture
 
 ### Phase 3 (ADK Engine Integration) — Current Phase
-- **DD-2 changes**: App container is NOT created per execution. Director is the permanent root_agent. App created at worker startup with Director as root_agent.
+- **DD-2 changes**: ~~App container is NOT created per execution. Director is the permanent root_agent. App created at worker startup with Director as root_agent.~~ **Superseded by decision #40**: App created per invocation with Director as root_agent (stateless config object).
 - `create_app_container()` in Phase 3 still uses EchoAgent for validation — but the pattern must accommodate the Director becoming root_agent in Phase 5.
 - Phase 3 spec's "Future Phase Extensions" section for `create_app_container()` must note Director as the production root_agent.
 
@@ -119,13 +117,13 @@ Follows the original 6-level memory architecture (260211_plan-shaping.md §11), 
 - `sub_agents` tree construction replaces flat `SequentialAgent` at the top level
 
 ### Phase 8 (Spec Pipeline & Autonomous Loop) — Restructured
-- `BatchOrchestrator` becomes a PM-level concern, not the root_agent
+- The PM IS the outer loop — no separate orchestrator agent
 - The "outer loop" is now at Director level (cross-project) and PM level (per-project)
 - Director manages multiple concurrent projects
 - PM manages the "while incomplete deliverables exist" loop for its project
 
 ### Phase 1 (Completed) — Retrospective Note
-- P4 (Dynamic Outer Loop) validated the `BatchOrchestrator` pattern — this is now the PM-level pattern, not the root_agent pattern. P4 validation still holds; it just maps to PM, not Director.
+- P4 (Dynamic Outer Loop) validated the dynamic batch construction pattern — this is now the PM-level pattern, not the root_agent pattern. P4 validation still holds; it just maps to PM, not Director.
 
 ## What This Is NOT
 
@@ -137,7 +135,7 @@ Follows the original 6-level memory architecture (260211_plan-shaping.md §11), 
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| 29 | Director (LlmAgent, opus) as permanent root_agent | Cross-project governance requires LLM reasoning; ADK App.root_agent is the natural home |
+| 29 | Director (LlmAgent, opus) as root_agent | Cross-project governance requires LLM reasoning; ADK App.root_agent is the natural home. (Originally "permanent"; superseded by #40: stateless, recreated per invocation.) |
 | 30 | PMs (LlmAgent, sonnet) for per-project management | Autonomous project supervision requires reasoning, not just programmatic orchestration |
 | 31 | Recursive autonomy at every tier | Each tier handles its problems; escalation is the exception |
 | 32 | Director has full project observability | Can intervene when patterns go wrong; not blind delegation |

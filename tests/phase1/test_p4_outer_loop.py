@@ -52,11 +52,11 @@ def create_feature_agent(feature: Feature) -> LlmAgent:
 
 
 # ---------------------------------------------------------------------------
-# BatchOrchestrator
+# OuterLoopAgent
 # ---------------------------------------------------------------------------
 
 
-class BatchOrchestrator(BaseAgent):
+class OuterLoopAgent(BaseAgent):
     """Custom agent that orchestrates features in dependency-ordered batches.
 
     Dynamically constructs ParallelAgent batches based on the feature DAG.
@@ -135,10 +135,10 @@ FEATURE_DAG = [
 
 @pytest.mark.asyncio
 async def test_features_execute_in_dependency_order(
-    runner_factory: Callable[[BatchOrchestrator], InMemoryRunner],
+    runner_factory: Callable[[OuterLoopAgent], InMemoryRunner],
 ) -> None:
     """Features execute in correct dependency order across 3 batches."""
-    orchestrator = BatchOrchestrator(
+    orchestrator = OuterLoopAgent(
         name="orchestrator",
         features=FEATURE_DAG,
     )
@@ -172,10 +172,10 @@ async def test_features_execute_in_dependency_order(
 
 @pytest.mark.asyncio
 async def test_loop_terminates_on_completion(
-    runner_factory: Callable[[BatchOrchestrator], InMemoryRunner],
+    runner_factory: Callable[[OuterLoopAgent], InMemoryRunner],
 ) -> None:
     """Orchestrator sets completion state after all features finish."""
-    orchestrator = BatchOrchestrator(
+    orchestrator = OuterLoopAgent(
         name="orchestrator",
         features=FEATURE_DAG,
     )
@@ -195,7 +195,7 @@ async def test_loop_terminates_on_completion(
 
 @pytest.mark.asyncio
 async def test_independent_features_not_blocked_by_unrelated_deps(
-    runner_factory: Callable[[BatchOrchestrator], InMemoryRunner],
+    runner_factory: Callable[[OuterLoopAgent], InMemoryRunner],
 ) -> None:
     """C and D depend only on A, so B's completion status is irrelevant to them.
 
@@ -212,7 +212,7 @@ async def test_independent_features_not_blocked_by_unrelated_deps(
         Feature(name="E", depends_on=["C", "D"], prompt="Write one sentence about elderberries."),
     ]
 
-    orchestrator = BatchOrchestrator(
+    orchestrator = OuterLoopAgent(
         name="orchestrator",
         features=features,
     )

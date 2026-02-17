@@ -28,7 +28,7 @@ AutoBuilder uses a **three-tier hierarchical supervision model** (CEO -> Directo
 | Agent Type | ADK Primitive | Execution Model | Examples |
 |------------|---------------|-----------------|----------|
 | **LLM Agents** | `LlmAgent` | Probabilistic -- LLM decides approach | Director, PM, `plan_agent`, `code_agent`, `review_agent`, `fix_agent` |
-| **Custom Agents** | `CustomAgent` (inherits `BaseAgent`) | Guaranteed -- runs exactly as coded | `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`, `FormatterAgent`, `DependencyResolverAgent`, `RegressionTestAgent`, `ContextBudgetAgent` |
+| **Custom Agents** | `CustomAgent` (inherits `BaseAgent`) | Guaranteed -- runs exactly as coded | `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`, `FormatterAgent`, `DependencyResolverAgent`, `RegressionTestAgent` |
 
 Both types participate in the same state system, emit events into the same unified event stream, and compose naturally with ADK's `SequentialAgent`, `ParallelAgent`, and `LoopAgent` workflow primitives. This is the decisive architectural advantage of Google ADK over alternatives: deterministic agents are first-class workflow citizens, not shadow functions called outside the framework.
 
@@ -42,10 +42,16 @@ Note: The worker-level examples below use auto-code agents (plan/code/lint/test/
 
 ```
 CEO (dev user / human)
-  └── Director (LlmAgent, opus) — root_agent of App
+  └── Director (LlmAgent, opus) — root_agent, stateless config, state in DB
+        │     personality: {user:director_personality} (per-CEO, evolvable)
+        │     sessions: chat sessions (CEO interaction) + work sessions (per-project oversight)
+        │     delegation: transfer_to_agent → PM
         ├── PM: Project Alpha (LlmAgent, sonnet) — per-project, IS the outer loop
-        │     ├── tools: select_ready_batch, run_regression, checkpoint
+        │     ├── tools: select_ready_batch, enqueue_ceo_item (FunctionTools)
         │     ├── after_agent_callback: verify_batch_completion
+        │     ├── checkpoint_project: `after_agent_callback` on DeliverablePipeline (persists state via CallbackContext)
+        │     ├── run_regression_tests: `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state)
+        │     ├── transfers back to Director on batch completion or escalation
         │     └── sub_agents: DeliverablePipeline instances (workers)
         ├── PM: Project Beta (LlmAgent, sonnet)
         │     └── ...
@@ -94,15 +100,32 @@ deliverable_pipeline = SequentialAgent(
 
 ## Director Agent
 
-The Director is the **permanent** `root_agent` of the ADK `App`. It is created at worker startup, not per workflow execution.
+The Director is the `root_agent` of the ADK `App`. It is **stateless config** -- the agent definition is pure configuration, recreated per invocation. All continuity lives in the database via `DatabaseSessionService`. This pattern is consistent across all tiers (Director, PM, Workers).
 
 | Property | Value |
 |----------|-------|
-| **Role** | Cross-project governance, CEO liaison, strategic decisions, resource allocation |
+| **Role** | Cross-project governance (COO) + CEO-adapted personal assistant. Acts as both. |
 | **ADK Type** | `LlmAgent` |
 | **Model** | `anthropic/claude-opus-4-6` (strategic reasoning requires strongest model) |
 | **Scope** | All projects, global settings |
+| **Lifecycle** | Stateless config, recreated per invocation. All state in DB. |
 | **Sub-agents** | PM agents (one per active project), cross-project utility agents |
+| **Delegation** | `transfer_to_agent` to hand off projects to PMs |
+
+### Director Personality
+
+Director personality is stored in `user:` scope state -- different CEO logins get different personalities. Seeded from a config file on first login, then evolvable via `state_delta` as the Director learns CEO preferences over time. System prompt templates reference `{user:director_personality}` for CEO-adapted behavior.
+
+### Session Model
+
+The Director operates via **multiple sessions**:
+
+| Session Type | Purpose | Lifecycle |
+|-------------|---------|-----------|
+| **Chat session** | CEO interaction (conversation, commands, status queries) | Created per conversation, multiple per project |
+| **Work session** | Background project oversight (monitoring, intervention) | One per project, long-lived |
+
+A "Main" project acts as the permanent default -- the Director's home context. Multiple chat sessions can exist per project.
 
 ### Capabilities
 
@@ -112,7 +135,8 @@ The Director is the **permanent** `root_agent` of the ADK `App`. It is created a
 - **Hard limit enforcement** -- sets per-project resource limits (cost, time, concurrency)
 - **Intelligent escalation** -- decides when to pause for CEO input (rare, due to accumulated memory)
 - **Cross-project pattern propagation** -- learnings from one project inform others
-- **Tools and skills** -- like all agents, Director has access to FunctionTools (governance tools, resource management) and skills (governance policies, global conventions)
+- **Tool authoring** -- Director can create new tools; CEO approval required by default
+- **Tools and skills** -- governance tools, resource management FunctionTools, governance policies and global convention skills
 
 ### ADK Integration
 
@@ -120,20 +144,19 @@ The Director is the **permanent** `root_agent` of the ADK `App`. It is created a
 director_agent = LlmAgent(
     name="Director",
     model="anthropic/claude-opus-4-6",
-    instruction="Cross-project governance agent. Manage PMs, allocate resources, "
+    instruction="Cross-project governance agent. {user:director_personality} "
+                "Manage PMs via transfer_to_agent, allocate resources, "
                 "enforce hard limits, intervene when patterns go wrong.",
-    sub_agents=[pm_alpha, pm_beta],  # PM agents are Director's sub_agents
+    sub_agents=[pm_alpha, pm_beta],  # PMs are Director's sub_agents
+    # PMs transfer back to Director on batch completion or escalation
 )
-
-# Director is the permanent root_agent
-app = App(name="autobuilder", root_agent=director_agent, ...)
 ```
 
 ---
 
 ## PM Agent
 
-PMs are per-project autonomous managers. They use LLM reasoning (not programmatic orchestration) to manage the outer batch loop -- selecting batches, supervising workers, and handling failures.
+PMs are per-project autonomous managers. They use LLM reasoning (not programmatic orchestration) to manage the outer batch loop -- selecting batches, supervising workers, and handling failures. Like the Director, PMs are **stateless config** -- recreated per invocation, all continuity in DB via `DatabaseSessionService`.
 
 | Property | Value |
 |----------|-------|
@@ -141,9 +164,13 @@ PMs are per-project autonomous managers. They use LLM reasoning (not programmati
 | **ADK Type** | `LlmAgent` |
 | **Model** | `anthropic/claude-sonnet-4-5-20250929` (project management reasoning) |
 | **Scope** | Single project |
-| **Tools** | `select_ready_batch`, `run_regression_tests`, `checkpoint_project` |
-| **Callbacks** | `after_agent_callback: verify_batch_completion` |
+| **Lifecycle** | Stateless config, recreated per invocation. Session continuity in DB. Consistent with Director tier. |
+| **Tools** | `select_ready_batch` (FunctionTool -- PM reasons about batch composition), `enqueue_ceo_item` (FunctionTool -- push notifications/escalations to CEO queue) |
+| **`after_agent_callback`** | `verify_batch_completion` (automatic, after every deliverable) |
+| **Checkpoint** | `checkpoint_project` -- `after_agent_callback` on DeliverablePipeline; fires after each deliverable completes, persists state via `CallbackContext` |
+| **Regression** | `run_regression_tests` -- `RegressionTestAgent` (CustomAgent) wired into pipeline after each batch; reads PM regression policy from session state, runs tests when policy says to, no-ops otherwise; always present (not skippable), policy-aware |
 | **Sub-agents** | `DeliverablePipeline` instances (workers) |
+| **Parent** | Director (via `transfer_to_agent` delegation). PM transfers back to Director on batch completion or escalation. |
 
 ### Why LlmAgent, Not CustomAgent
 
@@ -154,16 +181,21 @@ PMs need LLM reasoning to:
 - Assess quality gate failures and decide retry vs. escalate vs. skip
 - Reason between batches -- a mechanical loop cannot adapt strategy based on emergent patterns
 
+### Director-PM Delegation
+
+PMs are Director's `sub_agents`. The Director uses `transfer_to_agent` for "go manage this project" handoff -- the PM receives full control and transfers back to Director on batch completion or escalation. `transfer_to_agent` (not `AgentTool`, which forces synchronous execution, or a declarative tree, which removes Director reasoning about when/how to delegate).
+
 ### PM as the Outer Loop
 
-The PM manages the batch execution loop directly, rather than delegating to a separate orchestrator agent. Mechanical operations are exposed as FunctionTools; deterministic safety is provided by callbacks:
+The PM manages the batch execution loop directly, rather than delegating to a separate orchestrator agent. Batch composition is a FunctionTool (PM reasons about what to include). Checkpointing and regression testing are **not** LLM-discretionary -- they fire automatically per policy (not skippable):
 
-| When | Who | How |
-|------|-----|-----|
-| Before batch | PM (LLM) | Reasons about batch composition via `select_ready_batch` tool, sets strategy |
-| During batch | Callbacks (deterministic) | `after_agent_callback` monitors each pipeline, flags critical failures |
-| After batch | PM (LLM) | Observes results, runs `run_regression_tests`, decides retry/skip/escalate/continue |
-| Between batches | PM (LLM) | Full reasoning -- reorder, adjust, `checkpoint_project`, escalate to Director |
+| When | Mechanism | How |
+|------|-----------|-----|
+| Before batch | PM (LLM) | Reasons about batch composition via `select_ready_batch` FunctionTool, sets strategy |
+| During batch | `after_agent_callback` | `verify_batch_completion` monitors each pipeline, flags critical failures |
+| After deliverable | `after_agent_callback` on DeliverablePipeline | `checkpoint_project` -- fires after each deliverable completes, persists state via `CallbackContext` |
+| After batch | `RegressionTestAgent` (CustomAgent) in pipeline | `run_regression_tests` -- reads PM regression policy from session state, runs tests when policy says to, no-ops otherwise; always present, policy-aware |
+| Between batches | PM (LLM) | Full reasoning -- reorder, adjust, escalate to Director via `transfer_to_agent` |
 
 ### ADK Integration
 
@@ -173,15 +205,19 @@ pm_alpha = LlmAgent(
     model="anthropic/claude-sonnet-4-5-20250929",
     instruction="Autonomous project manager for Project Alpha. You ARE the outer batch loop. "
                 "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
-                "run regression tests between batches, checkpoint progress, and escalate only "
-                "when you cannot resolve an issue.",
+                "and escalate only when you cannot resolve an issue. "
+                "Transfer back to Director on batch completion or escalation.",
     tools=[
-        FunctionTool(select_ready_batch),
-        FunctionTool(run_regression_tests),
-        FunctionTool(checkpoint_project),
+        FunctionTool(select_ready_batch),  # PM reasons about batch composition
+        FunctionTool(enqueue_ceo_item),    # Push to unified CEO queue
     ],
     sub_agents=[],  # DeliverablePipeline instances added dynamically per batch
     after_agent_callback=verify_batch_completion,
+    # checkpoint_project: after_agent_callback on DeliverablePipeline
+    #   Fires after each deliverable completes, persists state via CallbackContext.
+    # run_regression_tests: RegressionTestAgent (CustomAgent) in pipeline after each batch
+    #   Reads PM regression policy from session state. Runs when policy says to, no-ops otherwise.
+    #   Always present in pipeline (not skippable), policy-aware.
 )
 ```
 
@@ -239,13 +275,13 @@ Worker-tier LLM Agents handle execution tasks that require reasoning, creativity
 
 | Property | Value |
 |----------|-------|
-| **Role** | Decompose a feature specification into a structured implementation plan |
+| **Role** | Decompose a deliverable specification into a structured implementation plan |
 | **Input** | `{current_deliverable_spec}`, `{loaded_skills}`, `{memory_context}`, `{app:coding_standards}` |
 | **Output** | `output_key: "implementation_plan"` |
 | **Model** | `anthropic/claude-opus-4-6` (planning benefits from strongest reasoning) |
 | **Tool Access** | Read-only -- filesystem read, directory list, search. No write tools. |
 
-The plan agent reads the feature specification, loaded skills, cross-session memory context, and project coding standards from session state. It produces a structured implementation plan that the code agent consumes. It never writes code or modifies files.
+The plan agent reads the deliverable specification, loaded skills, cross-session memory context, and project coding standards from session state. It produces a structured implementation plan that the code agent consumes. It never writes code or modifies files.
 
 ### code_agent (auto-code example)
 
@@ -269,7 +305,7 @@ The code agent consumes the structured plan and writes implementation code. Mode
 | **Model** | `anthropic/claude-sonnet-4-5-20250929` |
 | **Tool Access** | Read-only -- filesystem read, directory list, search. No write tools. |
 
-The review agent reads the code output alongside lint and test results written to state by deterministic agents. It evaluates quality and either approves the feature or produces structured feedback for the fix agent. If the review fails, the `LoopAgent` wrapper triggers another fix/lint/test/review cycle (up to `max_iterations`).
+The review agent reads the code output alongside lint and test results written to state by deterministic agents. It evaluates quality and either approves the deliverable or produces structured feedback for the fix agent. If the review fails, the `LoopAgent` wrapper triggers another fix/lint/test/review cycle (up to `max_iterations`).
 
 ### fix_agent (auto-code example)
 
@@ -290,7 +326,7 @@ All LLM agents receive instructions through a layered mechanism:
 | Layer | Mechanism | What It Provides |
 |-------|-----------|-----------------|
 | 1 | Static instruction string | Base personality and role definition |
-| 2 | `InstructionProvider` function | Project conventions, feature spec, patterns (resolved at invocation time from state) |
+| 2 | `InstructionProvider` function | Project conventions, deliverable spec, patterns (resolved at invocation time from state) |
 | 3 | `before_model_callback` | File context, codebase analysis, test results (injected right before LLM call) |
 | 4 | `{key}` state templates | Direct injection of specific state values into instruction text |
 
@@ -306,9 +342,9 @@ Like all agents, deterministic agents execute inside worker processes. Their sub
 
 ### SkillLoaderAgent
 
-**Purpose:** Resolve and load relevant skills into session state as the first step in every feature pipeline.
+**Purpose:** Resolve and load relevant skills into session state as the first step in every deliverable pipeline.
 
-Matches skills against current feature context using deterministic pattern matching (no LLM call). Writes matched skill content to state so all subsequent agents in the pipeline can access it.
+Matches skills against current deliverable context using deterministic pattern matching (no LLM call). Writes matched skill content to state so all subsequent agents in the pipeline can access it.
 
 ```python
 class SkillLoaderAgent(BaseAgent):
@@ -352,36 +388,36 @@ The review agent reads `{lint_results}` to evaluate code quality. If lint fails,
 
 ### DependencyResolverAgent
 
-**Purpose:** Perform topological sorting of features based on their declared dependencies. Determines which features can execute in parallel and which must wait for predecessors.
+**Purpose:** Perform topological sorting of deliverables based on their declared dependencies. Determines which deliverables can execute in parallel and which must wait for predecessors.
 
-This agent runs once before the batch loop begins. It writes the sorted feature execution order to session state, which the PM reads (via `select_ready_batch` tool) to construct batches.
+This agent runs once before the batch loop begins. It writes the sorted deliverable execution order to session state, which the PM reads (via `select_ready_batch` tool) to construct batches.
 
-### RegressionTestAgent
+### Regression Testing (`run_regression_tests`)
 
-**Purpose:** Run cross-feature regression tests after each batch completes. Ensures that newly implemented features have not broken previously completed features.
+**Purpose:** Run cross-deliverable regression tests after each batch completes. Ensures that newly implemented deliverables have not broken previously completed deliverables.
 
-Runs at the batch level (after `ParallelAgent` completes), not at the individual feature level. The PM triggers this via the `run_regression_tests` tool.
+Implemented as `RegressionTestAgent` (CustomAgent, inherits `BaseAgent`). Wired into the pipeline after each batch (after `ParallelAgent` completes), not at the individual deliverable level. Always present in the pipeline -- cannot be skipped by LLM judgment. Reads the PM's regression policy from session state (`regression_policy`). When the policy says to run (e.g., every batch, every N deliverables, on specific triggers), executes the cross-deliverable regression suite and writes results to state. When the policy says to skip, no-ops (yields a state_delta recording the skip). This is a substantial operation involving cross-deliverable test execution and result analysis.
 
-### ContextBudgetAgent
+### Context Budget Monitor
 
 **Purpose:** Check token usage against context window limits and trigger compression if needed.
 
-Implements the gap identified in ADK: there is no built-in context-window usage metric. This agent token-counts the assembled `LlmRequest` via `before_model_callback`, writes the usage percentage to state, and downstream logic reacts (trigger summarization, prune skills, checkpoint and restart). Approximately 50 lines of implementation.
+Implements the gap identified in ADK: there is no built-in context-window usage metric. Implemented as a `before_model_callback` (not a standalone agent) that token-counts the assembled `LlmRequest`, writes the usage percentage to state, and downstream logic reacts (trigger summarization, prune skills, checkpoint and restart). Approximately 50 lines of implementation.
 
 ---
 
 ## Plan/Execute Separation
 
-**Architecture Decision #5:** Planning agents never write code; execution agents consume structured plans.
+Planning agents never write code; execution agents consume structured plans.
 
-This principle is adopted from oh-my-opencode's Prometheus/Atlas pattern, where strict role boundaries between planning and execution proved effective at scale across 11 specialized agents.
+This follows the oh-my-opencode Prometheus/Atlas pattern: strict role boundaries between planning and execution scale effectively across specialized agent teams.
 
 ### How It Works in AutoBuilder
 
 ```
 plan_agent (LLM)          code_agent (LLM)
   |                          |
-  | Reads: feature spec,     | Reads: implementation_plan,
+  | Reads: deliverable spec,  | Reads: implementation_plan,
   |   skills, memory,        |   skills, coding_standards
   |   coding_standards       |
   |                          |
@@ -405,9 +441,15 @@ plan_agent (LLM)          code_agent (LLM)
 
 ## Agent Tool Restrictions
 
-**Architecture Decision #6:** Read-only agents for exploration prevent scope creep.
+Read-only agents for exploration prevent scope creep.
 
-All agent tiers (Director, PM, Workers) have access to tools and skills. However, not all agents should have access to *all* tools. AutoBuilder enforces role-based tool restrictions across every tier:
+All agent tiers (Director, PM, Workers) have access to tools and skills. However, not all agents should have access to *all* tools. AutoBuilder enforces role-based tool restrictions across every tier.
+
+### Tool Registry
+
+Tools are Python functions in `app/tools/`, organized by function type (filesystem, git, execution, web, task, project). `AutoBuilderToolset(BaseToolset)` handles per-role tool filtering via ADK's native `get_tools(readonly_context)` mechanism. Cascading permission config restricts tools top-down through the supervision hierarchy -- a PM cannot access Director-specific tools, a Worker cannot access PM-specific tools. The Director can author new tools; CEO approval is required by default before new tools become active. See [09-TOOLS.md](./09-TOOLS.md) for full toolset architecture.
+
+### Worker-Level Tool Matrix
 
 | Agent | Filesystem | Execution | Git |
 |-------|-----------|-----------|-----|
@@ -416,9 +458,9 @@ All agent tiers (Director, PM, Workers) have access to tools and skills. However
 | `review_agent` | Read-only | None | Read-only |
 | `fix_agent` | Full | `bash_exec` | None (code agent handles commits) |
 
-ADK supports this through `BaseToolset.get_tools()`, which returns different tool sets based on the agent or feature type. This keeps tool restriction logic centralized rather than scattered across agent definitions.
+ADK supports this through `BaseToolset.get_tools()`, which returns different tool sets based on the agent or deliverable type. This keeps tool restriction logic centralized rather than scattered across agent definitions.
 
-All tool access is within the worker's filesystem context, scoped to the appropriate git worktree for the feature being executed.
+All tool access is within the worker's filesystem context, scoped to the appropriate git worktree for the deliverable being executed.
 
 ---
 
@@ -479,7 +521,7 @@ class LlmRouter:
 
 ### Fallback Chain Resolution
 
-Provider fallback chains use 3-step resolution (adopted from oh-my-opencode):
+Provider fallback chains use 3-step resolution:
 
 1. **User override** -- if the user has specified a model preference in `user:` state, use it
 2. **Fallback chain** -- if the primary model is unavailable/rate-limited, walk the fallback chain
@@ -508,10 +550,11 @@ Between tiers, agents communicate via ADK's delegation primitives:
 
 | Pattern | Mechanism | Example |
 |---------|-----------|---------|
-| Director -> PM delegation | `transfer_to_agent` or `AgentTool` | Director assigns a project to a PM |
+| Director -> PM delegation | `transfer_to_agent` | Director hands off project to PM ("go manage this") |
+| PM -> Director return | `transfer_to_agent` back to Director | PM transfers back on batch completion or escalation |
 | PM -> Worker orchestration | `sub_agents` tree | PM constructs DeliverablePipeline workers per batch |
 | Worker -> PM escalation | State write + event | Worker writes failure to state; PM reads and decides |
-| PM -> Director escalation | State write + event | PM writes unresolvable issue; Director intervenes |
+| PM -> Director escalation | `transfer_to_agent` back to Director | PM transfers back with escalation context |
 | Director observation | `before_agent_callback` / `after_agent_callback` | Director monitors PM events via supervision hooks |
 
 ### Worker-Level Communication
@@ -619,6 +662,6 @@ review_agent writes: state["review_result"]
 
 ---
 
-**Document Version:** 2.2
+**Document Version:** 2.8
 **Last Updated:** 2026-02-16
 **Status:** Framework Validated -- Prototyping Phase

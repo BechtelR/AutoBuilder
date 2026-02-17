@@ -2,7 +2,7 @@
 
 ## 1. System Overview
 
-AutoBuilder is an autonomous agentic workflow system that orchestrates multi-agent teams alongside deterministic tooling in structured, resumable pipelines. The system uses **hierarchical agent supervision** (CEO → Director → PM → Workers) mapped to ADK's native agent tree, providing cross-project governance, per-project autonomous management, and parallel deliverable execution. The system exposes an API-first FastAPI gateway that owns the external contract. Google ADK runs behind an anti-corruption layer as the internal orchestration engine -- clients never interact with ADK directly. Workflow execution is out-of-process: the gateway enqueues work via ARQ, Redis-backed workers execute pipelines, and Redis Streams distribute events to consumers (SSE endpoints, webhook dispatchers, audit loggers).
+AutoBuilder is an autonomous agentic workflow system that orchestrates multi-agent teams alongside deterministic tooling in structured, resumable pipelines. The system uses **hierarchical agent supervision** (CEO → Director → PM → Workers) mapped to ADK's native agent tree, providing cross-project governance, per-project autonomous management, and parallel deliverable execution. Agents are **stateless config objects** recreated per invocation -- all continuity lives in database-backed ADK sessions. The Director operates via a **multi-session architecture**: chat sessions for CEO interaction, work sessions per project for background autonomous oversight. A **unified CEO queue** (DB-backed) aggregates notifications, approvals, escalations, and tasks across all projects. The system exposes an API-first FastAPI gateway that owns the external contract. Google ADK runs behind an anti-corruption layer as the internal orchestration engine -- clients never interact with ADK directly. Workflow execution is out-of-process: the gateway enqueues work via ARQ, Redis-backed workers execute pipelines, and Redis Streams distribute events to consumers (SSE endpoints, webhook dispatchers, audit loggers).
 
 The architecture is organized around five layers:
 
@@ -26,9 +26,10 @@ flowchart TB
     end
 
     subgraph GATEWAY["GATEWAY LAYER"]
-        FastAPI["FastAPI Gateway\n\nRoutes:\n- POST /workflows/{id}/run\n- GET /workflows/{id}/status\n- POST /workflows/{id}/intervene\n- GET /events/stream\n- GET /deliverables\n- POST /specs\n\nModels: Pydantic (auto-generates OpenAPI)\nAuth: TBD (Phase 11)"]
+        FastAPI["FastAPI Gateway\n\nRoutes:\n- POST /workflows/{id}/run\n- GET /workflows/{id}/status\n- POST /workflows/{id}/intervene\n- GET /events/stream\n- GET /deliverables\n- POST /specs\n- POST /chat/{session}/messages\n- GET /ceo/queue\n\nModels: Pydantic (auto-generates OpenAPI)\nAuth: TBD (Phase 11)"]
         ARQ[("ARQ Queue\n(Redis)")]
         DB[("SQLAlchemy 2.0 async\n(via gateway only)")]
+        CEOQueue[("CEO Queue\n(DB-backed)\nNotifications, approvals,\nescalations, tasks")]
     end
 
     subgraph WORKER["WORKER LAYER"]
@@ -51,8 +52,10 @@ flowchart TB
     CLI & Dashboard -->|"REST + SSE (HTTP)"| FastAPI
     FastAPI -->|enqueue| ARQ
     FastAPI -->|query| DB
+    FastAPI -->|push/poll| CEOQueue
     ARQ --> ARQWorkers
     ADK -->|publish events| Streams
+    ADK -->|enqueue items| CEOQueue
     ADK -->|read/write state| Database
     ADK -->|read/write| Filesystem
     Streams --> SSE & Webhook & Audit
@@ -87,6 +90,8 @@ sequenceDiagram
     Gateway-->>Client: 200 { status }
 ```
 
+**Two invocation models**: Chat sessions use per-message invocation -- the gateway calls `runner.run_async` for each user message, returning the response synchronously. Work sessions are long-running ARQ jobs that execute autonomously, publishing events to Redis Streams.
+
 **SSE reconnection**: Clients send `Last-Event-ID` header on reconnect. The SSE endpoint replays missed events from the Redis Stream starting from that ID, then resumes live streaming. No events are lost.
 
 ---
@@ -115,6 +120,11 @@ The gateway owns the external API contract. ADK is an internal implementation de
 | `GET` | `/deliverables` | Query deliverables (filter by workflow, status) |
 | `GET` | `/deliverables/{id}` | Get deliverable detail |
 | `GET` | `/events/stream` | SSE endpoint for real-time events |
+| `POST` | `/chat/{session_id}/messages` | Send message to Director chat session |
+| `GET` | `/chat/{session_id}/messages` | Retrieve chat history |
+| `GET` | `/ceo/queue` | List CEO queue items (filter by type, priority, status) |
+| `PATCH` | `/ceo/queue/{id}` | Resolve/dismiss a queue item |
+| `GET` | `/ceo/queue/stream` | SSE push for new queue items |
 
 ### Transport
 
@@ -225,6 +235,23 @@ No events are lost. Redis Stream IDs map directly to SSE event IDs.
 - Dispatches via httpx with HMAC signature
 - Retry with exponential backoff on failure
 
+### Unified CEO Queue
+
+A single DB-backed queue that aggregates all items requiring CEO attention across all projects. Items are **not injected into chat sessions** -- they live in a separate queryable/dismissable queue with SSE push for real-time notification.
+
+| Field | Purpose |
+|-------|---------|
+| `type` | `NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK` |
+| `priority` | `LOW`, `NORMAL`, `HIGH`, `CRITICAL` |
+| `source_project` | Which project produced this item |
+| `source_agent` | Which agent (Director, PM) enqueued it |
+| `metadata` | Structured JSON payload (approval choices, escalation context, task details) |
+| `status` | `PENDING`, `SEEN`, `RESOLVED`, `DISMISSED` |
+
+**Write path**: Director and PM agents enqueue items via `enqueue_ceo_item` tool. Redis Streams events can also trigger queue entries via a consumer.
+
+**Read path**: Dashboard polls `GET /ceo/queue` or subscribes to `GET /ceo/queue/stream` (SSE). CEO resolves items via `PATCH /ceo/queue/{id}`. Resolved approvals are written back to the relevant session's state for the agent to observe on next invocation.
+
 ---
 
 ## 7. Data Layer
@@ -249,7 +276,9 @@ No separate dashboard database. No separate session database. One schema, one mi
 | `specifications` | Submitted specs and their decomposition status |
 | `workflows` | Workflow execution records (status, params, timestamps) |
 | `deliverables` | Individual deliverable records within a workflow |
+| `project_configs` | Per-project configuration (limits, conventions, model overrides) -- DB entity, not state |
 | `sessions` | ADK session state (persisted via DatabaseSessionService adapter) |
+| `ceo_queue` | Unified queue: notifications, approvals, escalations, tasks (type + priority + structured metadata) |
 | `events` | Audit log (subset of events written by audit consumer) |
 | `webhook_listeners` | Registered webhook endpoints and filters |
 | `skills` | Skill index and metadata |
@@ -264,22 +293,25 @@ ADK runs inside workers, behind the anti-corruption layer. This section document
 
 | ADK Primitive | Role in AutoBuilder |
 |---------------|-------------------|
-| `App(root_agent=director)` | Top-level container; Director is the permanent root_agent |
-| `LlmAgent` (Director) | Cross-project governance, CEO liaison, strategic decisions (opus) |
-| `LlmAgent` (PM) | Per-project autonomous management, IS the outer batch loop, quality oversight (sonnet) |
+| `App(root_agent=director)` | Top-level container; Director (rebuilt per invocation) is root_agent |
+| `LlmAgent` (Director) | **Stateless config object**, recreated per invocation. Cross-project governance, CEO liaison, strategic decisions (opus). Personality in `user:` scope. |
+| `LlmAgent` (PM) | **Stateless config object**, recreated per invocation. Per-project autonomous management, IS the outer batch loop, quality oversight (sonnet). |
 | `LlmAgent` (Worker) | Planning, coding, reviewing -- probabilistic steps requiring LLM judgment |
 | `CustomAgent` (BaseAgent) | Linter, test runner, formatter, skill loader -- deterministic pipeline steps |
 | `SequentialAgent` | Inner deliverable pipeline (plan, code, lint, test, review) |
 | `ParallelAgent` | Concurrent deliverable execution within a batch |
 | `LoopAgent` | Review/fix cycles with max iteration bounds |
-| `Session State` | Inter-agent communication (4 scopes: session, user, app, temp) |
+| `Session` (chat) | Per-CEO-conversation session; "Main" is the permanent project chat. Per-message `runner.run_async` invocation. |
+| `Session` (work) | Per-project background execution session; long-running ARQ job. Same Director agent definition, different session ID. |
+| `Session State` | Inter-agent communication (4 scopes: session, user, app, temp). Cross-session bridge via `app:`/`user:` state + `MemoryService` + Redis Streams. |
 | `Event Stream` | Unified observability for all agent types (translated to Redis Streams at boundary) |
 | `FunctionTool` | Wrap Python functions as LLM-callable tools (auto-schema from type hints) |
 | `InstructionProvider` | Dynamic context/knowledge loading per invocation |
 | `before_model_callback` | Context injection, token budget monitoring |
-| `DatabaseSessionService` | State persistence (adapter bridges to shared database) |
-| `transfer_to_agent` / `AgentTool` | Director → PM delegation; PM → Worker delegation |
+| `DatabaseSessionService` | State persistence (adapter bridges to shared database). All agent continuity lives here. |
+| `transfer_to_agent` / `sub_agents` | Director → PM delegation via `sub_agents` + `transfer_to_agent`; PM → Worker delegation |
 | `before_agent_callback` / `after_agent_callback` | Supervision hooks; Director monitors PM events |
+| Tool Registry | `AutoBuilderToolset(BaseToolset)` — ADK-native per-role tool vending via `get_tools(readonly_context)`. Tools organized by function type in `app/tools/`. Cascading permission config. See Tool Registry subsection below. |
 
 ### Multi-Model via LiteLLM
 
@@ -304,7 +336,7 @@ flowchart TB
     end
 
     subgraph ORCH["ORCHESTRATION LAYER (PM manages outer loop)"]
-        PMLoop["PM (LlmAgent) IS the outer loop\n- tools: select_ready_batch, run_regression, checkpoint\n- after_agent_callback: verify_batch_completion\n- Reasons between batches (strategy, reorder, escalate)"]
+        PMLoop["PM (LlmAgent) manages batch execution\n- tools: select_ready_batch (FunctionTool)\n- after_agent_callback: verify_batch_completion\n- checkpoint_project: after_agent_callback on DeliverablePipeline (persists state via CallbackContext)\n- run_regression_tests: RegressionTestAgent (CustomAgent) in pipeline after each batch\n- Reasons between batches (strategy, reorder, escalate)"]
         Batch1["Batch_001\nParallelAgent"]
         Batch2["Batch_002\nParallelAgent"]
         BatchN["Batch_N\nParallelAgent"]
@@ -329,7 +361,7 @@ flowchart TB
     end
 
     subgraph INFRA["SHARED ENGINE INFRASTRUCTURE"]
-        Tools["Tool Registry (FunctionTools)\nfile_read, file_write, file_edit\nbash_exec, git_*, web_*, todo_*"]
+        Tools["AutoBuilderToolset (BaseToolset)\nADK-native get_tools(readonly_context)\nPer-role permission config\nfile_read, file_write, file_edit\nbash_exec, git_*, web_*, todo_*"]
         Skills["Skill Library\n(Global + Project-local)\nMarkdown + YAML frontmatter\nDeterministic matching"]
         Router["LLM Router\n(task_type to model)\ndirector: opus\npm: sonnet\nplanning: opus\ncoding: sonnet\nreview: sonnet\nclassification: haiku\nFallback chains"]
         Models["Models (Shared Domain)\nenums.py, constants.py\nbase.py (Pydantic base models)"]
@@ -347,31 +379,43 @@ flowchart TB
 
 ### Hierarchical Agent Structure
 
-```python
-# Director + PM hierarchy -- the supervision layer
-director_agent = LlmAgent(
-    name="Director",
-    model="anthropic/claude-opus-4-6",
-    instruction="Cross-project governance agent. Manage PMs, allocate resources, "
-                "enforce hard limits, intervene when patterns go wrong.",
-    sub_agents=[pm_alpha, pm_beta],  # PMs are Director's sub_agents
-)
+Agents are **stateless config objects** -- recreated from configuration on every invocation. All continuity lives in database-backed ADK sessions. The factory rebuilds the agent tree; the session carries the memory.
 
-pm_alpha = LlmAgent(
-    name="PM_ProjectAlpha",
-    model="anthropic/claude-sonnet-4-5-20250929",
-    instruction="Autonomous project manager for Project Alpha. You ARE the outer batch loop. "
-                "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
-                "run regression tests between batches, checkpoint progress, and escalate only "
-                "when you cannot resolve an issue.",
-    tools=[
-        FunctionTool(select_ready_batch),
-        FunctionTool(run_regression_tests),
-        FunctionTool(checkpoint_project),
-    ],
-    sub_agents=[],  # DeliverablePipeline instances added dynamically per batch
-    after_agent_callback=verify_batch_completion,
-)
+```python
+# Agent factory -- called per invocation, not once at startup
+def build_director(project_ids: list[str]) -> LlmAgent:
+    """Recreate Director agent tree from config. Stateless -- all
+    continuity is in the ADK session (DB-backed)."""
+    pms = [build_pm(pid) for pid in project_ids]
+    return LlmAgent(
+        name="Director",
+        model="anthropic/claude-opus-4-6",
+        instruction="Cross-project governance agent. Manage PMs, allocate resources, "
+                    "enforce hard limits, intervene when patterns go wrong. "
+                    "Your personality and preferences are in user: state. "
+                    "Delegate to PMs via transfer_to_agent.",
+        sub_agents=pms,  # PMs are Director's sub_agents; delegation via transfer_to_agent
+    )
+
+def build_pm(project_id: str) -> LlmAgent:
+    """Recreate PM agent from project config (DB entity). Stateless."""
+    return LlmAgent(
+        name=f"PM_{project_id}",
+        model="anthropic/claude-sonnet-4-5-20250929",
+        instruction="Autonomous project manager. You manage batch execution. "
+                    "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
+                    "and escalate only when you cannot resolve an issue.",
+        tools=[
+            FunctionTool(select_ready_batch),  # PM reasons about batch composition
+            FunctionTool(enqueue_ceo_item),     # Push to unified CEO queue
+        ],
+        sub_agents=[],  # DeliverablePipeline instances added dynamically per batch
+        after_agent_callback=verify_batch_completion,
+        # checkpoint_project: after_agent_callback on DeliverablePipeline
+        #   Fires after each deliverable completes, persists state via CallbackContext.
+        # run_regression_tests: RegressionTestAgent (CustomAgent) in pipeline after each batch
+        #   Reads PM regression policy from session state. Runs when policy says to, no-ops otherwise.
+    )
 ```
 
 ### Inner Pipeline Composition
@@ -400,31 +444,55 @@ deliverable_pipeline = SequentialAgent(
 )
 ```
 
+### Tool Registry (AutoBuilderToolset)
+
+Tools are Python functions in the `app/tools/` module, organized by function type (filesystem, git, execution, web, task, project). Authorization is handled by `AutoBuilderToolset(BaseToolset)` -- ADK's native mechanism for context-sensitive tool vending via `get_tools(readonly_context)`.
+
+| Concern | Mechanism |
+|---------|-----------|
+| Tool code | `app/tools/` module, organized by function type |
+| Per-role filtering | `AutoBuilderToolset.get_tools(readonly_context)` |
+| Permission config | Config-driven: CEO restricts Director, Director restricts PM, PM restricts Worker |
+| Role scoping | `plan_agent` gets read-only tools, `code_agent` gets full tools, etc. |
+| Tool authoring | Director can write new tool functions; CEO approval required by default |
+
+Restrictions cascade downward through the permission config -- a PM cannot access Director tools, a Worker cannot access PM tools. Within each tier, individual agents have further role-based scoping enforced by the toolset at agent construction time. See [09-TOOLS.md](./09-TOOLS.md) for full toolset architecture.
+
 ```python
-# PM-level tools -- the mechanical operations the PM calls as part of its outer loop
+# PM-level FunctionTool -- the PM reasons about when/what to select
 def select_ready_batch(project_id: str) -> str:
     """Dependency-aware batch selection via topological sort. Returns the next
     set of deliverables whose prerequisites are satisfied."""
     ...
 
-def run_regression_tests(project_id: str) -> str:
-    """Run cross-deliverable regression suite after a batch completes."""
-    ...
+# checkpoint_project -- after_agent_callback on DeliverablePipeline
+# Fires after each deliverable completes, persists state via CallbackContext.
 
-def checkpoint_project(project_id: str) -> str:
-    """Persist current project state for resume."""
-    ...
+# run_regression_tests -- RegressionTestAgent (CustomAgent) in pipeline after each batch
+# Reads PM regression policy from session state. Runs when policy says to, no-ops otherwise.
+# Always present in pipeline (not skippable), policy-aware. Substantial operation
+# (cross-deliverable regression suite).
 
-# The PM (LlmAgent) IS the outer loop -- it calls these tools and reasons
-# between batches. No separate BatchOrchestrator agent needed.
-# Dynamic ParallelAgent batch construction happens within the PM's tool calls.
+# The PM (LlmAgent) manages the outer loop -- it calls select_ready_batch and reasons
+# between batches.
 ```
 
 ---
 
 ## 9. The Autonomous Execution Loop
 
-The execution loop operates at two levels within the hierarchy:
+The execution loop operates at two levels within the hierarchy, across multiple sessions in two categories (chat and work):
+
+### Multi-Session Architecture
+
+The Director operates via **multiple ADK sessions** -- same agent definition, different session IDs:
+
+| Session Type | Invocation Model | Purpose |
+|-------------|-----------------|---------|
+| **Chat session** | Per-message (`runner.run_async` per user message) | CEO interaction -- questions, directives, status checks. Multiple chats per project; "Main" is the permanent project chat. |
+| **Work session** | Long-running ARQ job | Background autonomous execution -- PM delegation, monitoring, intervention. One active work session per project. |
+
+**Cross-session bridge**: Chat and work sessions share context via `app:` state (project-scoped), `user:` state (CEO preferences/Director personality), `MemoryService` (searchable cross-session archive), and Redis Streams (real-time event observation). A chat session can inspect and influence a running work session without interrupting it.
 
 ### Director-Level Loop
 
@@ -432,17 +500,20 @@ The execution loop operates at two levels within the hierarchy:
 1. Client submits spec via POST /specs
 2. Gateway enqueues decomposition job -> ARQ worker decomposes -> deliverables in DB
 3. Client triggers POST /workflows/{id}/run
-4. Gateway enqueues execution job -> ARQ worker picks up
-5. Director (root_agent) receives the workflow:
-   a. Assigns project to a PM (creates PM agent if new project)
-   b. Sets hard limits (cost, time, concurrency) for the PM
+4. Gateway enqueues work session (ARQ job) for the project
+5. Director (root_agent, recreated from config) receives the workflow:
+   a. Assigns project to a PM via sub_agents + transfer_to_agent
+   b. Sets hard limits (cost, time, concurrency) in project_configs (DB entity)
    c. Delegates execution to PM
    d. Monitors PM progress via event stream
    e. Intervenes if cross-project patterns go wrong
-   f. Manages multiple concurrent projects in parallel
+   f. Pushes notifications/escalations to unified CEO queue
+   g. Manages multiple concurrent projects via separate work sessions
 6. Director publishes completion event when PM reports done
-7. Client receives completion via SSE stream (or polls status endpoint)
+7. Client receives completion via SSE stream, CEO queue notification, or polls status
 ```
+
+**CEO interaction (chat sessions)**: CEO sends messages via `POST /chat/{session_id}/messages`. Gateway calls `runner.run_async` with the Director agent and the chat session ID. Director responds using `app:`/`user:` state and `MemoryService` for project context. No ARQ job -- synchronous per-message invocation.
 
 ### PM-Level Loop (per project)
 
@@ -455,11 +526,11 @@ The execution loop operates at two levels within the hierarchy:
       ii.  For each deliverable in batch (parallel):
            - Load relevant skills (deterministic: SkillLoaderAgent)
            - Plan implementation (LLM: plan_agent)
-           - Execute plan (LLM: execute_agent)
-           - Validate output (deterministic: workflow-specific ValidatorAgent)
-           - Verify output (deterministic: workflow-specific VerifyAgent)
+           - Execute plan (LLM: code_agent)
+           - Validate output (deterministic: workflow-specific, e.g. LinterAgent)
+           - Verify output (deterministic: workflow-specific, e.g. TestRunnerAgent)
            - Review quality (LLM: review_agent)
-           - Loop execute-validate-verify-review if review fails (max N)
+           - Loop review-fix-validate-verify if review fails (max N)
       iii. Merge completed deliverables
       iv.  Run regression checks
       v.   Publish batch completion event -> Redis Streams
@@ -562,15 +633,18 @@ The dashboard is a static asset. It can be served from any CDN, file server, or 
 
 ## 13. State Architecture
 
-Agents communicate via session state, not direct message passing. All state updates happen through `Event.actions.state_delta`, making every change auditable in the event stream.
+Agents are **stateless config objects** recreated per invocation -- all continuity lives in database-backed ADK sessions. All state updates happen through `Event.actions.state_delta`, making every change auditable in the event stream.
 
 | Scope | Prefix | Contents | Persistence |
 |-------|--------|----------|-------------|
 | **Session** | *(none)* | Current batch, deliverable statuses, loaded skills, validation results, verification results | Per-run (persistent via database) |
-| **User** | `user:` | Preferences, model selections, intervention settings | Cross-session per user |
-| **App** | `app:` | Project config, global conventions, skill index | Cross-user, cross-session |
+| **User** | `user:` | CEO preferences, model selections, intervention settings, **Director personality** | Cross-session per user |
+| **App** | `app:` | Skill index, workflow registry, runtime agent coordination (project config is a **DB entity**, not `app:` state) | Cross-user, cross-session |
 | **Temp** | `temp:` | Intermediate LLM outputs, scratch data | Discarded after invocation |
 | **Memory** | `MemoryService` | Cross-session learnings, past decisions, discovered patterns | Persistent, searchable archive |
+| **DB entity** | `project_configs` table | Per-project limits, conventions, model overrides -- queried at invocation, not stored in ADK state | Persistent, queryable, editable via API |
+
+**Cross-session bridge**: Chat sessions and work sessions share context via `app:`/`user:` scoped state (both resolve from the same `DatabaseSessionService`), `MemoryService` (searchable archive), and Redis Streams (real-time event visibility). This allows CEO chat to observe and influence running work sessions without coupling session lifecycles.
 
 State values are injectable into agent instructions via `{key}` templating. For example: `"Implement the deliverable: {current_deliverable_spec}"` auto-resolves from `session.state['current_deliverable_spec']`. Use `{key?}` for optional keys that may not exist.
 
@@ -580,10 +654,10 @@ The 6-level memory architecture applies at each tier's scope:
 
 | Level | Director Scope | PM Scope | Worker Scope |
 |-------|---------------|----------|--------------|
-| Invocation (`temp:`) | Current decision cycle | Current batch management cycle | Current deliverable execution |
-| Pipeline (`session`) | Cross-project governance state | Project execution state | Deliverable pipeline state |
-| Project (`app:` + Skills) | Global conventions, all project configs | Project conventions, project skills | Deliverable-specific skills |
-| User (`user:`) | CEO preferences, global settings | Inherits from Director | Inherits from PM |
+| Invocation (`temp:`) | Current decision cycle (chat or work session) | Current batch management cycle | Current deliverable execution |
+| Pipeline (`session`) | Chat: conversation state. Work: cross-project governance state. | Project execution state | Deliverable pipeline state |
+| Project (DB entity + Skills) | All `project_configs` (DB). Global conventions. | Project config (DB). Project conventions, skills. | Deliverable-specific skills |
+| User (`user:`) | CEO preferences, Director personality | Inherits from Director | Inherits from PM |
 | Cross-session (`MemoryService`) | Historical decisions, pattern library | Project history, past batch outcomes | Past deliverable patterns |
 | Business (Skills) | Global skills, governance rules | Project skills, workflow skills | Task-specific skills |
 
@@ -610,12 +684,13 @@ Between tiers, agents communicate via ADK's delegation primitives:
 
 | Pattern | Mechanism | Example |
 |---------|-----------|---------|
-| Director → PM delegation | `transfer_to_agent` or `AgentTool` | Director assigns a project to a PM |
-| PM -> Worker orchestration | `sub_agents` tree | PM constructs DeliverablePipeline workers per batch |
+| Director → PM delegation | `sub_agents` + `transfer_to_agent` | Director declares PMs as sub_agents, delegates via transfer_to_agent |
+| PM → Worker orchestration | `sub_agents` tree | PM constructs DeliverablePipeline workers per batch |
 | Worker → PM escalation | State write + event | Worker writes failure to state; PM reads and decides |
-| PM → Director escalation | State write + event | PM writes unresolvable issue; Director intervenes |
+| PM → Director escalation | State write + event + CEO queue | PM writes unresolvable issue; enqueues escalation to CEO queue |
 | Director observation | `before_agent_callback` / `after_agent_callback` | Director monitors PM events via supervision hooks |
 | Cross-project state | `app:` scope prefix | Visible to Director and all PMs |
+| Cross-session bridge | `app:`/`user:` state + `MemoryService` + Redis Streams | Chat sessions observe/influence work sessions |
 
 ---
 
@@ -679,13 +754,13 @@ ADK's `App` class is the top-level container for the agent workflow, instantiate
 
 | Feature | Purpose | AutoBuilder Use |
 |---------|---------|----------------|
-| `root_agent` | The top-level agent tree | `Director` (LlmAgent, opus) — permanent, not per-execution |
+| `root_agent` | The top-level agent tree | `Director` (LlmAgent, opus) — **recreated per invocation** from config; session carries continuity |
 | `events_compaction_config` | Context compression (sliding window summarization) | Keep long autonomous runs within context limits |
 | `resumability_config` | Workflow resume after interruption | Pick up where we left off after crash/power loss |
 | `plugins` | Global lifecycle hooks (logging, metrics, guardrails) | Token tracking, cost monitoring, security guardrails |
 | `context_cache_config` | Cache static prompt parts server-side | Cache system instructions and skill content |
-| Lifecycle hooks | `on_startup` / `on_shutdown` | Initialize connections, tool registry, skill library |
-| State scope boundary | `app:*` prefix for app-level state | Project config, global conventions, workflow registry |
+| Lifecycle hooks | `on_startup` / `on_shutdown` | Initialize connections, toolset, skill library |
+| State scope boundary | `app:*` prefix for app-level state | Skill index, workflow registry, runtime agent coordination (project config is a **DB entity**, not `app:` state) |
 
 ### App Structure
 
@@ -697,10 +772,11 @@ summarizer = LlmEventSummarizer(
     llm=LiteLlm(model="anthropic/claude-haiku-4-5-20251001")
 )
 
-# Director is the permanent root_agent -- created at worker startup, not per execution
+# Director is recreated per invocation (stateless config); session carries continuity
+director_agent = build_director(active_project_ids)
 app = App(
     name="autobuilder",
-    root_agent=director_agent,  # LlmAgent (opus) — hierarchical supervision root
+    root_agent=director_agent,  # LlmAgent (opus) — rebuilt from config each invocation
 
     events_compaction_config=EventsCompactionConfig(
         compaction_interval=5,
@@ -723,11 +799,11 @@ app = App(
 
 ADK's Resume feature (v1.16+) tracks workflow execution and allows picking up after unexpected interruption:
 
-- Resume is not automatic for CustomAgents -- we must implement `BaseAgentState` subclass and define checkpoint steps (PM uses `checkpoint_project` tool)
+- Resume is not automatic for CustomAgents -- we must implement `BaseAgentState` subclass and define checkpoint steps (exact mechanism TBD, Phase 5 prototype)
 - Tools may run more than once on resume -- git, file write, and bash tools must be idempotent or include duplicate-run protection
 - The system reinstates results from successfully completed tools and re-runs from the point of failure
 
 ---
 
-*Document Version: 2.2*
+*Document Version: 2.9*
 *Last Updated: 2026-02-16*

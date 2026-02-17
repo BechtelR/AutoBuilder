@@ -210,8 +210,8 @@ deliverable_pipeline = SequentialAgent(
 )
 
 # Outer loop — dynamic orchestrator
-class BatchOrchestrator(BaseAgent):
-    """Dynamically constructs ParallelAgent batches per iteration."""
+class OuterLoopAgent(BaseAgent):
+    """Phase 1 prototype: Dynamically constructs ParallelAgent batches per iteration."""
     async def _run_async_impl(self, ctx):
         while incomplete_deliverables_exist(ctx):
             batch = select_next_batch(ctx)  # Dependency-aware, respects concurrency
@@ -498,7 +498,7 @@ fallback_chains:
   anthropic/claude-sonnet-4-5-20250929: ["anthropic/claude-haiku-4-5-20251001"]
 ```
 
-**Integration with ADK:** Each `LlmAgent` can have its model set dynamically. The router runs as part of agent construction (in the `BatchOrchestrator`) or via `before_model_callback` to override the model on the `LlmRequest` at invocation time. This keeps routing logic centralized rather than scattered across agent definitions.
+**Integration with ADK:** Each `LlmAgent` can have its model set dynamically. The router runs as part of agent construction (in the PM outer loop) or via `before_model_callback` to override the model on the `LlmRequest` at invocation time. This keeps routing logic centralized rather than scattered across agent definitions.
 
 **Phase 1 implementation:** Start simple — static routing config mapping task_type → model. No ML-based routing, no cost optimization. Just a clean lookup table that's easy to change. Sophisticate in Phase 2 with cost tracking, latency monitoring, and adaptive selection.
 
@@ -600,7 +600,7 @@ class WorkflowRegistry:
 - LLM Router (model selection)
 - State management (session/user/app/temp scopes)
 - Observability (event stream, tracing)
-- Outer loop (BatchOrchestrator — if workflow supports batch_parallel)
+- Outer loop (PM-driven — if workflow supports batch_parallel)
 - App container (lifecycle, compression, resumability)
 
 **Workflow-specific:**
@@ -629,7 +629,7 @@ ADK's `App` class (v1.14.0+) is the top-level container for an entire agent work
 
 | Feature | Purpose | AutoBuilder Use |
 |---------|---------|----------------|
-| `root_agent` | The top-level agent tree | Our `BatchOrchestrator` (CustomAgent) |
+| `root_agent` | The top-level agent tree | Director (LlmAgent) |
 | `events_compaction_config` | Context compression (sliding window summarization) | Keep long autonomous runs within context limits |
 | `resumability_config` | Workflow resume after interruption | Pick up where we left off after crash/power loss |
 | `plugins` | Global lifecycle hooks (logging, metrics, guardrails) | Token tracking, cost monitoring, security guardrails |
@@ -650,7 +650,7 @@ summarizer = LlmEventSummarizer(
 
 app = App(
     name="autobuilder",
-    root_agent=batch_orchestrator,   # CustomAgent: the outer loop
+    root_agent=director_agent,   # Director (LlmAgent) as root_agent
     
     # Context compression for long autonomous runs
     events_compaction_config=EventsCompactionConfig(
@@ -676,7 +676,7 @@ app = App(
 
 ADK's Resume feature (v1.16+) tracks workflow execution and allows picking up after unexpected interruption. Key considerations for AutoBuilder:
 
-- **Resume is not automatic for CustomAgents** — we must implement `BaseAgentState` subclass and define checkpoint steps in our `BatchOrchestrator`
+- **Resume is not automatic for CustomAgents** — we must implement `BaseAgentState` subclass and define checkpoint steps in our PM outer loop implementation
 - Tools may run more than once on resume — our git, file write, and bash tools must be idempotent or include duplicate-run protection
 - The system reinstates results from successfully completed tools and re-runs from the point of failure
 - This significantly reduces the severity of the "no Temporal-style durability" tradeoff — ADK's native resume may be sufficient for Phase 1, deferring Temporal evaluation

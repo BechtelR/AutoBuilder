@@ -85,7 +85,7 @@ All tests executed with live Claude API calls (`ANTHROPIC_API_KEY` set).
    - LLM agents with FunctionTools (Phase 4 production tools)
    - Mixed LLM + deterministic pipelines (Phase 5 agent composition)
    - Parallel execution with state isolation (Phase 5 batch processing)
-   - Dynamic orchestration loops (Phase 5 BatchOrchestrator)
+   - Dynamic orchestration loops (Phase 5 PM outer loop)
 4. **Critical finding**: Direct state writes don't persist — all future CustomAgents MUST use `state_delta` (quirk #1)
 5. **No blockers**: All quirks have clean workarounds
 

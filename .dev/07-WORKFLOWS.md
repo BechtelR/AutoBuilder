@@ -87,8 +87,8 @@ default_models:
   implementation: anthropic/claude-sonnet-4-5-20250929
   review: anthropic/claude-sonnet-4-5-20250929
 pipeline_type: batch_parallel    # batch_parallel | sequential | single_pass
-supports_features: true           # Can decompose spec into features?
-supports_parallel: true           # Can run features in parallel?
+supports_deliverables: true       # Can decompose spec into deliverables?
+supports_parallel: true           # Can run deliverables in parallel?
 ```
 
 ### Manifest Fields
@@ -101,9 +101,9 @@ supports_parallel: true           # Can run features in parallel?
 | `required_tools` | list of strings | Yes | FunctionTools that must be available. Pipeline creation fails if any are missing. |
 | `optional_tools` | list of strings | No | FunctionTools that enhance the workflow but are not required. |
 | `default_models` | dict | No | Default model assignments per task type. Overridden by LLM Router and user preferences. |
-| `pipeline_type` | string | Yes | How the pipeline executes: `batch_parallel` (features in parallel batches), `sequential` (one at a time), `single_pass` (no feature decomposition). |
-| `supports_features` | boolean | Yes | Whether the workflow can decompose a specification into implementable features. |
-| `supports_parallel` | boolean | Yes | Whether features can execute concurrently via `ParallelAgent`. |
+| `pipeline_type` | string | Yes | How the pipeline executes: `batch_parallel` (deliverables in parallel batches), `sequential` (one at a time), `single_pass` (no deliverable decomposition). |
+| `supports_deliverables` | boolean | Yes | Whether the workflow can decompose a specification into implementable deliverables. |
+| `supports_parallel` | boolean | Yes | Whether deliverables can execute concurrently via `ParallelAgent`. |
 
 ### Trigger Matching
 
@@ -151,7 +151,7 @@ class WorkflowRegistry:
         """Instantiate the workflow's ADK pipeline with the given config."""
         workflow = self.get(workflow_name)
         module = import_module(workflow.pipeline_module)
-        return module.create_pipeline(config, self.tool_registry, self.skill_library)
+        return module.create_pipeline(config, self.toolset, self.skill_library)
 ```
 
 ### Key Design Points
@@ -162,7 +162,7 @@ class WorkflowRegistry:
 
 **Pipeline instantiation is deferred.** The registry indexes manifests at startup (lightweight YAML parsing) but only instantiates the ADK pipeline when `create_pipeline()` is called. This avoids loading agent definitions and importing modules for workflows that are not used.
 
-**create_pipeline receives shared infrastructure.** The `tool_registry`, `skill_library`, and `config` are passed to the workflow's `pipeline.py` module, which uses them to construct its ADK agent tree. The workflow does not need to know how tools or skills are managed — it receives them as dependencies.
+**create_pipeline receives shared infrastructure.** The `toolset` (`AutoBuilderToolset`), `skill_library`, and `config` are passed to the workflow's `pipeline.py` module, which uses them to construct its ADK agent tree. The workflow does not need to know how tools or skills are managed — it receives them as dependencies.
 
 ---
 
@@ -174,13 +174,13 @@ All workflows operate on the same platform foundation:
 
 - **Gateway API** — FastAPI REST + SSE endpoints. Clients interact with workflows through the gateway, not directly.
 - **Worker execution** — ARQ workers execute ADK pipelines. Workflows run in worker processes.
-- **Tool registry** — FunctionTools available to all workflows (filesystem, bash, git, web, todo)
+- **AutoBuilderToolset** — FunctionTools available to all workflows (filesystem, bash, git, web, todo), vended per-role via ADK's `BaseToolset.get_tools()`
 - **Skill library** — global + project-local skills, loaded by SkillLoaderAgent
 - **LLM Router** — dynamic model selection based on task type and routing rules
 - **State management** — session/user/app/temp state scopes via ADK's session system, persisted to single database
 - **Event bus** — Redis Streams for event distribution (SSE, webhooks, audit)
 - **Observability** — unified event stream, OpenTelemetry tracing, ADK Dev UI
-- **Outer loop** — BatchOrchestrator (if workflow supports `batch_parallel` pipeline type)
+- **Outer loop** — PM agent drives batch orchestration via tools and deterministic safety mechanisms (`checkpoint_project`, `verify_batch_completion`, `run_regression_tests`) (if workflow supports `batch_parallel` pipeline type)
 - **App container** — ADK `App` class providing lifecycle management, context compression, resumability
 - **Memory service** — cross-session learnings via `MemoryService` (PostgreSQL tsvector + pgvector)
 
@@ -262,11 +262,11 @@ auto-code is the first workflow shipped with AutoBuilder. It implements autonomo
 ### Pipeline Stages
 
 ```
-1. Load spec --> generate features (spec-to-feature pipeline)
+1. Load spec --> generate deliverables (spec-to-deliverable pipeline)
 2. Resolve dependencies (topological sort via DependencyResolverAgent)
-3. While incomplete features exist:
-   a. Select next batch (respecting deps + concurrency limits)
-   b. For each feature in batch (parallel via ParallelAgent):
+3. PM drives "while incomplete deliverables exist" loop:
+   a. PM calls select_ready_batch() tool (dependency-aware, respects concurrency)
+   b. For each deliverable in batch (parallel via ParallelAgent):
       i.   Load relevant skills       (deterministic: SkillLoaderAgent)
       ii.  Plan implementation         (LLM: plan_agent)
       iii. Write code                  (LLM: code_agent)
@@ -274,9 +274,11 @@ auto-code is the first workflow shipped with AutoBuilder. It implements autonomo
       v.   Run tests                   (deterministic: TestRunnerAgent)
       vi.  Review quality              (LLM: review_agent)
       vii. Loop steps iii-vi if review fails (max N iterations via LoopAgent)
-   c. Merge completed features
-   d. Run regression tests             (deterministic: RegressionTestAgent)
-   e. Optional: pause for human review (get_user_choice tool)
+   c. after_agent_callback: verify_batch_completion (monitors each DeliverablePipeline)
+   d. checkpoint_project                (`after_agent_callback` on DeliverablePipeline; persists state via `CallbackContext`)
+   e. run_regression_tests             (`RegressionTestAgent` (CustomAgent) in pipeline after each batch; reads PM regression policy from session state)
+   f. PM reasons between batches — decides retry/skip/reorder/escalate/continue
+   g. Optional: pause for human review (get_user_choice tool)
 4. Report completion
 ```
 
@@ -305,20 +307,20 @@ deliverable_pipeline = SequentialAgent(
     ]
 )
 
-# auto-code outer loop
-class BatchOrchestrator(BaseAgent):
-    """Dynamically constructs ParallelAgent batches per iteration."""
-    async def _run_async_impl(self, ctx):
-        while incomplete_deliverables_exist(ctx):
-            batch = select_next_batch(ctx)  # Dependency-aware, respects concurrency
-            parallel = ParallelAgent(
-                name=f"Batch_{batch.id}",
-                sub_agents=[create_pipeline(d) for d in batch.deliverables]
-            )
-            async for event in parallel.run_async(ctx):
-                yield event
-            await run_regression_tests(ctx)
-            await checkpoint(ctx)
+# auto-code outer loop — PM (LlmAgent, sonnet) IS the outer loop
+# PM uses tools + deterministic safety mechanisms, not a separate orchestrator agent.
+#
+# Tools (LLM-discretionary):
+#   select_ready_batch()    — FunctionTool: dependency-aware batch composition
+#
+# after_agent_callback (on DeliverablePipeline):
+#   verify_batch_completion — monitors each pipeline, flags critical failures
+#
+# Deterministic safety (not LLM-discretionary):
+#   checkpoint_project      — after_agent_callback on DeliverablePipeline, persists state via CallbackContext
+#   run_regression_tests    — RegressionTestAgent (CustomAgent) in pipeline after each batch, reads PM regression policy from session state
+#
+# PM reasons between batches to decide retry/skip/reorder/escalate/continue.
 ```
 
 ### Key Properties
@@ -326,13 +328,13 @@ class BatchOrchestrator(BaseAgent):
 | Property | Value |
 |----------|-------|
 | `pipeline_type` | `batch_parallel` |
-| `supports_features` | `true` |
+| `supports_deliverables` | `true` |
 | `supports_parallel` | `true` |
 | Required tools | `file_read`, `file_write`, `file_edit`, `bash_exec`, `git_status`, `git_commit`, `git_diff` |
 | Default planning model | `anthropic/claude-opus-4-6` |
 | Default implementation model | `anthropic/claude-sonnet-4-5-20250929` |
 | Default review model | `anthropic/claude-sonnet-4-5-20250929` |
-| Isolation | Git worktree per feature (parallel features write to separate filesystem locations) |
+| Isolation | Git worktree per deliverable (parallel deliverables write to separate filesystem locations) |
 | Quality gates | Lint pass, test pass, review approval (all mandatory, deterministic enforcement) |
 | Max review iterations | 3 (configurable via `LoopAgent.max_iterations`) |
 
@@ -358,12 +360,12 @@ auto-code defines its own:
 - Agent definitions (`agents/plan_agent.py`, `agents/code_agent.py`, `agents/review_agent.py`)
 - Pipeline composition (`pipeline.py` with the SequentialAgent/ParallelAgent/LoopAgent tree)
 - Tool requirements (`required_tools` in WORKFLOW.yaml)
-- Feature decomposition strategy (spec-to-feature generation adapted from Autocoder patterns)
+- Deliverable decomposition strategy (spec-to-deliverable generation adapted from Autocoder patterns)
 - Quality gates (lint + test + review, enforced by deterministic agents)
 
 It does not define:
 
-- How tools work (shared FunctionTools from the tool registry)
+- How tools work (shared FunctionTools from `AutoBuilderToolset`)
 - How skills load (shared SkillLoaderAgent + SkillLibrary)
 - How models are selected (shared LLM Router)
 - How state persists (shared database via DatabaseSessionService)
@@ -397,6 +399,6 @@ The gateway never runs ADK pipelines. It is a job broker and event proxy. This m
 
 ---
 
-**Document Version:** 2.0
-**Last Updated:** 2026-02-11
+**Document Version:** 2.5
+**Last Updated:** 2026-02-16
 **Status:** Framework Validated -- Prototyping Phase

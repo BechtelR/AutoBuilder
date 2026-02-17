@@ -159,12 +159,12 @@ Batch 1: [A, B], Batch 2: [C, D], Batch 3: [E]
 **Implement inline:**
 - `Feature` dataclass/model: `name: str, depends_on: list[str], prompt: str`
 - `create_feature_agent(feature)` → returns `LlmAgent` with haiku model, output_key=`f"feature_{feature.name}_output"`
-- `BatchOrchestrator(BaseAgent)` with `features: list[Feature]` as Pydantic model field:
+- `OuterLoopAgent(BaseAgent)` with `features: list[Feature]` as Pydantic model field:
   - `_run_async_impl(self, ctx)` implements the while-loop: select ready features → construct `ParallelAgent` → run → track completed
   - Writes `batch_{n}_features`, `all_completed`, `completed_features`, `total_batches` to state
 
 **Test: `test_features_execute_in_dependency_order`**
-- Run BatchOrchestrator with 5 features
+- Run OuterLoopAgent with 5 features
 - Assert `batch_1_features` contains A and B
 - Assert `batch_2_features` contains C and D
 - Assert batch 3 contains E

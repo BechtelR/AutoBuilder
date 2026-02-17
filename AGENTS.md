@@ -90,7 +90,8 @@ API-first gateway (FastAPI) enqueues work to ARQ workers via Redis. Workers exec
 
 ## Critical DON'Ts
 - NEVER MAKE UP NON-EXISTENT FILES, FACTS OR REFERENCES
-- NEVER IGNORE EXISTING ERRORS
+- NEVER IGNORE EXISTING ERRORS, DO NOT DEFER
+- Don't use retrospective language, eg. `old version was ABC design, but now it's XYZ design`
 - Don't expose ADK types through the gateway API
 - Don't bypass type checking with `Any`
 - Don't commit secrets or API keys

@@ -1,4 +1,4 @@
-# Tools & Tool Registry
+# Tools & AutoBuilderToolset
 
 ## Overview
 
@@ -48,7 +48,7 @@ ADK provides excellent plumbing for building tools but almost nothing directly u
 
 MCP is reserved for cases where a well-maintained server provides substantial value that cannot easily be replicated (e.g., complex database connectors). For browser automation, use agent-browser (purpose-built, lighter footprint) instead of Playwright MCP.
 
-Decision rationale: See consolidated planning doc, Decision #16.
+See consolidated planning doc for rationale.
 
 ---
 
@@ -96,7 +96,7 @@ def web_fetch(url: str) -> str:
     """Fetch and extract content from a URL. Supplements ADK's load_web_page if needed."""
 ```
 
-Web search provider selection (SearXNG vs Brave vs Tavily) is an open question for Phase 1. See consolidated planning doc, Open Questions #7.
+Web search provider selection (SearXNG vs Brave vs Tavily) is an open design question. See consolidated planning doc, Open Questions #7.
 
 ### 3.4 Task Management Tools
 
@@ -127,50 +127,35 @@ def git_diff(path: str, ref: str | None = None) -> str:
     """Show changes against a reference."""
 ```
 
-### 3.6 FunctionTool Registration Example
+### 3.6 FunctionTool Registration
+
+Tools are Python functions in the `app/tools/` module, organized by function type. ADK auto-wraps them via `FunctionTool`:
 
 ```python
-from google.adk.tools import FunctionTool
+from google.adk.tools.function_tool import FunctionTool
 
 # ADK auto-generates the tool schema from type hints + docstring
-tools = [
-    FunctionTool(file_read),
-    FunctionTool(file_write),
-    FunctionTool(file_edit),
-    FunctionTool(file_search),
-    FunctionTool(directory_list),
-    FunctionTool(bash_exec),
-    FunctionTool(web_search),
-    FunctionTool(web_fetch),
-    FunctionTool(todo_read),
-    FunctionTool(todo_write),
-    FunctionTool(todo_list),
-    FunctionTool(git_status),
-    FunctionTool(git_commit),
-    FunctionTool(git_branch),
-    FunctionTool(git_diff),
-]
+tool = FunctionTool(file_read)
 ```
 
-Workflows declare which tools they require in their `WORKFLOW.yaml` manifest via `required_tools` and `optional_tools`. The tool registry provides the subset each workflow needs.
+`AutoBuilderToolset` (see Section 7) handles per-role tool filtering via ADK's native `BaseToolset.get_tools(readonly_context)`. Workflows declare which tools they require in their `WORKFLOW.yaml` manifest via `required_tools` and `optional_tools`.
 
-### 3.7 PM Project Management Tools
+### 3.7 PM & Director Tools
 
-These tools support PM-level batch orchestration. The PM (LlmAgent) calls them as part of its outer loop -- selecting batches, running regression tests, and checkpointing progress.
+The PM uses FunctionTools for batch composition and escalation. The Director uses the same escalation tool for CEO communication.
 
 ```python
 def select_ready_batch(project_id: str) -> str:
     """Dependency-aware batch selection via topological sort. Returns the next
     set of deliverables whose prerequisites are satisfied."""
 
-def run_regression_tests(project_id: str) -> str:
-    """Run cross-deliverable regression suite after a batch completes.
-    Validates that new deliverables have not broken previously completed ones."""
-
-def checkpoint_project(project_id: str) -> str:
-    """Persist current project state for resume. Captures batch progress,
-    deliverable statuses, and session state snapshot."""
+def enqueue_ceo_item(item_type: str, priority: str, message: str, metadata: str) -> str:
+    """Push a notification, approval request, escalation, or task to the unified
+    CEO queue. Used by PM and Director to communicate with the CEO without
+    injecting items into chat sessions."""
 ```
+
+**Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment. `checkpoint_project` is an `after_agent_callback` on DeliverablePipeline that fires after each deliverable completes, persisting state via `CallbackContext`. `run_regression_tests` is a `RegressionTestAgent` (CustomAgent) wired into the pipeline after each batch -- it reads the PM's regression policy from session state, runs tests when the policy says to, and no-ops otherwise. Always present in the pipeline, policy-aware. See [05-AGENTS.md](./05-AGENTS.md) for details.
 
 ---
 
@@ -278,17 +263,79 @@ Phase 2 will add cost tracking, latency monitoring, and adaptive selection.
 
 ---
 
-## 7. Tool Restrictions by Agent Role
+## 7. AutoBuilderToolset (ADK-Native Tool Authorization)
 
-All agent tiers (Director, PM, Workers) have access to tools and skills. Tool restrictions are role-based, not tier-based — the principle is that read-only agents prevent scope creep regardless of where they sit in the hierarchy. Phase 2 implements enforcement. Examples:
+Tools live in one place: the `app/tools/` module, organized by function type (filesystem, git, execution, web, task, project). Authorization is separate: a config-driven permission layer powered by ADK's native `BaseToolset` mechanism. We use ADK's primitives, not a custom registry.
 
-- `plan_agent` (worker) -- read-only filesystem tools, no file_write or bash_exec
+### 7.1 Architecture
+
+```
+Tools (code)          →  app/tools/filesystem.py, git.py, execution.py, web.py, ...
+Authorization (config)→  permission config defining which role gets which tools
+Vending (ADK-native)  →  AutoBuilderToolset(BaseToolset).get_tools(readonly_context)
+```
+
+**Separation of concerns:** Tool implementations are pure Python functions. Permission logic is centralized in `AutoBuilderToolset`. ADK's `get_tools(readonly_context)` is the native mechanism for context-sensitive tool vending -- the readonly context carries the agent's role, and the toolset returns only the tools that role is permitted to use.
+
+### 7.2 AutoBuilderToolset
+
+```python
+from google.adk.tools import BaseToolset, BaseTool
+
+class AutoBuilderToolset(BaseToolset):
+    """Vends per-role tools based on permission config.
+
+    ADK calls get_tools() during agent construction, passing a
+    ReadonlyContext that identifies the requesting agent's role.
+    The toolset filters the full tool catalog based on the
+    permission config for that role.
+    """
+
+    async def get_tools(
+        self, readonly_context: ReadonlyContext
+    ) -> list[BaseTool]:
+        role = resolve_role(readonly_context)
+        allowed = self._permission_config.get_allowed_tools(role)
+        return [t for t in self._all_tools if t.name in allowed]
+```
+
+### 7.3 Cascading Permission Config
+
+Tool access is restricted top-down through the supervision hierarchy via configuration:
+
+```
+CEO config    →  restricts Director's tools  (global config)
+Director config →  restricts PM's tools      (per-project config)
+PM config     →  restricts Worker's tools    (per-workflow config)
+```
+
+All restrictions flow through the same config mechanism. A parent tier can disable any tool available to its children. The default is permissive -- all tools are available unless explicitly restricted.
+
+### 7.4 Role-Based Tool Scoping
+
+Within each tier, individual agents have further scoping based on their role:
+
+- `plan_agent` (worker) -- read-only filesystem tools, no `file_write` or `bash_exec`
 - `code_agent` (worker) -- full filesystem and execution tools
 - `review_agent` (worker) -- read-only tools, no mutation
-- PM -- project management tools (`select_ready_batch`, `run_regression_tests`, `checkpoint_project`)
-- Director -- governance tools, resource management, cross-project tools
+- PM -- batch selection tool (`select_ready_batch`) + shared tools. Note: `checkpoint_project` (`after_agent_callback` on DeliverablePipeline) and `run_regression_tests` (`RegressionTestAgent`, CustomAgent in pipeline) are not tools -- they are not LLM-discretionary.
+- Director -- governance tools, resource management, cross-project tools + shared tools
 
-This pattern is adopted from oh-my-opencode's architecture. See consolidated planning doc, Decision #6.
+`AutoBuilderToolset.get_tools()` enforces this scoping at agent construction time, not through directory placement.
+
+### 7.5 Director Tool Authoring
+
+Director can author new tools (writes Python functions to the tools module). **CEO approval is required by default** before newly authored tools become active. This approval gate is configurable in global config (can be relaxed to auto-approve for trusted projects).
+
+### 7.6 ADK Tool Primitives
+
+| Primitive | Purpose | AutoBuilder Use |
+|-----------|---------|-----------------|
+| `FunctionTool` | Wrap Python function as LLM-callable tool | All core tools (filesystem, git, bash, etc.) |
+| `BaseToolset` | Context-sensitive tool vending via `get_tools()` | `AutoBuilderToolset` for role-based filtering |
+| `tool_filter` | Additional per-agent tool filtering | Fine-grained restrictions within a role |
+| `McpToolset` | Connect MCP servers | Reserved for complex integrations (used sparingly) |
+| `OpenAPIToolset` | Generate tools from OpenAPI spec | Potential future use for external API integration |
 
 ---
 
@@ -303,5 +350,5 @@ This pattern is adopted from oh-my-opencode's architecture. See consolidated pla
 
 ---
 
-*Document Version: 2.1*
+*Document Version: 2.7*
 *Last Updated: 2026-02-16*

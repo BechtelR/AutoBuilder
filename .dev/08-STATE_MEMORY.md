@@ -21,8 +21,8 @@ Key-value scratchpad within a session, with four prefix-scoped tiers:
 | Prefix | Scope | Lifetime | AutoBuilder Use |
 |--------|-------|----------|----------------|
 | *(none)* | This session only | Persists with session (via `DatabaseSessionService`) | Current batch, deliverable statuses, loaded skills, validation/verification results, intermediate pipeline data |
-| `user:` | All sessions for this user (within same app) | Persistent | User preferences, model selections, intervention settings, notification preferences |
-| `app:` | All users and sessions for this app | Persistent | Project config, global conventions, skill index, workflow registry, shared templates |
+| `user:` | All sessions for this user (within same app) | Persistent | **Director personality**, user preferences, model selections, intervention settings, notification preferences |
+| `app:` | All users and sessions for this app | Persistent | Skill index, workflow registry, shared templates, runtime agent coordination |
 | `temp:` | Current invocation only | Discarded after invocation completes | Intermediate LLM outputs, scratch calculations, data passed between tool calls within one invocation |
 
 Key characteristics:
@@ -30,6 +30,12 @@ Key characteristics:
 - **Event-sourced updates.** State changes happen via `Event.actions.state_delta` -- never direct mutation. All state changes are auditable in the event stream.
 - **Serializable values only.** Strings, numbers, booleans, simple lists/dicts. No complex objects.
 - **Template injection.** State values are injectable into agent instructions via `{key}` templating: `"Implement the deliverable: {current_deliverable_spec}"` auto-resolves from `session.state['current_deliverable_spec']`. Use `{key?}` for optional keys that may not exist.
+
+> **Director personality:** The Director's personality profile lives in `user:` scope. Different CEO logins get different Director personalities. Seeded from a config file on first login, then evolvable via `state_delta` over time. This means personality follows the user across all sessions and projects.
+
+> **Project config as DB entity:** Project-specific configuration (conventions, architecture decisions, tech stack settings) is a **database entity** (project table with CRUD, permissions, versioning) -- NOT stored in `app:` state. Agents load project config at session start via a tool or init callback. ADK state scopes remain exclusively for runtime agent communication. This keeps `app:` scope lightweight and avoids persisting large structured data in the key-value state system.
+
+> **Multi-session model:** Director operates via multiple concurrent sessions: **chat sessions** for interactive CEO conversation and **work sessions** (one per project) for background autonomous oversight. Same agent definition, different session IDs. ADK `Runner.run_async()` supports concurrent calls with different session IDs natively. The `user:` scoped Director personality is shared across all of these sessions automatically.
 
 ### 1.3 Memory (MemoryService)
 
@@ -194,8 +200,8 @@ Mapping the original "multi-level memory" requirement (Problem #7 from plan-shap
 |---|---|---|---|
 | **Invocation context** | `temp:` state | Scratch data for current tool chain | Auto-available, discarded after |
 | **Pipeline context** | Session state (no prefix) | Deliverable spec, plan, execution output, validation results, verification results | Written by agents via `state_delta`, read via `{key}` templates |
-| **Project conventions** | `app:` state + Skills | Standards, architecture decisions, workflow patterns | SkillLoaderAgent + `InstructionProvider` |
-| **User preferences** | `user:` state | Model preferences, notification settings, review strictness | Auto-merged into session at load |
+| **Project conventions** | Database entity (project table) + Skills | Standards, architecture decisions, workflow patterns, tech stack settings | Loaded at session start via tool/init callback; Skills via SkillLoaderAgent |
+| **Director personality + user preferences** | `user:` state | Director personality profile, model preferences, notification settings, review strictness | Auto-merged into session at load; personality seeded from config on first login |
 | **Cross-session learnings** | `MemoryService` | Patterns discovered, mistakes made, architectural decisions from past runs | `PreloadMemoryTool` or `LoadMemory` tool |
 | **Business knowledge** | Skills files (global + project-local) | Domain rules, compliance requirements, workflow conventions | SkillLoaderAgent (deterministic matching) |
 
@@ -212,9 +218,10 @@ Client request --> Gateway (enqueue job) --> Redis (ARQ queue) --> Worker picks 
 
 Worker execution:
   Session loads via DatabaseSessionService (database)
-    --> app:* state available (project config, conventions)
-    --> user:* state available (preferences, settings)
-    --> session state available (feature list, batch status from last run)
+    --> app:* state available (skill index, workflow registry, runtime coordination)
+    --> user:* state available (Director personality, preferences, settings)
+    --> Project config loaded from DB via tool/init callback
+    --> session state available (deliverable list, batch status from last run)
     |
     v
   SkillLoaderAgent
@@ -226,11 +233,11 @@ Worker execution:
     |
     v
   plan_agent reads:
-    {current_deliverable_spec}, {loaded_skills}, {memory_context}, {app:coding_standards}
+    {current_deliverable_spec}, {loaded_skills}, {memory_context}, {project_config}
     |
     v
   code_agent reads:
-    {implementation_plan}, {loaded_skills}, {app:coding_standards}
+    {implementation_plan}, {loaded_skills}, {project_config}
     |
     v
   LinterAgent writes: lint_results to session state
@@ -267,21 +274,21 @@ yield Event(
         "lint_status": "passed",
     })
 )
+```
 
 > **VERIFIED (Phase 1):** Direct `ctx.session.state["key"] = value` writes inside `_run_async_impl` do NOT persist to the session service. Only `state_delta` on yielded Events persists state. Direct reads from `ctx.session.state` still work within the same execution because ADK applies incoming `state_delta` from sub-agent events. See `.knowledge/adk/ERRATA.md` #1.
-```
 
 ### 8.2 Memory Ingestion Is Explicit
 
-Call `memory_service.add_session_to_memory(session)` at appropriate points -- after feature completion, after batch completion, at session end. Not every invocation needs to be ingested.
+Call `memory_service.add_session_to_memory(session)` at appropriate points -- after deliverable completion, after batch completion, at session end. Not every invocation needs to be ingested.
 
-The ingestion strategy (after each feature, each batch, or session end) is an open question for Phase 1. See consolidated planning doc, Open Questions #10.
+The ingestion strategy (after each deliverable, each batch, or session end) is an open design question. See consolidated planning doc, Open Questions #10.
 
 ### 8.3 Rewind Limitations
 
-Session rewind restores session-level state and artifacts but NOT `app:` or `user:` state. Since AutoBuilder's project conventions live in `app:` state and skills, a rewind does not accidentally erase global learnings. This is the right behavior for our use case.
+Session rewind restores session-level state and artifacts but NOT `app:` or `user:` state. Since AutoBuilder's project conventions live in the database (project config entity) and skills, and Director personality lives in `user:` state, a rewind does not accidentally erase global learnings or personality. This is the right behavior for our use case.
 
-External filesystem state is not managed by rewind. AutoBuilder handles this via git worktree isolation -- each parallel feature executes in its own worktree, so rewind within a feature pipeline does not affect other features.
+External filesystem state is not managed by rewind. AutoBuilder handles this via git worktree isolation -- each parallel deliverable executes in its own worktree, so rewind within a deliverable pipeline does not affect other deliverables.
 
 ### 8.4 Multiple Memory Services
 
@@ -319,7 +326,7 @@ Phase 2 introduces gateway endpoints for state and memory inspection:
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /sessions/{id}/state` | Inspect session state (loaded skills, feature status, etc.) |
+| `GET /sessions/{id}/state` | Inspect session state (loaded skills, deliverable status, etc.) |
 | `GET /memory/search?q=...` | Search cross-session memory |
 | `GET /metrics/tokens` | Token usage across sessions |
 | `GET /costs` | Cost breakdown per agent, per model, per run |
@@ -353,5 +360,5 @@ The rest of the state and memory architecture (state scopes, session management,
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: 2026-02-11*
+*Document Version: 2.2*
+*Last Updated: 2026-02-16*

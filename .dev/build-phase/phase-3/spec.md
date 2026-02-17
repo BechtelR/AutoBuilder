@@ -45,7 +45,7 @@ runner = Runner(app=app, session_service=ctx["session_service"])
 # Runner provides: session management, event streaming
 ```
 
-Phase 3 uses EchoAgent as root_agent for infrastructure validation. In production, Director (LlmAgent, opus) becomes the **permanent** root_agent with PM sub-agents, changing the App container lifecycle from per-execution to per-worker-startup. The `create_app_container(root_agent)` factory pattern supports this transition — only the caller changes.
+Phase 3 uses EchoAgent as root_agent for infrastructure validation. In production, Director (LlmAgent, opus) becomes the root_agent with PM sub_agents via `sub_agents` + `transfer_to_agent`. Director is a stateless config object recreated per invocation -- all persistent state lives in DatabaseSessionService, personality in `user:` scope. The `create_app_container(root_agent)` factory pattern supports this transition -- only the caller changes.
 
 ### DD-3: DatabaseSessionService — ADK-Managed Tables
 ADK's `DatabaseSessionService` is configured with the same PostgreSQL URL as AutoBuilder (`AUTOBUILDER_DB_URL`). ADK creates and manages its own tables via a separate SQLAlchemy metadata (not AutoBuilder's `Base`):
@@ -317,11 +317,17 @@ from google.genai.types import Content, Part
 
 ### Hierarchical Supervision
 Phase 3 validates ADK infrastructure with EchoAgent. The production architecture uses a three-tier hierarchy:
-- **Director** (LlmAgent, opus) → permanent root_agent of App
-- **PM** (LlmAgent, sonnet) → per-project manager, IS the outer loop (no separate BatchOrchestrator); manages batch execution via tools + callbacks
-- **Workers** (LlmAgent + CustomAgent) → deliverable execution
+- **Director** (LlmAgent, opus) -- stateless config object, recreated per invocation; personality in `user:` scope, seeded from config on first login; delegates to PMs via `sub_agents` + `transfer_to_agent`
+- **PM** (LlmAgent, sonnet) -- per-project manager, IS the outer loop via tools (`select_ready_batch`), `after_agent_callback` (`verify_batch_completion`), `checkpoint_project` (`after_agent_callback` on DeliverablePipeline, persists state via `CallbackContext`), and `run_regression_tests` (`RegressionTestAgent` CustomAgent in pipeline after each batch, reads PM regression policy from session state); stateless config object same as Director
+- **Workers** (LlmAgent + CustomAgent) -- deliverable execution
 
-The `create_app_container(root_agent)` factory in Phase 3 accommodates this — Phase 5 passes Director instead of EchoAgent. See `.discussion/260214_hierarchical-supervision.md`, `.discussion/260216_terminology-skills-pm.md`.
+Multi-session architecture: chat sessions for CEO interaction, work sessions per project for autonomous oversight. Cross-session bridge via `app:`/`user:` state + MemoryService + Redis Streams.
+
+Project config is a DB entity -- no new ADK scope. Existing 4 ADK scopes are sufficient: `app:` = global, `user:` = CEO prefs + Director personality, session = per-session, `temp:` = scratch.
+
+`AutoBuilderToolset(BaseToolset)` for per-role tool vending via ADK-native `get_tools(readonly_context)`. Tools organized by function type in `app/tools/`. Cascading permission config CEO->Director->PM->Worker.
+
+The `create_app_container(root_agent)` factory in Phase 3 accommodates this -- Phase 5 passes Director instead of EchoAgent. See `.discussion/260214_hierarchical-supervision.md`, `.discussion/260216_terminology-skills-pm.md`.
 
 ### Runner Execution Pattern
 ```python
