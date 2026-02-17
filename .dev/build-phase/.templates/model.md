@@ -7,6 +7,12 @@
 {Mermaid flowchart showing components, their relationships, and which architecture layer each belongs to (Interface / Gateway / Worker / Engine / Infrastructure). Group components into subgraphs by layer. Show data flow direction with arrows. For UI components: names + relationships only — detailed UI design lives in separate files for dashboard phases.}
 ```
 
+## Deliverable-to-Component Traceability
+
+| Deliverable | Components |
+|---|---|
+| P{N}.D{n} | {components this deliverable maps to} |
+
 ## Major Interfaces
 
 {Protocol classes and ABCs with method signatures only — no implementation bodies. One code block per interface. Include docstrings for non-obvious methods. These define the contracts between components.}

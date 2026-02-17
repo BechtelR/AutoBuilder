@@ -8,6 +8,8 @@ Produce a high-level architecture model for Phase {$ARGUMENTS}. Output: `model.m
 
 This is a DESIGN artifact — no implementation code. Defines components, interfaces, types, and data flow that the build phase will implement.
 
+Conciseness principle: model what the builder must comply with. Skip signatures that are obvious from the interface name and types. Skip diagrams for trivial flows. Design for decisions, not dictation.
+
 CRITICAL: NOT done until model.md is written AND every spec deliverable maps to at least one component. On blockers, ask the user.
 </objective>
 
@@ -50,15 +52,18 @@ Map spec deliverables to concrete components: modules, classes, functions. Show 
 
 STEP 4 — DEFINE INTERFACES
 For each component boundary: define Protocol classes or ABCs with method signatures only. No implementation bodies. Include type hints for all parameters and return types. These are the contracts the build phase must satisfy.
+Omit signatures that are obvious from the class hierarchy (e.g., subclass constructors that just narrow a parent parameter).
 
 STEP 5 — DEFINE KEY TYPES
 Pydantic models at API boundaries, enums for state/status, TypedDicts for internal DTOs. Field-level detail. Follow enum convention: values MUST match names (uppercase).
 
 STEP 6 — MAP DATA FLOW
 Trace how data transforms across layers. Show the type chain: what enters each boundary and what exits. Use Mermaid diagrams. Include the full type safety chain where applicable (SQLAlchemy → Pydantic → OpenAPI → TypeScript).
+One diagram per distinct data path. Skip flows that are self-evident from the interfaces (e.g., simple CRUD with no transformation).
 
 STEP 7 — DIAGRAM LOGIC FLOW
 State machines, pipeline stages, decision trees. Use Mermaid state diagrams or flowcharts. Describe transitions, conditions, and outcomes — no implementation code.
+Only diagram non-obvious logic. If a lifecycle is linear (A → B → C) with no branching, a bullet list suffices.
 
 STEP 8 — WRITE model.md
 Follow template at `.dev/build-phase/.templates/model.md`. Fill all sections. Include integration points (existing system + future phase extensions). Re-read to verify completeness.
