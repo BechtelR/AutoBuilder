@@ -19,7 +19,7 @@ Parse phase number from arguments (if missing, ask). Flags:
 - `--review=none` — skip review, quality gate only
 
 Bootstrap (parallel reads):
-- @.dev/build-phase/phase-{N}/spec.md — full spec (deliverables, decisions, requirements, build order)
+- @.dev/build-phase/phase-{N}/spec.md — full spec (deliverables, BOM components, decisions, requirements, build order)
 - @.dev/build-phase/phase-{N}/model.md — architecture model (OPTIONAL — skip if not present)
 - @.dev/03-STRUCTURE.md — file placement truth
 - @.dev/02-ARCHITECTURE.md — five-layer architecture
@@ -82,7 +82,7 @@ Execute the Build Order from spec.md batch-by-batch. Each batch is one cycle:
 1. **Delegate** — assign deliverables to subagents per `<delegation>`. Parallel batches → launch subagents in parallel. Sequential batches → one at a time.
 
    **Context injection per subagent** (progressive disclosure — give each agent only what it needs):
-   - The deliverable's spec section (ID, files, description, requirements, validation)
+   - The deliverable's spec section (ID, files, description, BOM components, requirements, validation)
    - Relevant model.md interfaces/types for that deliverable (if model.md exists)
    - Design decisions from spec.md that apply to this deliverable
    - Existing code in files being created/modified (from Step 1A findings)
@@ -148,7 +148,10 @@ CRITICAL — Every checkbox requires EVIDENCE (command output or observable resu
 Per item in Completion Contract: run verification command → read output → only mark `[x]` on proven success. Failures → fix and re-verify.
 
 **B. Mark Spec Complete**
-Open `.dev/build-phase/phase-{N}/spec.md`. Per deliverable: run validation → check off (`[x]`) only passing requirements. Unverifiable → leave unchecked, report to user.
+Open `.dev/build-phase/phase-{N}/spec.md`. Per deliverable:
+1. Check off BOM Components (`[x]`) — each component that was implemented
+2. Check off Requirements (`[x]`) — only passing requirements verified by validation command
+3. Unverifiable items → leave unchecked, report to user
 
 **C. Mark Roadmap Complete**
 Open `.dev/01-ROADMAP.md`:

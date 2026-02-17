@@ -18,11 +18,12 @@ Parse phase number from arguments (if missing, ask).
 
 Bootstrap (parallel reads):
 - @.dev/build-phase/phase-{N}/spec.md — full spec (deliverables, decisions, files)
+- @.dev/07-COMPONENTS.md — filter by phase number for **authoritative component list** with types and dependencies
 - @.dev/02-ARCHITECTURE.md — five-layer architecture (conformance target)
 - @.dev/03-STRUCTURE.md — file placement truth
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
-Selective deep-reads (only what the phase touches, via INDEX.md):
+Selective deep-reads (only architecture files referenced in BOM "Source" column for this phase's components):
 - Agents → `architecture/agents.md` | Skills → `architecture/skills.md` | Workflows → `architecture/workflows.md`
 - State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
 - Tech decisions → `04-TECH_STACK.md` | Design history → `.discussion/design-changelog.md`

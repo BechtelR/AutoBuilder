@@ -18,6 +18,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | 04 | `04-TECH_STACK.md` | Technology decisions & rationale | Every tech choice with why + rejected alternatives |
 | 10 | `05-DEV_SETUP.md` | Development environment setup | Prerequisites, env vars, local dev workflow |
 | 11 | `06-PROVIDERS.md` | External providers | LLM models, pricing, fallback chains, search providers |
+| 07 | `07-COMPONENTS.md` | Component Registry (BOM) | **Every buildable component** → phase assignment; gap detection |
 
 ---
 
@@ -51,6 +52,8 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | Why was decision X made? | `.discussion/design-changelog.md` |
 | How does ADK feature X work? | `.knowledge/adk/README.md` → category file → WebFetch URL |
 | What are the coding standards? | `.standards.md`, `CLAUDE.md` (project root) |
+| What components are in Phase N? | `07-COMPONENTS.md` (filter by phase) |
+| What components are unassigned? | `07-COMPONENTS.md` (search for `—` in Phase column) |
 
 ---
 
@@ -64,3 +67,5 @@ Before working with ADK code or designs, must read `.knowledge/adk/README.md` �
 - **04-TECH_STACK.md** justifies choices; `.discussion/design-changelog.md` records when/why they changed
 - **.standards.md** and root `CLAUDE.md` both govern code style — standards is the superset
 - **architecture/** files are linked from `02-ARCHITECTURE.md` §4 reference map
+- **07-COMPONENTS.md** is the BOM — derived from `architecture/` files, assigns components to roadmap phases
+- **PostToolUse hook** (`scripts/check-arch-change.sh`) fires on architecture file edits → reminds to update BOM + roadmap

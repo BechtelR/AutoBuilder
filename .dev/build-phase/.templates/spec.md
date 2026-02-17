@@ -32,7 +32,10 @@
 **Files:** `path/to/file.py`, `path/to/other.py`
 **Depends on:** {P{N}.D{x} | —}
 **Description:** {What to build — 2-4 sentences. What, not how. Include key patterns or API shapes when they reduce ambiguity.}
-**Requirements:** *(what must be true — checked off during build as acceptance criteria)*
+**BOM Components:** *(checked off during build when implemented)*
+- [ ] `{ID1}` — {component name}
+- [ ] `{ID2}` — {component name}
+**Requirements:** *(conditions that must be true when complete)*
 - [ ] {Specific, measurable condition — no "works correctly"}
 - [ ] {Another requirement}
 **Validation:**
@@ -55,9 +58,19 @@ Batch 2 (sequential): P{N}.D{z}
 
 ## Completion Contract Traceability
 
+### Contract Coverage
+
 | # | Roadmap Completion Contract Item | Covered By | Validation |
 |---|---|---|---|
 | 1 | {Exact text from roadmap} | P{N}.D{x}, P{N}.D{y} | `{verification command}` |
+
+### BOM Coverage
+
+| BOM ID | Component | Deliverable |
+|---|---|---|
+| {ID} | {Component name} | P{N}.D{x} |
+
+*Every BOM component assigned to Phase {N} in `07-COMPONENTS.md` must appear above. Zero unmapped.*
 
 ## Research Notes
 
