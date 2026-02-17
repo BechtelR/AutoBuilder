@@ -1,3 +1,5 @@
+[← Architecture Overview](../02-ARCHITECTURE.md)
+
 # AutoBuilder State & Memory Architecture
 
 ## Overview
@@ -37,7 +39,22 @@ Key characteristics:
 
 > **Multi-session model:** Director operates via multiple concurrent sessions: **chat sessions** for interactive CEO conversation and **work sessions** (one per project) for background autonomous oversight. Same agent definition, different session IDs. ADK `Runner.run_async()` supports concurrent calls with different session IDs natively. The `user:` scoped Director personality is shared across all of these sessions automatically.
 
-### 1.3 Memory (MemoryService)
+### 1.3 State Scope per Tier
+
+The 6-level memory architecture applies at each tier's scope:
+
+| Level | Director Scope | PM Scope | Worker Scope |
+|-------|---------------|----------|--------------|
+| Invocation (`temp:`) | Current decision cycle (chat or work session) | Current batch management cycle | Current deliverable execution |
+| Pipeline (`session`) | Chat: conversation state. Work: cross-project governance state. | Project execution state | Deliverable pipeline state |
+| Project (DB entity + Skills) | All `project_configs` (DB). Global conventions. | Project config (DB). Project conventions, skills. | Deliverable-specific skills |
+| User (`user:`) | CEO preferences, Director personality | Inherits from Director | Inherits from PM |
+| Cross-session (`MemoryService`) | Historical decisions, pattern library | Project history, past batch outcomes | Past deliverable patterns |
+| Business (Skills) | Global skills, governance rules | Project skills, workflow skills | Task-specific skills |
+
+Hard limits cascade through the hierarchy: CEO sets globals -> Director enforces per-project limits -> PM enforces per-worker constraints.
+
+### 1.4 Memory (MemoryService)
 
 Searchable cross-session knowledge archive. Two operations:
 
@@ -52,11 +69,11 @@ Built-in tools for agent access:
 | `LoadMemory` | Agent-decided retrieval (on-demand) |
 | `tool.Context.search_memory()` | Programmatic search from within custom tools |
 
-### 1.4 Session Rewind (v1.17+)
+### 1.5 Session Rewind (v1.17+)
 
 Revert to any previous invocation point. Session-level state and artifacts are restored. `app:` and `user:` state are NOT restored (by design -- those are cross-session). External systems (filesystem, git) are not managed by rewind -- AutoBuilder handles that via git worktree isolation.
 
-### 1.5 Session Migration
+### 1.6 Session Migration
 
 CLI tool for `DatabaseSessionService` schema upgrades (v0 pickle to v1 JSON). Important for production maintenance when upgrading ADK versions.
 
@@ -166,11 +183,11 @@ PostgreSQL's built-in `tsvector` provides full-text search with ranking, stemmin
 
 ### Semantic Search: pgvector
 
-The `pgvector` extension adds vector column types and similarity search operators to PostgreSQL. When semantic search is needed (Phase 9+), embeddings are stored alongside text in the same table — no separate vector database required.
+The `pgvector` extension adds vector column types and similarity search operators to PostgreSQL. When semantic search is needed (Phase 9+), embeddings are stored alongside text in the same table -- no separate vector database required.
 
 ### Embedding Model
 
-pgvector stores and indexes vectors; an embedding model produces them. Embeddings are routed through **LiteLLM** (`litellm.embedding()`) — same provider-agnostic abstraction used for LLM calls. The model is a configuration value, not a hardcoded dependency.
+pgvector stores and indexes vectors; an embedding model produces them. Embeddings are routed through **LiteLLM** (`litellm.embedding()`) -- same provider-agnostic abstraction used for LLM calls. The model is a configuration value, not a hardcoded dependency.
 
 | Option | Dims | Notes |
 |--------|------|-------|
@@ -183,12 +200,12 @@ Default: whichever provider the project already has an API key for. Swappable vi
 ### Implementation: `PostgresMemoryService`
 
 Custom `BaseMemoryService` implementation (~200-500 LOC):
-- `add_session_to_memory(session)` — ingests completed session text + optional embeddings
-- `search_memory(app_name, user_id, query)` — tsvector keyword search (Phase 1), pgvector semantic search (Phase 9+)
+- `add_session_to_memory(session)` -- ingests completed session text + optional embeddings
+- `search_memory(app_name, user_id, query)` -- tsvector keyword search (Phase 1), pgvector semantic search (Phase 9+)
 - Single table in the shared PostgreSQL database
 - Same SQLAlchemy models, same Alembic migrations, same connection pool
 
-**Why not a separate vector database?** ChromaDB, Qdrant, Pinecone, etc. add another service to operate. pgvector keeps everything in PostgreSQL — one database, one backup strategy, one connection pool. The single-database architecture principle is preserved.
+**Why not a separate vector database?** ChromaDB, Qdrant, Pinecone, etc. add another service to operate. pgvector keeps everything in PostgreSQL -- one database, one backup strategy, one connection pool. The single-database architecture principle is preserved.
 
 ---
 
@@ -258,9 +275,38 @@ Each step reads from and writes to session state. Agents communicate via state, 
 
 ---
 
-## 8. Key Implementation Details
+## 8. Multi-Agent Communication
 
-### 8.1 State Updates Are Event-Sourced
+Agents communicate via four mechanisms, all operating through session state:
+
+| # | Mechanism | How It Works |
+|---|-----------|-------------|
+| 1 | `output_key` | Agent writes its result to a named state key |
+| 2 | `{key}` templates | Agent reads from state via template injection in instructions |
+| 3 | `InstructionProvider` | Dynamic function reads state and constructs context-appropriate instructions at invocation time |
+| 4 | `before_model_callback` | Injects additional context (file contents, test results) right before LLM call |
+
+Within a pipeline tier, no agent calls another agent directly. All coordination flows through the shared state system, making data flow explicit and debuggable.
+
+### Hierarchical Communication
+
+Between tiers, agents communicate via ADK's delegation primitives:
+
+| Pattern | Mechanism | Example |
+|---------|-----------|---------|
+| Director -> PM delegation | `sub_agents` + `transfer_to_agent` | Director declares PMs as sub_agents, delegates via transfer_to_agent |
+| PM -> Worker orchestration | `sub_agents` tree | PM constructs DeliverablePipeline workers per batch |
+| Worker -> PM escalation | State write + event | Worker writes failure to state; PM reads and decides |
+| PM -> Director escalation | State write + event + CEO queue | PM writes unresolvable issue; enqueues escalation to CEO queue |
+| Director observation | `before_agent_callback` / `after_agent_callback` | Director monitors PM events via supervision hooks |
+| Cross-project state | `app:` scope prefix | Visible to Director and all PMs |
+| Cross-session bridge | `app:`/`user:` state + `MemoryService` + Redis Streams | Chat sessions observe/influence work sessions |
+
+---
+
+## 9. Key Implementation Details
+
+### 9.1 State Updates Are Event-Sourced
 
 Never mutate `session.state` directly. Always write via `EventActions(state_delta={...})`. This ensures all changes are captured in the event stream and are rewind-safe.
 
@@ -278,23 +324,23 @@ yield Event(
 
 > **VERIFIED (Phase 1):** Direct `ctx.session.state["key"] = value` writes inside `_run_async_impl` do NOT persist to the session service. Only `state_delta` on yielded Events persists state. Direct reads from `ctx.session.state` still work within the same execution because ADK applies incoming `state_delta` from sub-agent events. See `.knowledge/adk/ERRATA.md` #1.
 
-### 8.2 Memory Ingestion Is Explicit
+### 9.2 Memory Ingestion Is Explicit
 
 Call `memory_service.add_session_to_memory(session)` at appropriate points -- after deliverable completion, after batch completion, at session end. Not every invocation needs to be ingested.
 
 The ingestion strategy (after each deliverable, each batch, or session end) is an open design question. See consolidated planning doc, Open Questions #10.
 
-### 8.3 Rewind Limitations
+### 9.3 Rewind Limitations
 
 Session rewind restores session-level state and artifacts but NOT `app:` or `user:` state. Since AutoBuilder's project conventions live in the database (project config entity) and skills, and Director personality lives in `user:` state, a rewind does not accidentally erase global learnings or personality. This is the right behavior for our use case.
 
 External filesystem state is not managed by rewind. AutoBuilder handles this via git worktree isolation -- each parallel deliverable executes in its own worktree, so rewind within a deliverable pipeline does not affect other deliverables.
 
-### 8.4 Multiple Memory Services
+### 9.4 Multiple Memory Services
 
 ADK allows agents to access more than one `MemoryService`. This could be useful if AutoBuilder later needs separate stores for different knowledge types (e.g., code patterns vs. project decisions). Phase 1 uses a single `PostgresMemoryService`.
 
-### 8.5 Redis Cache Strategy
+### 9.5 Redis Cache Strategy
 
 Frequently accessed read-heavy data is cached in Redis to reduce database load:
 
@@ -307,7 +353,7 @@ Frequently accessed read-heavy data is cached in Redis to reduce database load:
 
 Cache reads are opportunistic -- a cache miss falls through to the database. Cache writes happen on database reads (write-through for hot data).
 
-### 8.6 Context Window Management
+### 9.6 Context Window Management
 
 ADK's `LlmAgent` automatically receives session event history as part of each LLM prompt. Two built-in mechanisms manage growth:
 
@@ -320,7 +366,7 @@ ADK's `LlmAgent` automatically receives session event history as part of each LL
 
 ---
 
-## 9. Gateway API for State & Memory (Phase 2)
+## 10. Gateway API for State & Memory (Phase 2)
 
 Phase 2 introduces gateway endpoints for state and memory inspection:
 
@@ -335,7 +381,7 @@ These endpoints read from the database. They do not interact with ADK directly -
 
 ---
 
-## 10. Scope Estimate
+## 11. Scope Estimate
 
 **`PostgresMemoryService`**: ~200-500 lines implementing `BaseMemoryService` with PostgreSQL tsvector backing (pgvector for semantic search in Phase 9+).
 
@@ -347,12 +393,13 @@ The rest of the state and memory architecture (state scopes, session management,
 
 ---
 
-## 11. Related Documents
+## See Also
 
-- Consolidated planning doc: `.dev/.discussion/260211_plan-shaping.md` (Section 11)
-- Skills system: `.dev/06-SKILLS.md`
-- Tools: `.dev/09-TOOLS.md`
-- Delivery plan: `.dev/01-ROADMAP.md`
+- [Agents](./agents.md) -- agent composition, custom agents, supervision hierarchy
+- [Skills](./skills.md) -- skill-based knowledge injection, SkillLoaderAgent
+- [Tools](./tools.md) -- FunctionTools, AutoBuilderToolset, tool authorization
+- [Architecture Overview](../02-ARCHITECTURE.md) -- system-level architecture
+- [Roadmap](../01-ROADMAP.md) -- delivery plan
 - ADK Sessions & Memory overview: https://google.github.io/adk-docs/sessions/
 - ADK State management: https://google.github.io/adk-docs/sessions/state/
 - ADK Memory service: https://google.github.io/adk-docs/sessions/memory/
@@ -360,5 +407,5 @@ The rest of the state and memory architecture (state scopes, session management,
 
 ---
 
-*Document Version: 2.2*
-*Last Updated: 2026-02-16*
+*Document Version: 3.0*
+*Last Updated: 2026-02-17*

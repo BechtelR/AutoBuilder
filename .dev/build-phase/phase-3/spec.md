@@ -113,7 +113,7 @@ The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` si
 ### P3.D1: Configuration Extensions + Domain Enums
 **Files:** `app/config/settings.py` (update), `app/models/enums.py` (update), `app/models/__init__.py` (update)
 **Depends on:** —
-**Description:** Add LLM model default settings for each task type and new domain enums for LLM routing and event classification. Settings fields use `AUTOBUILDER_DEFAULT_*_MODEL` env vars with defaults pointing to Anthropic models per `11-PROVIDERS.md`.
+**Description:** Add LLM model default settings for each task type and new domain enums for LLM routing and event classification. Settings fields use `AUTOBUILDER_DEFAULT_*_MODEL` env vars with defaults pointing to Anthropic models per `06-PROVIDERS.md`.
 **Requirements:**
 - [ ] `Settings` has `default_code_model: str` defaulting to `"anthropic/claude-sonnet-4-5-20250929"`
 - [ ] `Settings` has `default_plan_model: str` defaulting to `"anthropic/claude-opus-4-6"`
@@ -131,7 +131,7 @@ The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` si
 ### P3.D2: LLM Router — Static Routing + Fallback Chains
 **Files:** `app/router/router.py`, `app/router/__init__.py` (update)
 **Depends on:** P3.D1
-**Description:** `LlmRouter` class that maps `TaskType` to LiteLLM model strings using configuration from Settings. Implements 3-step fallback chain resolution: user override → fallback chain → default. Phase 3 fallback chains define Anthropic-tier degradation paths (opus → sonnet → haiku). Cross-provider fallbacks (Anthropic → OpenAI → Google per `11-PROVIDERS.md`) deferred to Phase 11 (adaptive routing). A `from_settings()` class method creates the router from application settings. The router is a stateless, synchronous lookup — no API calls, no I/O.
+**Description:** `LlmRouter` class that maps `TaskType` to LiteLLM model strings using configuration from Settings. Implements 3-step fallback chain resolution: user override → fallback chain → default. Phase 3 fallback chains define Anthropic-tier degradation paths (opus → sonnet → haiku). Cross-provider fallbacks (Anthropic → OpenAI → Google per `06-PROVIDERS.md`) deferred to Phase 11 (adaptive routing). A `from_settings()` class method creates the router from application settings. The router is a stateless, synchronous lookup — no API calls, no I/O.
 **Requirements:**
 - [ ] `LlmRouter.select_model(task_type: TaskType, user_override: str | None = None) -> str` returns model string matching Settings defaults: `CODE`→`"anthropic/claude-sonnet-4-5-20250929"`, `PLAN`→`"anthropic/claude-opus-4-6"`, `REVIEW`→`"anthropic/claude-sonnet-4-5-20250929"`, `FAST`→`"anthropic/claude-haiku-4-5-20251001"`
 - [ ] When `user_override` is a non-None string, `select_model()` returns that string regardless of task_type

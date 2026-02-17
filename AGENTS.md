@@ -124,7 +124,7 @@ uv run pyright                        # Identify type errors
 | `OPENAI_API_KEY` | -- | OpenAI models (fallback) |
 | `GOOGLE_API_KEY` | -- | Gemini models (fallback) |
 
-See [.dev/11-PROVIDERS.md](./.dev/11-PROVIDERS.md) for full model reference (strings, pricing, fallback chains).
+See [.dev/06-PROVIDERS.md](./.dev/06-PROVIDERS.md) for full model reference (strings, pricing, fallback chains).
 
 ## Knowledge Base
 Before writing ADK code, must read `.dev/.knowledge/adk/README.md` → category file → `ERRATA.md`. Never guess ADK APIs.

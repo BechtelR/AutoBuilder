@@ -269,7 +269,7 @@ class OuterLoopAgent(BaseAgent):
 **Files:** `tests/phase1/test_p5_alternate_providers.py`, `tests/phase1/conftest.py` (update)
 **Depends on:** P1.D1, P1.D2
 
-**Description:** Validate that OpenAI and Gemini models work through the same LiteLLM+ADK pipeline used for Claude. This is critical because these providers serve as production fallbacks (see `11-PROVIDERS.md`). Each provider's function calling format is different — LiteLLM must translate correctly for ADK's FunctionTool mechanism to work. Tests use the cheapest model per provider to minimize cost.
+**Description:** Validate that OpenAI and Gemini models work through the same LiteLLM+ADK pipeline used for Claude. This is critical because these providers serve as production fallbacks (see `06-PROVIDERS.md`). Each provider's function calling format is different — LiteLLM must translate correctly for ADK's FunctionTool mechanism to work. Tests use the cheapest model per provider to minimize cost.
 
 Each provider is tested independently with its own skip marker. A missing API key skips that provider's tests without failing the suite.
 
@@ -285,7 +285,7 @@ requires_google_key = pytest.mark.skipif(
 )
 ```
 
-**Models under test** (cheapest per provider — see `11-PROVIDERS.md`):
+**Models under test** (cheapest per provider — see `06-PROVIDERS.md`):
 - OpenAI: `LiteLlm(model="openai/gpt-5-nano")` — $0.05/$0.40 per 1M tokens
 - Gemini: `LiteLlm(model="gemini/gemini-2.5-flash-lite")` — $0.10/$0.40 per 1M tokens
 
@@ -415,4 +415,4 @@ if event.usage_metadata:
 
 ### Model Strings
 
-See [.dev/11-PROVIDERS.md](../../11-PROVIDERS.md) for full model reference (all providers, pricing, context windows, fallback chains).
+See [.dev/06-PROVIDERS.md](../../06-PROVIDERS.md) for full model reference (all providers, pricing, context windows, fallback chains).

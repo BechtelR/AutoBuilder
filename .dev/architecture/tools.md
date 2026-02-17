@@ -1,10 +1,12 @@
+[← Architecture Overview](../02-ARCHITECTURE.md)
+
 # Tools & AutoBuilderToolset
 
 ## Overview
 
-AutoBuilder's tool layer consists of **FunctionTools** — thin Python wrappers that LLM agents call at their discretion. ADK auto-generates tool schemas from type hints and docstrings, so tools are just annotated functions.
+AutoBuilder's tool layer consists of **FunctionTools** -- thin Python wrappers that LLM agents call at their discretion. ADK auto-generates tool schemas from type hints and docstrings, so tools are just annotated functions.
 
-This document covers FunctionTools only. For custom agents (deterministic pipeline participants like `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`), see [05-AGENTS.md](./05-AGENTS.md). The key distinction: tools are passive (LLM decides when to call them), agents are active (pipeline structure determines when they run).
+This document covers FunctionTools only. For custom agents (deterministic pipeline participants like `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`), see [Agents](./agents.md). The key distinction: tools are passive (LLM decides when to call them), agents are active (pipeline structure determines when they run).
 
 **Tools execute in ARQ worker processes, not the FastAPI gateway.** The gateway exposes high-level REST endpoints (e.g., "run workflow", "get status"). It does not expose raw tool operations. FunctionTools run inside the ADK pipeline, which executes in worker processes. Tools have access to the worker's filesystem, subprocess environment, and git worktrees.
 
@@ -155,7 +157,7 @@ def enqueue_ceo_item(item_type: str, priority: str, message: str, metadata: str)
     injecting items into chat sessions."""
 ```
 
-**Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment. `checkpoint_project` is an `after_agent_callback` on DeliverablePipeline that fires after each deliverable completes, persisting state via `CallbackContext`. `run_regression_tests` is a `RegressionTestAgent` (CustomAgent) wired into the pipeline after each batch -- it reads the PM's regression policy from session state, runs tests when the policy says to, and no-ops otherwise. Always present in the pipeline, policy-aware. See [05-AGENTS.md](./05-AGENTS.md) for details.
+**Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment. `checkpoint_project` is an `after_agent_callback` on DeliverablePipeline that fires after each deliverable completes, persisting state via `CallbackContext`. `run_regression_tests` is a `RegressionTestAgent` (CustomAgent) wired into the pipeline after each batch -- it reads the PM's regression policy from session state, runs tests when the policy says to, and no-ops otherwise. Always present in the pipeline, policy-aware. See [Agents](./agents.md) for details.
 
 ---
 
@@ -212,7 +214,7 @@ deliverable_pipeline = SequentialAgent(
 )
 ```
 
-Custom agents (`SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`) are defined in [05-AGENTS.md](./05-AGENTS.md). The entire pipeline runs inside a worker process, with events published to Redis Streams for external consumption.
+Custom agents (`SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`) are defined in [Agents](./agents.md). The entire pipeline runs inside a worker process, with events published to Redis Streams for external consumption.
 
 ---
 
@@ -270,14 +272,26 @@ Tools live in one place: the `app/tools/` module, organized by function type (fi
 ### 7.1 Architecture
 
 ```
-Tools (code)          →  app/tools/filesystem.py, git.py, execution.py, web.py, ...
-Authorization (config)→  permission config defining which role gets which tools
-Vending (ADK-native)  →  AutoBuilderToolset(BaseToolset).get_tools(readonly_context)
+Tools (code)          ->  app/tools/filesystem.py, git.py, execution.py, web.py, ...
+Authorization (config)->  permission config defining which role gets which tools
+Vending (ADK-native)  ->  AutoBuilderToolset(BaseToolset).get_tools(readonly_context)
 ```
 
 **Separation of concerns:** Tool implementations are pure Python functions. Permission logic is centralized in `AutoBuilderToolset`. ADK's `get_tools(readonly_context)` is the native mechanism for context-sensitive tool vending -- the readonly context carries the agent's role, and the toolset returns only the tools that role is permitted to use.
 
-### 7.2 AutoBuilderToolset
+### 7.2 Tool Registry Summary
+
+| Concern | Mechanism |
+|---------|-----------|
+| Tool code | `app/tools/` module, organized by function type |
+| Per-role filtering | `AutoBuilderToolset.get_tools(readonly_context)` |
+| Permission config | Config-driven: CEO restricts Director, Director restricts PM, PM restricts Worker |
+| Role scoping | `plan_agent` gets read-only tools, `code_agent` gets full tools, etc. |
+| Tool authoring | Director can write new tool functions; CEO approval required by default |
+
+Restrictions cascade downward through the permission config -- a PM cannot access Director tools, a Worker cannot access PM tools. Within each tier, individual agents have further role-based scoping enforced by the toolset at agent construction time.
+
+### 7.3 AutoBuilderToolset Implementation
 
 ```python
 from google.adk.tools import BaseToolset, BaseTool
@@ -299,19 +313,19 @@ class AutoBuilderToolset(BaseToolset):
         return [t for t in self._all_tools if t.name in allowed]
 ```
 
-### 7.3 Cascading Permission Config
+### 7.4 Cascading Permission Config
 
 Tool access is restricted top-down through the supervision hierarchy via configuration:
 
 ```
-CEO config    →  restricts Director's tools  (global config)
-Director config →  restricts PM's tools      (per-project config)
-PM config     →  restricts Worker's tools    (per-workflow config)
+CEO config    ->  restricts Director's tools  (global config)
+Director config ->  restricts PM's tools      (per-project config)
+PM config     ->  restricts Worker's tools    (per-workflow config)
 ```
 
 All restrictions flow through the same config mechanism. A parent tier can disable any tool available to its children. The default is permissive -- all tools are available unless explicitly restricted.
 
-### 7.4 Role-Based Tool Scoping
+### 7.5 Role-Based Tool Scoping
 
 Within each tier, individual agents have further scoping based on their role:
 
@@ -323,11 +337,11 @@ Within each tier, individual agents have further scoping based on their role:
 
 `AutoBuilderToolset.get_tools()` enforces this scoping at agent construction time, not through directory placement.
 
-### 7.5 Director Tool Authoring
+### 7.6 Director Tool Authoring
 
 Director can author new tools (writes Python functions to the tools module). **CEO approval is required by default** before newly authored tools become active. This approval gate is configurable in global config (can be relaxed to auto-approve for trusted projects).
 
-### 7.6 ADK Tool Primitives
+### 7.7 ADK Tool Primitives
 
 | Primitive | Purpose | AutoBuilder Use |
 |-----------|---------|-----------------|
@@ -339,16 +353,17 @@ Director can author new tools (writes Python functions to the tools module). **C
 
 ---
 
-## 8. Related Documents
+## See Also
 
-- Consolidated planning doc: `.dev/.discussion/260211_plan-shaping.md` (Section 8)
-- State and memory: `.dev/08-STATE_MEMORY.md`
-- Skills system: `.dev/06-SKILLS.md`
-- Agents (including custom agents): `.dev/05-AGENTS.md`
+- [Agents](./agents.md) -- agent composition, custom agents, supervision hierarchy
+- [Skills](./skills.md) -- skill-based knowledge injection, SkillLoaderAgent
+- [State](./state.md) -- state scopes, memory architecture, session management
+- [Providers](../06-PROVIDERS.md) -- LLM models, pricing, fallback chains
+- [Architecture Overview](../02-ARCHITECTURE.md) -- system-level architecture
 - ADK tools documentation: https://google.github.io/adk-docs/tools/
 - ADK custom agents: https://google.github.io/adk-docs/agents/custom-agents/
 
 ---
 
-*Document Version: 2.7*
-*Last Updated: 2026-02-16*
+*Document Version: 3.0*
+*Last Updated: 2026-02-17*

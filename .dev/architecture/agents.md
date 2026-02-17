@@ -1,3 +1,5 @@
+[← Architecture Overview](../02-ARCHITECTURE.md)
+
 # Agents
 
 **AutoBuilder Platform**
@@ -9,15 +11,16 @@
 
 1. [Overview](#overview)
 2. [Agent Hierarchy](#agent-hierarchy)
-3. [Director Agent](#director-agent)
-4. [PM Agent](#pm-agent)
-5. [Execution Environment](#execution-environment)
-6. [Worker-Tier LLM Agents](#worker-tier-llm-agents)
-7. [Worker-Tier Custom Agents (Deterministic)](#worker-tier-custom-agents)
-8. [Plan/Execute Separation](#planexecute-separation)
-9. [Agent Tool Restrictions](#agent-tool-restrictions)
-10. [LLM Router](#llm-router)
-11. [Agent Communication via Session State](#agent-communication-via-session-state)
+3. [Agent Factory Pattern](#agent-factory-pattern)
+4. [Director Agent](#director-agent)
+5. [PM Agent](#pm-agent)
+6. [Execution Environment](#execution-environment)
+7. [Worker-Tier LLM Agents](#worker-tier-llm-agents)
+8. [Worker-Tier Custom Agents (Deterministic)](#worker-tier-custom-agents)
+9. [Plan/Execute Separation](#planexecute-separation)
+10. [Agent Tool Restrictions](#agent-tool-restrictions)
+11. [LLM Router](#llm-router)
+12. [Agent Communication via Session State](#agent-communication-via-session-state)
 
 ---
 
@@ -32,7 +35,7 @@ AutoBuilder uses a **three-tier hierarchical supervision model** (CEO -> Directo
 
 Both types participate in the same state system, emit events into the same unified event stream, and compose naturally with ADK's `SequentialAgent`, `ParallelAgent`, and `LoopAgent` workflow primitives. This is the decisive architectural advantage of Google ADK over alternatives: deterministic agents are first-class workflow citizens, not shadow functions called outside the framework.
 
-For FunctionTools (LLM-callable tool wrappers), see [09-TOOLS.md](./09-TOOLS.md). The key distinction: tools are passive (LLM decides when to call them), agents are active (pipeline structure determines when they run).
+For FunctionTools (LLM-callable tool wrappers), see [Tools](./tools.md). The key distinction: tools are passive (LLM decides when to call them), agents are active (pipeline structure determines when they run).
 
 Note: The worker-level examples below use auto-code agents (plan/code/lint/test/review). Other workflows define their own agent sets with the same patterns. The architecture is workflow-agnostic; the agent *roles* are workflow-specific.
 
@@ -94,6 +97,49 @@ deliverable_pipeline = SequentialAgent(
         )
     ]
 )
+```
+
+---
+
+## Agent Factory Pattern
+
+Agents are **stateless config objects** -- recreated from configuration on every invocation. All continuity lives in database-backed ADK sessions. The factory rebuilds the agent tree; the session carries the memory.
+
+```python
+# Agent factory -- called per invocation, not once at startup
+def build_director(project_ids: list[str]) -> LlmAgent:
+    """Recreate Director agent tree from config. Stateless -- all
+    continuity is in the ADK session (DB-backed)."""
+    pms = [build_pm(pid) for pid in project_ids]
+    return LlmAgent(
+        name="Director",
+        model="anthropic/claude-opus-4-6",
+        instruction="Cross-project governance agent. Manage PMs, allocate resources, "
+                    "enforce hard limits, intervene when patterns go wrong. "
+                    "Your personality and preferences are in user: state. "
+                    "Delegate to PMs via transfer_to_agent.",
+        sub_agents=pms,  # PMs are Director's sub_agents; delegation via transfer_to_agent
+    )
+
+def build_pm(project_id: str) -> LlmAgent:
+    """Recreate PM agent from project config (DB entity). Stateless."""
+    return LlmAgent(
+        name=f"PM_{project_id}",
+        model="anthropic/claude-sonnet-4-5-20250929",
+        instruction="Autonomous project manager. You manage batch execution. "
+                    "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
+                    "and escalate only when you cannot resolve an issue.",
+        tools=[
+            FunctionTool(select_ready_batch),  # PM reasons about batch composition
+            FunctionTool(enqueue_ceo_item),     # Push to unified CEO queue
+        ],
+        sub_agents=[],  # DeliverablePipeline instances added dynamically per batch
+        after_agent_callback=verify_batch_completion,
+        # checkpoint_project: after_agent_callback on DeliverablePipeline
+        #   Fires after each deliverable completes, persists state via CallbackContext.
+        # run_regression_tests: RegressionTestAgent (CustomAgent) in pipeline after each batch
+        #   Reads PM regression policy from session state. Runs when policy says to, no-ops otherwise.
+    )
 ```
 
 ---
@@ -447,7 +493,7 @@ All agent tiers (Director, PM, Workers) have access to tools and skills. However
 
 ### Tool Registry
 
-Tools are Python functions in `app/tools/`, organized by function type (filesystem, git, execution, web, task, project). `AutoBuilderToolset(BaseToolset)` handles per-role tool filtering via ADK's native `get_tools(readonly_context)` mechanism. Cascading permission config restricts tools top-down through the supervision hierarchy -- a PM cannot access Director-specific tools, a Worker cannot access PM-specific tools. The Director can author new tools; CEO approval is required by default before new tools become active. See [09-TOOLS.md](./09-TOOLS.md) for full toolset architecture.
+Tools are Python functions in `app/tools/`, organized by function type (filesystem, git, execution, web, task, project). `AutoBuilderToolset(BaseToolset)` handles per-role tool filtering via ADK's native `get_tools(readonly_context)` mechanism. Cascading permission config restricts tools top-down through the supervision hierarchy -- a PM cannot access Director-specific tools, a Worker cannot access PM-specific tools. The Director can author new tools; CEO approval is required by default before new tools become active. See [Tools](./tools.md) for full toolset architecture.
 
 ### Worker-Level Tool Matrix
 
@@ -499,7 +545,7 @@ routing_rules:
     model: "anthropic/claude-haiku-4-5-20251001"
 ```
 
-For full model reference (all providers, pricing, fallback chains): see [11-PROVIDERS.md](./11-PROVIDERS.md).
+For full model reference (all providers, pricing, fallback chains): see [Providers](../06-PROVIDERS.md).
 
 ### Implementation
 
@@ -662,6 +708,18 @@ review_agent writes: state["review_result"]
 
 ---
 
+## See Also
+
+- [Execution Loop](./execution.md) -- The autonomous execution loop (Director-level and PM-level)
+- [Tools](./tools.md) -- Tool registry, toolset architecture, and tool restrictions
+- [Workers](./workers.md) -- ARQ worker processes and job execution
+- [Events](./events.md) -- Redis Streams event bus and event distribution
+- [State & Memory](./state.md) -- ADK session state, memory service, and cross-session context
+- [Skills](./skills.md) -- Skill-based knowledge injection and progressive disclosure
+- [Architecture Overview](../02-ARCHITECTURE.md) -- Full system architecture
+
+---
+
 **Document Version:** 2.8
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-02-17
 **Status:** Framework Validated -- Prototyping Phase

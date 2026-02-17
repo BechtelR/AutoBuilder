@@ -1,4 +1,7 @@
 # Terminology Alignment, Skills Standard, PM Architecture
+
+The references to `05-AGENTS.md`, `06-SKILLS.md`, and `09-TOOLS.md` in this historical document now correspond to files in `architecture/`.
+
 *Date: 2026-02-16*
 *Status: DECIDED*
 

@@ -6,7 +6,7 @@ Read before starting:
 - `CLAUDE.md` — project rules (loaded automatically)
 - `.dev/03-STRUCTURE.md` — file placement truth
 - `.dev/build-phase/phase-1/spec.md` — full spec (Overview, Design Decisions, Research Notes, ALL Deliverables)
-- `.dev/05-AGENTS.md` — agent architecture patterns (CustomAgent, state communication, composition)
+- `.dev/architecture/agents.md` — agent architecture patterns (CustomAgent, state communication, composition)
 - `.dev/04-TECH_STACK.md` — technology choices (ADK, LiteLLM, model routing)
 - `.dev/.knowledge/adk/models/litellm.md` — LiteLLM integration reference
 - `.dev/.knowledge/adk/agents/custom-agents.md` — CustomAgent implementation pattern

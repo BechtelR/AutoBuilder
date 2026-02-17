@@ -1,3 +1,5 @@
+[← Architecture Overview](../02-ARCHITECTURE.md)
+
 # Skills System
 
 **AutoBuilder Platform**
@@ -371,6 +373,15 @@ This is disproportionate value for the effort. Skills transform agents from gene
 
 ---
 
+## See Also
+
+- [Agents](./agents.md) -- agent architecture, composition, plan/execute separation
+- [Tools](./tools.md) -- FunctionTool vs CustomAgent, MCP guidance, tool isolation
+- [Workflows](./workflows.md) -- pluggable workflow system, manifests, registry
+- [State & Memory](./state.md) -- ADK 4-scope state, session rewind, cross-session memory
+
+---
+
 **Document Version:** 2.3
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-02-17
 **Status:** Framework Validated -- Prototyping Phase

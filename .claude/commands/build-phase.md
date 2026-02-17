@@ -26,8 +26,8 @@ Bootstrap (parallel reads):
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
 Selective reads (only what the phase touches, via INDEX.md):
-- Agents → `05-AGENTS.md` | Skills → `06-SKILLS.md` | Workflows → `07-WORKFLOWS.md`
-- State/memory → `08-STATE_MEMORY.md` | Tools → `09-TOOLS.md`
+- Agents → `architecture/agents.md` | Skills → `architecture/skills.md` | Workflows → `architecture/workflows.md`
+- State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
 - Tech decisions → `04-TECH_STACK.md`
 
 Skip `CLAUDE.md` and `.claude/rules/` (already in context).
@@ -86,7 +86,7 @@ Execute the Build Order from spec.md batch-by-batch. Each batch is one cycle:
    - Relevant model.md interfaces/types for that deliverable (if model.md exists)
    - Design decisions from spec.md that apply to this deliverable
    - Existing code in files being created/modified (from Step 1A findings)
-   - Relevant `.dev/` doc sections based on files touched (e.g., gateway → `02-ARCHITECTURE.md` gateway layer, agents → `05-AGENTS.md`)
+   - Relevant `.dev/` doc sections based on files touched (e.g., gateway → `architecture/gateway.md`, agents → `architecture/agents.md`)
 
    **Skill injection** — check available skills (listed in system context with descriptions), match by frontmatter description to the deliverable's domain, and instruct subagents to invoke matched skills. Not every deliverable needs a skill — only inject when a skill's description is relevant to the work.
 

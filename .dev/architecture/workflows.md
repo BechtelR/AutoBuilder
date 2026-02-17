@@ -1,3 +1,5 @@
+[← Architecture Overview](../02-ARCHITECTURE.md)
+
 # Workflow Composition System
 
 **AutoBuilder Platform**
@@ -399,6 +401,15 @@ The gateway never runs ADK pipelines. It is a job broker and event proxy. This m
 
 ---
 
+## See Also
+
+- [Agents](./agents.md) -- agent architecture, composition, plan/execute separation
+- [Tools](./tools.md) -- FunctionTool vs CustomAgent, MCP guidance, tool isolation
+- [Skills](./skills.md) -- skill-based knowledge injection, progressive disclosure
+- [Execution](./execution.md) -- ARQ workers, job lifecycle, event streaming
+
+---
+
 **Document Version:** 2.5
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-02-17
 **Status:** Framework Validated -- Prototyping Phase

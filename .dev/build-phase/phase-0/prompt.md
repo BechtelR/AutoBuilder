@@ -3,7 +3,7 @@ Read these files before starting:
 - `CLAUDE.md` — project rules (loaded automatically)
 - `.dev/03-STRUCTURE.md` — file placement truth
 - `.dev/build-phase/phase-0/spec.md` — full spec (read Overview, Design Decisions, and all Deliverables)
-- `.dev/10-DEV_SETUP.md` — environment variables (section 3), dependencies (section 7)
+- `.dev/05-DEV_SETUP.md` — environment variables (section 3), dependencies (section 7)
 - `.dev/04-TECH_STACK.md` — tech decisions and rationale (reference only if questions arise)
 
 # Task

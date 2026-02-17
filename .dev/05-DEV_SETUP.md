@@ -363,8 +363,9 @@ Maximum ~500 per module. If a module grows beyond this, decompose into sub-modul
 ## 10. Related Documents
 
 - Consolidated planning doc: `.dev/.discussion/260211_plan-shaping.md`
-- State and memory: `.dev/08-STATE_MEMORY.md`
-- Tools and agents: `.dev/09-TOOLS.md`
+- State and memory: `.dev/architecture/state.md`
+- Tools: `.dev/architecture/tools.md`
+- Agents: `.dev/architecture/agents.md`
 - ADK documentation: https://google.github.io/adk-docs/
 - LiteLLM documentation: https://docs.litellm.ai/
 

@@ -1,4 +1,7 @@
 # Hierarchical Supervision Architecture
+
+The references to `05-AGENTS.md` in this historical document now correspond to `architecture/agents.md`.
+
 *Date: 2026-02-14*
 *Status: DECIDED — fundamental architecture change*
 *Supersedes: Flat pipeline model in 02-ARCHITECTURE.md and 05-AGENTS.md*

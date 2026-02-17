@@ -23,8 +23,8 @@ Bootstrap (parallel reads):
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
 Selective deep-reads (only what the phase touches, via INDEX.md):
-- Agents → `05-AGENTS.md` | Skills → `06-SKILLS.md` | Workflows → `07-WORKFLOWS.md`
-- State/memory → `08-STATE_MEMORY.md` | Tools → `09-TOOLS.md`
+- Agents → `architecture/agents.md` | Skills → `architecture/skills.md` | Workflows → `architecture/workflows.md`
+- State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
 - Tech decisions → `04-TECH_STACK.md` | Design history → `.discussion/design-changelog.md`
 
 If spec.md doesn't exist: stop and tell user to run `/spec-phase {N}` first.

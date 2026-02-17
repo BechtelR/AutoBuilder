@@ -134,13 +134,23 @@ AutoBuilder/
 │   ├── 02-ARCHITECTURE.md          # Technical architecture
 │   ├── 03-STRUCTURE.md             # This file — project scaffold
 │   ├── 04-TECH_STACK.md            # Technology choices and rationale
-│   ├── 05-AGENTS.md                # Agent architecture reference
-│   ├── 06-SKILLS.md                # Skills system design
-│   ├── 07-WORKFLOWS.md             # Workflow composition system
-│   ├── 08-STATE_MEMORY.md          # State and memory architecture
-│   ├── 09-TOOLS.md                 # Tools and deterministic agents
-│   ├── 10-DEV_SETUP.md             # Development environment setup
-│   ├── .discussion/                # Planning discussion documents
+│   ├── architecture/               # Domain-specific architecture reference (13 files)
+│   │   ├── gateway.md              # Gateway layer, ACL, routes, type safety
+│   │   ├── workers.md              # ARQ workers, lifecycle, concurrency
+│   │   ├── events.md               # Event system, Redis Streams, CEO queue
+│   │   ├── data.md                 # Data layer + infrastructure
+│   │   ├── engine.md               # ADK engine, App container, LLM routing
+│   │   ├── agents.md               # Agent hierarchy, types, composition
+│   │   ├── execution.md            # Execution loop, multi-session model
+│   │   ├── state.md                # State scopes, memory architecture
+│   │   ├── tools.md                # FunctionTools, AutoBuilderToolset
+│   │   ├── skills.md               # Skill system, format, triggers
+│   │   ├── workflows.md            # Pluggable workflows, manifests, registry
+│   │   ├── observability.md        # Observability, context management
+│   │   └── clients.md              # CLI + Dashboard architecture
+│   ├── 05-DEV_SETUP.md              # Development environment setup
+│   ├── 06-PROVIDERS.md              # External providers
+│   ├── .discussion/                 # Planning discussion documents
 │   └── .notes/                     # Working notes
 │
 ├── AGENTS.md                       # AI agent guidance (concise)
