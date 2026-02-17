@@ -126,6 +126,9 @@ uv run pyright                        # Identify type errors
 
 See [.dev/11-PROVIDERS.md](./.dev/11-PROVIDERS.md) for full model reference (strings, pricing, fallback chains).
 
+## Knowledge Base
+Before writing ADK code, must read `.dev/.knowledge/adk/README.md` → category file → `ERRATA.md`. Never guess ADK APIs.
+
 ## Related Documentation
 - **[README.md](./README.md)**: Setup and introduction
 - **[.dev/02-ARCHITECTURE.md](./.dev/02-ARCHITECTURE.md)**: Technical architecture and design

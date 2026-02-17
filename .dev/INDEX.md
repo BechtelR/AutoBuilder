@@ -30,7 +30,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | Directory | Purpose | Key Contents |
 |-----------|---------|--------------|
 | `.discussion/` | Design evolution & decisions | `design-changelog.md` — canonical decision record (28 decisions) |
-| `.knowledge/` | Google ADK reference (offline) | 117 files; see `.knowledge/SEARCH_GUIDE.md` for topic lookup |
+| `.knowledge/` | Multi-domain reference index | `README.md` → domain dirs; `adk/` has 13 category files + ERRATA |
 | `.todo/` | Active task tracking | Phase-specific task lists |
 
 ---
@@ -52,10 +52,13 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | How do I set up local dev? | `10-DEV_SETUP.md` |
 | What external providers do we use? | `11-PROVIDERS.md` |
 | Why was decision X made? | `.discussion/design-changelog.md` |
-| How does ADK feature X work? | `.knowledge/SEARCH_GUIDE.md` |
+| How does ADK feature X work? | `.knowledge/adk/README.md` → category file → WebFetch URL |
 | What are the coding standards? | `.standards.md`, `CLAUDE.md` (project root) |
 
 ---
+
+## Knowledge Base
+Before working with ADK code or designs, must read `.knowledge/adk/README.md` → category file → `ERRATA.md`. Never guess ADK APIs.
 
 ## Cross-References
 

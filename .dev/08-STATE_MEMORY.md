@@ -21,7 +21,7 @@ Key-value scratchpad within a session, with four prefix-scoped tiers:
 | Prefix | Scope | Lifetime | AutoBuilder Use |
 |--------|-------|----------|----------------|
 | *(none)* | This session only | Persists with session (via `DatabaseSessionService`) | Current batch, deliverable statuses, loaded skills, validation/verification results, intermediate pipeline data |
-| `user:` | All sessions for this user (within same app) | Persistent | **Director personality**, user preferences, model selections, intervention settings, notification preferences |
+| `user:` | All sessions for this user (within same app) | Persistent | Director personality, user preferences, model selections, intervention settings, notification preferences |
 | `app:` | All users and sessions for this app | Persistent | Skill index, workflow registry, shared templates, runtime agent coordination |
 | `temp:` | Current invocation only | Discarded after invocation completes | Intermediate LLM outputs, scratch calculations, data passed between tool calls within one invocation |
 
