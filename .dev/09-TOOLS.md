@@ -1,10 +1,12 @@
-# AutoBuilder Tools & Deterministic Agents
+# Tools & Tool Registry
 
 ## Overview
 
-AutoBuilder's tool architecture has two distinct layers: **FunctionTools** (thin Python wrappers that LLM agents call at their discretion) and **Deterministic Agents** (workflow-level participants that execute unconditionally at specific pipeline points). Both are first-class citizens in ADK's composition model. Which tools and deterministic agents are used depends on the workflow type.
+AutoBuilder's tool layer consists of **FunctionTools** — thin Python wrappers that LLM agents call at their discretion. ADK auto-generates tool schemas from type hints and docstrings, so tools are just annotated functions.
 
-**Tools execute in ARQ worker processes, not the FastAPI gateway.** The gateway exposes high-level REST endpoints (e.g., "run workflow", "get status"). It does not expose raw tool operations. FunctionTools and deterministic agents run inside the ADK pipeline, which executes in worker processes. Tools have access to the worker's filesystem, subprocess environment, and git worktrees.
+This document covers FunctionTools only. For custom agents (deterministic pipeline participants like `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`), see [05-AGENTS.md](./05-AGENTS.md). The key distinction: tools are passive (LLM decides when to call them), agents are active (pipeline structure determines when they run).
+
+**Tools execute in ARQ worker processes, not the FastAPI gateway.** The gateway exposes high-level REST endpoints (e.g., "run workflow", "get status"). It does not expose raw tool operations. FunctionTools run inside the ADK pipeline, which executes in worker processes. Tools have access to the worker's filesystem, subprocess environment, and git worktrees.
 
 ---
 
@@ -52,9 +54,9 @@ Decision rationale: See consolidated planning doc, Decision #16.
 
 ## 3. AutoBuilder Core Toolset (FunctionTools)
 
-Each of these is a thin Python function (~5-30 lines) that ADK auto-wraps via `FunctionTool`. ADK generates the tool schema automatically from type hints and docstrings -- no manual schema definition required.
+Each of these is a thin Python function (~5-30 lines) that ADK auto-wraps via `FunctionTool`. ADK generates the tool schema automatically from type hints and docstrings -- no manual schema definition required. These are `FunctionTool` wrappers: the LLM decides when and whether to call them, unlike custom agents which run unconditionally at pipeline positions.
 
-All FunctionTools execute inside worker processes. They have direct access to the worker's filesystem and subprocess environment. The gateway never calls these tools directly — it only enqueues workflow jobs that workers execute.
+All FunctionTools execute inside worker processes. They have direct access to the worker's filesystem and subprocess environment. The gateway never calls these tools directly -- it only enqueues workflow jobs that workers execute.
 
 ### 3.1 Filesystem Tools
 
@@ -152,6 +154,24 @@ tools = [
 
 Workflows declare which tools they require in their `WORKFLOW.yaml` manifest via `required_tools` and `optional_tools`. The tool registry provides the subset each workflow needs.
 
+### 3.7 PM Project Management Tools
+
+These tools support PM-level batch orchestration. The PM (LlmAgent) calls them as part of its outer loop -- selecting batches, running regression tests, and checkpointing progress.
+
+```python
+def select_ready_batch(project_id: str) -> str:
+    """Dependency-aware batch selection via topological sort. Returns the next
+    set of deliverables whose prerequisites are satisfied."""
+
+def run_regression_tests(project_id: str) -> str:
+    """Run cross-deliverable regression suite after a batch completes.
+    Validates that new deliverables have not broken previously completed ones."""
+
+def checkpoint_project(project_id: str) -> str:
+    """Persist current project state for resume. Captures batch progress,
+    deliverable statuses, and session state snapshot."""
+```
+
 ---
 
 ## 4. Gateway vs. Worker Tool Boundary
@@ -161,152 +181,61 @@ The gateway and workers have distinct roles with respect to tools:
 | Layer | Responsibility | Examples |
 |-------|---------------|----------|
 | **Gateway (FastAPI)** | High-level REST endpoints. Enqueue jobs, query status, stream events. | `POST /workflows/run`, `GET /workflows/{id}/status`, `GET /workflows/{id}/events` (SSE) |
-| **Worker (ARQ + ADK)** | Execute ADK pipelines. FunctionTools and deterministic agents run here. | `file_write`, `bash_exec`, `git_commit`, `LinterAgent`, `TestRunnerAgent` |
+| **Worker (ARQ + ADK)** | Execute ADK pipelines. FunctionTools and custom agents run here. | `file_write`, `bash_exec`, `git_commit`, `SkillLoaderAgent`, `LinterAgent` |
 
-The gateway does not proxy raw tool calls. A client never sends "write this file" to the gateway — it sends "run this workflow with this spec." The worker's ADK pipeline decides which tools to invoke and when.
+The gateway does not proxy raw tool calls. A client never sends "write this file" to the gateway -- it sends "run this workflow with this spec." The worker's ADK pipeline decides which tools to invoke and when.
 
 This boundary matters because:
 
-1. **Security** — filesystem/subprocess access is contained to workers, not exposed via API
-2. **Scalability** — workers can scale independently of the gateway
-3. **Isolation** — a misbehaving tool (infinite loop, memory leak) affects only its worker, not the gateway
-4. **Swappability** — ADK is an internal engine; the gateway could theoretically swap it out without changing the API surface
+1. **Security** -- filesystem/subprocess access is contained to workers, not exposed via API
+2. **Scalability** -- workers can scale independently of the gateway
+3. **Isolation** -- a misbehaving tool (infinite loop, memory leak) affects only its worker, not the gateway
+4. **Swappability** -- ADK is an internal engine; the gateway could theoretically swap it out without changing the API surface
 
 ---
 
-## 5. Deterministic Agents (CustomAgent / BaseAgent)
+## 5. How Tools and Agents Compose in the Pipeline
 
-These are **workflow-level participants**, not LLM-callable tools. They inherit from ADK's `BaseAgent` and execute unconditionally at specific pipeline points. They cannot be skipped by LLM judgment -- they are workflow steps, not suggestions.
+FunctionTools and custom agents serve different roles in the pipeline:
 
-Key properties of deterministic agents:
+- **FunctionTools** are passive: LLM agents decide when to call them during their reasoning steps.
+- **Custom agents** are active: they execute unconditionally at their position in the pipeline.
 
-- Participate in the same state system as LLM agents
-- Visible to tracing/observability (same Event stream)
-- Compose naturally with LLM agents in Sequential/Parallel/Loop workflows
-- Re-run deterministically in loops without LLM re-invocation
-- Execute inside worker processes alongside LLM agents
-
-### 5.1 SkillLoaderAgent
-
-Resolves and loads relevant skills into session state. Runs as the first step in the feature pipeline.
-
-```python
-class SkillLoaderAgent(BaseAgent):
-    """Deterministic: resolve and load relevant skills into state."""
-
-    async def _run_async_impl(self, ctx):
-        matched = skill_library.match(context_from_state(ctx))
-        loaded = [skill_library.load(entry) for entry in matched]
-        yield Event(
-            author=self.name,
-            actions=EventActions(state_delta={
-                "loaded_skills": {s.entry.name: s.content for s in loaded},
-                "loaded_skill_names": [s.entry.name for s in loaded],
-            })
-        )
-```
-
-### 5.2 LinterAgent
-
-Runs the project linter against generated code. Writes structured results to session state.
-
-```python
-class LinterAgent(BaseAgent):
-    """Deterministic: run project linter, write results to state."""
-
-    async def _run_async_impl(self, ctx):
-        # Run linter subprocess, parse output
-        results = await run_linter(ctx)
-        yield Event(
-            author=self.name,
-            actions=EventActions(state_delta={
-                "lint_results": results,
-                "lint_status": "passed" if results["errors"] == 0 else "failed",
-            })
-        )
-```
-
-### 5.3 TestRunnerAgent
-
-Runs the test suite against generated code. Writes structured results to session state.
-
-```python
-class TestRunnerAgent(BaseAgent):
-    """Deterministic: run test suite, write results to state."""
-
-    async def _run_async_impl(self, ctx):
-        results = await run_tests(ctx)
-        yield Event(
-            author=self.name,
-            actions=EventActions(state_delta={
-                "test_results": results,
-                "test_status": "passed" if results["failures"] == 0 else "failed",
-            })
-        )
-```
-
-### 5.4 FormatterAgent
-
-Runs the code formatter (e.g., ruff format, prettier) against generated code. No LLM involvement.
-
-### 5.5 DependencyResolverAgent
-
-Performs topological sort of features based on declared dependencies. Determines execution order and identifies parallelizable batches.
-
-### 5.6 RegressionTestAgent
-
-Runs cross-feature regression suite after a batch completes. Validates that newly implemented features have not broken previously completed features.
-
-Regression strategy (random sampling or dependency-aware) is an open question for Phase 1. See consolidated planning doc, Open Questions #3.
-
-### 5.7 ContextBudgetAgent
-
-Checks token usage via token-counting the assembled `LlmRequest`. Writes usage percentage to state. Triggers compression if threshold is exceeded.
-
-This agent addresses ADK's gap: no built-in context-window usage metric. Implementation is approximately 50 lines.
-
----
-
-## 6. How Tools and Agents Compose in the Pipeline
-
-FunctionTools and deterministic agents serve different roles in the pipeline:
+Both participate in the same state system, event stream, and observability infrastructure.
 
 ```python
 # Inner deliverable pipeline -- declarative composition
 deliverable_pipeline = SequentialAgent(
     name="DeliverablePipeline",
     sub_agents=[
-        SkillLoaderAgent(name="LoadSkills"),     # Deterministic
-        plan_agent,                                # LLM (uses FunctionTools)
-        code_agent,                                # LLM (uses FunctionTools)
-        LinterAgent(name="Lint"),                  # Deterministic
-        TestRunnerAgent(name="Test"),               # Deterministic
+        SkillLoaderAgent(name="LoadSkills"),     # Custom agent (deterministic)
+        plan_agent,                                # LLM agent (uses FunctionTools)
+        code_agent,                                # LLM agent (uses FunctionTools)
+        LinterAgent(name="Lint"),                  # Custom agent (deterministic)
+        TestRunnerAgent(name="Test"),               # Custom agent (deterministic)
         LoopAgent(
             name="ReviewCycle",
             max_iterations=3,
             sub_agents=[
-                review_agent,                      # LLM
-                fix_agent,                         # LLM (uses FunctionTools)
-                LinterAgent(name="ReLint"),        # Deterministic
-                TestRunnerAgent(name="ReTest"),     # Deterministic
+                review_agent,                      # LLM agent
+                fix_agent,                         # LLM agent (uses FunctionTools)
+                LinterAgent(name="ReLint"),        # Custom agent (deterministic)
+                TestRunnerAgent(name="ReTest"),     # Custom agent (deterministic)
             ]
         )
     ]
 )
 ```
 
-- **LLM agents** (`plan_agent`, `code_agent`, `review_agent`, `fix_agent`) have FunctionTools available and decide when/how to use them.
-- **Deterministic agents** (`SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`) execute unconditionally at their position in the pipeline.
-- **Both types** communicate via session state (`output_key` writes, `{key}` template reads) and emit events into the same unified stream.
-- **The entire pipeline** runs inside a worker process. Events are published to Redis Streams for external consumption.
+Custom agents (`SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`) are defined in [05-AGENTS.md](./05-AGENTS.md). The entire pipeline runs inside a worker process, with events published to Redis Streams for external consumption.
 
 ---
 
-## 7. LLM Router (Dynamic Model Selection)
+## 6. LLM Router (Dynamic Model Selection)
 
 Different tasks have different optimal models. The LLM Router is a centralized lookup that selects the model for each LLM agent invocation.
 
-### 7.1 Routing Dimensions
+### 6.1 Routing Dimensions
 
 | Dimension | Description |
 |-----------|-------------|
@@ -315,7 +244,7 @@ Different tasks have different optimal models. The LLM Router is a centralized l
 | Cost/speed | batch operations use cheaper models; critical-path uses best available |
 | Fallback chains | if primary model is unavailable/rate-limited, fall back gracefully |
 
-### 7.2 Phase 1 Implementation
+### 6.2 Phase 1 Implementation
 
 Static routing config mapping `task_type` to model. No ML-based routing, no cost optimization. A clean lookup table that is easy to change.
 
@@ -341,36 +270,38 @@ fallback_chains:
   anthropic/claude-sonnet-4-5-20250929: ["anthropic/claude-haiku-4-5-20251001"]
 ```
 
-### 7.3 ADK Integration
+### 6.3 ADK Integration
 
-Each `LlmAgent` can have its model set dynamically. The router runs as part of agent construction (in the `BatchOrchestrator`) or via `before_model_callback` to override the model on the `LlmRequest` at invocation time. Routing logic is centralized rather than scattered across agent definitions.
+Each `LlmAgent` can have its model set dynamically. The router runs as part of agent construction or via `before_model_callback` to override the model on the `LlmRequest` at invocation time. Routing logic is centralized rather than scattered across agent definitions.
 
 Phase 2 will add cost tracking, latency monitoring, and adaptive selection.
 
 ---
 
-## 8. Tool Restrictions by Agent Role
+## 7. Tool Restrictions by Agent Role
 
-Agent role-based tool restrictions are a Phase 2 capability. The principle: read-only agents for exploration prevent scope creep. For example:
+All agent tiers (Director, PM, Workers) have access to tools and skills. Tool restrictions are role-based, not tier-based — the principle is that read-only agents prevent scope creep regardless of where they sit in the hierarchy. Phase 2 implements enforcement. Examples:
 
-- `plan_agent` -- read-only filesystem tools, no file_write or bash_exec
-- `code_agent` -- full filesystem and execution tools
-- `review_agent` -- read-only tools, no mutation
+- `plan_agent` (worker) -- read-only filesystem tools, no file_write or bash_exec
+- `code_agent` (worker) -- full filesystem and execution tools
+- `review_agent` (worker) -- read-only tools, no mutation
+- PM -- project management tools (`select_ready_batch`, `run_regression_tests`, `checkpoint_project`)
+- Director -- governance tools, resource management, cross-project tools
 
 This pattern is adopted from oh-my-opencode's architecture. See consolidated planning doc, Decision #6.
 
 ---
 
-## 9. Related Documents
+## 8. Related Documents
 
 - Consolidated planning doc: `.dev/.discussion/260211_plan-shaping.md` (Section 8)
 - State and memory: `.dev/08-STATE_MEMORY.md`
 - Skills system: `.dev/06-SKILLS.md`
-- Agents: `.dev/05-AGENTS.md`
+- Agents (including custom agents): `.dev/05-AGENTS.md`
 - ADK tools documentation: https://google.github.io/adk-docs/tools/
 - ADK custom agents: https://google.github.io/adk-docs/agents/custom-agents/
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: 2026-02-11*
+*Document Version: 2.1*
+*Last Updated: 2026-02-16*

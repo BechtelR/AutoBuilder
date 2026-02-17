@@ -53,6 +53,12 @@ Early development = zero regression technical debt. Don't create it. Delete when
 - Explicit code over clever abstractions
 - CSS variables for theming (not hardcoded colors)
 
+## Testing: Real Infrastructure, Never Mocked
+
+- **Never mock** local infrastructure (PostgreSQL, Redis) — use real services; skip when unavailable
+- Only mock **external** APIs (LLM, third-party webhooks)
+- Degraded-path tests use broken connection URLs, not mock objects
+
 ## Common Violations to Watch
 
 - **String Literals**: Use enums/constants, not magic strings.

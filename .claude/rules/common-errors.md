@@ -103,6 +103,11 @@ Pydantic v2 fields always exist on the class. `hasattr()` is always `True` — u
 - ❌ `if hasattr(model, "field") and model.field:`
 - ✅ `if model.field is not None:`
 
+## AutoBuilderError Hierarchy
+Each subclass has a hardcoded `ErrorCode`. Never pass `code=` to a subclass — use the correct subclass.
+- ❌ `WorkerError(message=..., code=ErrorCode.NOT_FOUND)`
+- ✅ `NotFoundError(message=...)` (uses `ErrorCode.NOT_FOUND` internally)
+
 ## ADK CustomAgent: State Writes (CRITICAL)
 Direct `ctx.session.state["key"] = val` does NOT persist. Only `state_delta` on yielded Events persists. Reads work normally.
 - ❌ `ctx.session.state["key"] = val`

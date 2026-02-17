@@ -13,12 +13,13 @@ Unlike chat-based assistants that require constant human steering, AutoBuilder i
 ## Core Differentiators
 
 1. **Autonomous completion** -- "run until done" loop, not session-based human interaction
-2. **Deterministic + probabilistic composition** -- LLM agents and deterministic tools are equal workflow participants
-3. **Spec-to-deliverable pipeline** -- specification to deliverable decomposition to parallel implementation to verified output
-4. **Multi-model orchestration** -- route tasks to optimal models by capability
-5. **Structured quality gates** -- validation, verification, and review cycles are guaranteed workflow steps, not LLM suggestions
-6. **API-first architecture** -- gateway owns the contract; ADK is an internal implementation detail behind an anti-corruption layer
-7. **Out-of-process execution** -- gateway enqueues work, ARQ workers execute pipelines, Redis Streams distribute events
+2. **Hierarchical agent supervision** -- CEO (user) → Director → PM → Workers; each tier autonomous with recursive problem-solving, mapped to ADK's native agent tree
+3. **Deterministic + probabilistic composition** -- LLM agents and deterministic tools are equal workflow participants
+4. **Spec-to-deliverable pipeline** -- specification to deliverable decomposition to parallel implementation to verified output
+5. **Multi-model orchestration** -- route tasks to optimal models by capability
+6. **Structured quality gates** -- validation, verification, and review cycles are guaranteed workflow steps, not LLM suggestions
+7. **API-first architecture** -- gateway owns the contract; ADK is an internal implementation detail behind an anti-corruption layer
+8. **Out-of-process execution** -- gateway enqueues work, ARQ workers execute pipelines, Redis Streams distribute events
 
 ---
 
@@ -36,7 +37,7 @@ Unlike chat-based assistants that require constant human steering, AutoBuilder i
 | # | Problem | Description |
 |---|---------|-------------|
 | 1 | **Excessive human-in-the-loop** | Existing tools require constant human steering |
-| 2 | **No intelligent orchestration** | Lack of sequential vs parallel process coordination across agent teams |
+| 2 | **No intelligent orchestration** | Lack of hierarchical supervision and sequential vs parallel process coordination across agent teams |
 | 3 | **Expensive autonomous alternatives** | Tools like Blitzy cost $10k+ per project |
 | 4 | **Fragmented ecosystem** | Agent harnesses that do specific things instead of orchestrating multi-agent teams |
 | 5 | **Insufficient quality control** | Too little verification and structured review in autonomous workflows |
@@ -87,5 +88,5 @@ Throughout this documentation, **deliverable** refers to any discrete, independe
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: February 2026*
+*Document Version: 2.1*
+*Last Updated: 2026-02-14*

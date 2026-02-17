@@ -1,5 +1,5 @@
 # AutoBuilder Project Roadmap
-*Version: 1.2.0*
+*Version: 1.4.0*
 
 **Single source of truth for project status and phased delivery.**
 
@@ -254,6 +254,13 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 #### Task Management Tools
 - [ ] `todo_read()`, `todo_write(action, task_id, content)`, `todo_list(filter)`
 
+#### PM-Level Tools (Phase 5 Integration)
+- [ ] `select_ready_batch()` — dependency-aware batch selection (topological sort of deliverables)
+- [ ] `run_regression_tests()` — cross-deliverable regression suite at batch boundary
+- [ ] `checkpoint_project()` — persist project state for resume/recovery
+
+> **Note:** These FunctionTools are defined here as part of the core toolset but consumed by the PM agent (Phase 5). The PM calls these tools to manage the batch loop — they replace what was previously envisioned as a separate BatchOrchestrator agent.
+
 #### Tool Registry
 - [ ] Central `FunctionTool` registration
 - [ ] Per-workflow tool subset selection (from `WORKFLOW.yaml` required_tools)
@@ -270,7 +277,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ## Phase 5: Agent Definitions `L`
 
-**Goal**: All LLM and deterministic agents defined, composable via ADK primitives.
+**Goal**: All agents defined — Director, PMs, and worker-tier LLM/deterministic agents — composable via ADK primitives in a hierarchical supervision model.
 
 **Status**: PLANNED
 
@@ -278,13 +285,25 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ### Deliverables
 
-#### LLM Agents (auto-code)
+#### Supervision Hierarchy (Director + PM)
+- [ ] `Director` agent (LlmAgent, opus) — permanent root_agent of App; cross-project governance, CEO (user) liaison, resource allocation
+- [ ] `PM` agent (LlmAgent, sonnet) — per-project autonomous manager; PM IS the outer loop (no separate BatchOrchestrator). Uses tools (`select_ready_batch`, `run_regression_tests`, `checkpoint_project`) for mechanical operations and `after_agent_callback` for intra-batch oversight. PM reasons between batches to decide retry/skip/reorder/escalate.
+- [ ] Director → PM delegation via `transfer_to_agent` or `AgentTool`
+- [ ] Hard limits cascade: CEO → Director → PM → Workers
+- [ ] Supervision hooks (`before_agent_callback` / `after_agent_callback`) for Director observability over PM, and PM observability over DeliverablePipeline workers
+
+#### PM Loop Prototype
+- [ ] Validate that LlmAgent PM reliably manages batch loop with tools + callbacks (similar to P4 validation of the mechanical pattern)
+- [ ] Test: PM calls `select_ready_batch()`, constructs `ParallelAgent`, runs batch, observes results via `after_agent_callback`, decides continuation strategy
+- [ ] Confirm PM inter-batch reasoning is reliable (not degenerate repetition)
+
+#### Worker-Tier LLM Agents (auto-code)
 - [ ] `plan_agent` — spec → structured implementation plan (read-only tools, opus model)
 - [ ] `code_agent` — plan → code implementation (full tools, sonnet model)
 - [ ] `review_agent` — evaluate code quality against standards (read-only tools)
 - [ ] `fix_agent` — apply targeted fixes from review feedback (full tools)
 
-#### Deterministic Agents (CustomAgent / BaseAgent)
+#### Worker-Tier Deterministic Agents (CustomAgent / BaseAgent)
 - [ ] `SkillLoaderAgent` — resolve and load relevant skills into state
 - [ ] `LinterAgent` — run project linter, write structured results to state
 - [ ] `TestRunnerAgent` — run test suite, write results to state
@@ -294,7 +313,8 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] `ContextBudgetAgent` — token-count `LlmRequest`, write usage % to state (~50 LOC)
 
 #### Agent Communication
-- [ ] `output_key` state writes for inter-agent data flow
+- [ ] Hierarchical delegation (Director → PM → Workers) via ADK primitives
+- [ ] `output_key` state writes for inter-agent data flow (worker-level)
 - [ ] `{key}` template injection in agent instructions
 - [ ] `InstructionProvider` for dynamic context construction
 - [ ] `before_model_callback` for runtime context injection
@@ -305,6 +325,9 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ### Completion Contract
 
+- [ ] Director agent operates as permanent root_agent
+- [ ] PM agent manages a project autonomously via tool-driven batch loop, escalating only when necessary
+- [ ] PM loop prototype validates reliable inter-batch reasoning with tools + callbacks
 - [ ] Can run a single deliverable through the full DeliverablePipeline
 - [ ] Plan agent produces structured plan; code agent implements it
 - [ ] Lint/test agents produce structured results in state
@@ -324,15 +347,18 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 ### Deliverables
 
 #### Skill Library Core
-- [ ] `SkillEntry` Pydantic model (frontmatter metadata)
+- [ ] Adopt [Agent Skills open standard](https://agentskills.io/specification) file format — `SKILL.md` naming convention, L1/L2/L3 progressive disclosure structure, standard frontmatter schema
+- [ ] `SkillEntry` Pydantic model (frontmatter metadata aligned with Agent Skills standard where applicable)
 - [ ] `SkillLibrary` class — index building, matching, loading (~120 LOC)
 - [ ] Frontmatter parser (YAML extraction from markdown)
 - [ ] Trigger matchers: `deliverable_type` (exact), `file_pattern` (glob), `tag_match` (set), `explicit` (named), `always`
 - [ ] OR-logic: skill matches if ANY trigger matches
 
+> **Standard adoption:** File format follows the Agent Skills open standard (agentskills.io). Our deterministic loading runtime (`SkillLoaderAgent`) is custom — ADK's `SkillToolset` is experimental and LLM-discretionary, which does not meet our requirement for deterministic skill injection.
+
 #### Two-Tier Architecture
-- [ ] Global skills scan (`app/skills/`)
-- [ ] Project-local skills scan (`.app/skills/` in user repo)
+- [ ] Global skills scan (`app/skills/`) — each skill as `<skill-name>/SKILL.md` with optional `references/` and `assets/` subdirectories
+- [ ] Project-local skills scan (`.app/skills/` in user repo) — same `SKILL.md` convention
 - [ ] Override: project-local replaces global with same `name`
 
 #### InstructionProvider Integration
@@ -362,7 +388,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ## Phase 7: Workflow Composition `M`
 
-**Goal**: Pluggable workflow architecture — auto-code is the first workflow, not a hardcoded pipeline.
+**Goal**: Pluggable workflow architecture — auto-code is ONLY THE FIRST mvp workflow, not a hardcoded pipeline.
 
 **Status**: PLANNED
 
@@ -399,7 +425,7 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 
 ## Phase 8: Spec Pipeline & Autonomous Loop `L`
 
-**Goal**: The core thesis — specification to parallel deliverable execution with autonomous continuation.
+**Goal**: The core thesis — specification to parallel deliverable execution with autonomous continuation under hierarchical supervision. PM IS the outer loop.
 
 **Status**: PLANNED
 
@@ -413,18 +439,22 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] Deliverable model: status tracking, dependency declaration, assignment
 - [ ] Deliverable status enum: PENDING, IN_PROGRESS, COMPLETED, FAILED, BLOCKED
 
-#### BatchOrchestrator (Outer Loop)
-- [ ] `BatchOrchestrator` (CustomAgent) — dynamic `ParallelAgent` batch construction
-- [ ] Dependency-aware deliverable selection (respects topological order)
-- [ ] Concurrency limits (configurable max parallel deliverables)
-- [ ] Checkpoint after each batch (for resume)
-- [ ] Regression testing at batch boundary
+#### PM Outer Loop (Batch Execution)
+- [ ] PM (LlmAgent) drives the "while incomplete deliverables exist" loop — no separate BatchOrchestrator agent
+- [ ] PM calls `select_ready_batch()` tool for dependency-aware deliverable selection (topological sort, dynamic `ParallelAgent` construction)
+- [ ] PM calls `run_regression_tests()` tool at batch boundary for cross-deliverable regression
+- [ ] PM calls `checkpoint_project()` tool for resume/recovery persistence
+- [ ] Concurrency limits (configurable max parallel deliverables, cascaded from Director)
+- [ ] `after_agent_callback` on each `DeliverablePipeline` — monitors completion, flags critical failures
+- [ ] `before_agent_callback` — injects context, verifies preconditions
 
 #### Autonomous Continuation
-- [ ] "Run until done" loop — while incomplete deliverables exist, select next batch and execute
+- [ ] PM reasons between batches — observes results, decides retry/skip/reorder/escalate/continue
+- [ ] Director-level cross-project management — Director oversees multiple concurrent PMs
 - [ ] Optional human-in-the-loop pause at batch boundary (`get_user_choice` tool)
 - [ ] Intervention API endpoint (`POST /workflows/{id}/intervene`)
 - [ ] Partial failure handling: failed deliverables don't block independent ones
+- [ ] PM handles failures autonomously (retry, reorder, skip); escalates to Director only when necessary
 
 #### Git Worktree Isolation
 - [ ] Worktree creation per parallel deliverable
@@ -435,7 +465,8 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 ### Completion Contract
 
 - [ ] Can submit a spec, have it decomposed into deliverables
-- [ ] Deliverables execute in dependency-aware parallel batches
+- [ ] Director delegates project to PM; PM drives batch loop autonomously via tools
+- [ ] PM constructs dependency-aware parallel batches via `select_ready_batch()` tool
 - [ ] Loop continues autonomously until all deliverables complete
 - [ ] Failed deliverables don't block independent work
 - [ ] Git worktrees provide filesystem isolation for parallel execution
@@ -538,8 +569,8 @@ Five focused prototypes validate that Google ADK can serve as AutoBuilder's orch
 - [ ] Extended API: `GET /metrics`, `GET /costs`, `GET /memory`
 
 #### Crash Recovery
-- [ ] `BaseAgentState` subclass for `BatchOrchestrator` checkpoint
-- [ ] `CustomAgent` resume with checkpoint steps
+- [ ] PM checkpoint recovery — resume batch loop from last `checkpoint_project()` state
+- [ ] ADK session resume with `ResumabilityConfig`
 - [ ] Tool idempotency validation (re-run safety)
 
 #### Enhanced Routing
@@ -664,6 +695,9 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 | 12 | Quote style — double vs single for Python | Decided: double quotes (ruff default) | Phase 0 |
 | 13 | Auth strategy for gateway API | TBD | Phase 11 |
 | 14 | Docker configuration details | Decided: docker-compose with PostgreSQL + Redis | Phase 0 |
+| 15 | Director persistence model — how does Director state survive worker restarts? | Open | Phase 5 |
+| 16 | PM batch tool design — exact signatures for `select_ready_batch`, `run_regression_tests`, `checkpoint_project` | Open | Phase 5 |
+| 17 | Agent Skills standard mapping — which frontmatter fields from agentskills.io map to our trigger system | Open | Phase 6 |
 
 ---
 
@@ -711,10 +745,10 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 | 2: Gateway + Infra | `L` | FastAPI, Redis, ARQ workers, database, config |
 | 3: ADK Engine | `L` | Anti-corruption layer, LLM Router, LiteLLM, session state |
 | 4: Core Toolset | `M` | FunctionTools (filesystem, bash, git, web, todo) |
-| 5: Agent Definitions | `L` | LLM agents, deterministic agents, pipeline composition |
+| 5: Agent Definitions | `L` | Director + PM (outer loop) hierarchy, PM loop prototype, worker agents, pipeline composition |
 | 6: Skills System | `M` | SkillLibrary, two-tier matching, initial skills |
 | 7: Workflow Composition | `M` | WorkflowRegistry, auto-code workflow, WORKFLOW.yaml |
-| 8: Spec Pipeline | `L` | BatchOrchestrator, autonomous loop, git worktrees |
+| 8: Spec Pipeline | `L` | PM-driven batch loop, spec decomposition, autonomous continuation, git worktrees |
 | 9: Memory Service | `M` | PostgresMemoryService, cross-session search |
 | 10: Events, CLI, Observability | `L` | SSE, webhooks, typer CLI, OpenTelemetry |
 | 11: Hardening | `L` | Langfuse, cost tracking, crash recovery, adaptive routing |
@@ -734,8 +768,10 @@ Dashboard (React) ──→ Gateway (FastAPI) → Workers (ARQ + ADK)
 | 1.0.0 | 2026-02-12 | Initial roadmap — restructured from delivery plan into phased increments with completion contracts |
 | 1.1.0 | 2026-02-12 | Renumbered all phases to sequential whole numbers (eliminated sub-phases) |
 | 1.2.0 | 2026-02-12 | Phase 0 verified COMPLETE — all deliverables and completion contract pass |
+| 1.3.0 | 2026-02-14 | Hierarchical supervision (Director → PM → Workers) integrated into Phase 5, 8 |
+| 1.4.0 | 2026-02-16 | PM absorbs BatchOrchestrator; tool/agent terminology aligned; Agent Skills standard adopted |
 
 ---
 
-*Document Version: 1.2.0*
-*Last Updated: 2026-02-12*
+*Document Version: 1.4.0*
+*Last Updated: 2026-02-16*

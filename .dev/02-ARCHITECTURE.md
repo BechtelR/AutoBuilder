@@ -2,7 +2,7 @@
 
 ## 1. System Overview
 
-AutoBuilder is an autonomous agentic workflow system that orchestrates multi-agent teams alongside deterministic tooling in structured, resumable pipelines. The system exposes an API-first FastAPI gateway that owns the external contract. Google ADK runs behind an anti-corruption layer as the internal orchestration engine -- clients never interact with ADK directly. Workflow execution is out-of-process: the gateway enqueues work via ARQ, Redis-backed workers execute pipelines, and Redis Streams distribute events to consumers (SSE endpoints, webhook dispatchers, audit loggers).
+AutoBuilder is an autonomous agentic workflow system that orchestrates multi-agent teams alongside deterministic tooling in structured, resumable pipelines. The system uses **hierarchical agent supervision** (CEO → Director → PM → Workers) mapped to ADK's native agent tree, providing cross-project governance, per-project autonomous management, and parallel deliverable execution. The system exposes an API-first FastAPI gateway that owns the external contract. Google ADK runs behind an anti-corruption layer as the internal orchestration engine -- clients never interact with ADK directly. Workflow execution is out-of-process: the gateway enqueues work via ARQ, Redis-backed workers execute pipelines, and Redis Streams distribute events to consumers (SSE endpoints, webhook dispatchers, audit loggers).
 
 The architecture is organized around five layers:
 
@@ -34,7 +34,7 @@ flowchart TB
     subgraph WORKER["WORKER LAYER"]
         subgraph ARQWorkers["ARQ Workers (async, out-of-process)"]
             ACL["Anti-Corruption Layer\n- Translates gateway commands to ADK Runner calls\n- Translates ADK events to Redis Stream messages\n- ADK is an internal implementation detail"]
-            ADK["ADK Engine\n- App container (context compression, resumability)\n- BatchOrchestrator (outer loop)\n- DeliverablePipeline (inner sequential agent)\n- LLM agents + deterministic agents\n- LLM Router (LiteLLM)"]
+            ADK["ADK Engine\n- App container (context compression, resumability)\n- Director (LlmAgent, opus) — root_agent\n- PM agents (LlmAgent, sonnet) — per-project, IS the outer loop\n- DeliverablePipeline (inner sequential agent)\n- LLM agents + deterministic agents\n- LLM Router (LiteLLM)"]
             ACL --> ADK
         end
         Streams[("Redis Streams")]
@@ -264,8 +264,11 @@ ADK runs inside workers, behind the anti-corruption layer. This section document
 
 | ADK Primitive | Role in AutoBuilder |
 |---------------|-------------------|
-| `LlmAgent` | Planning, coding, reviewing -- probabilistic steps requiring LLM judgment |
-| `CustomAgent` (BaseAgent) | Linter, test runner, formatter, skill loader, orchestrator -- deterministic steps |
+| `App(root_agent=director)` | Top-level container; Director is the permanent root_agent |
+| `LlmAgent` (Director) | Cross-project governance, CEO liaison, strategic decisions (opus) |
+| `LlmAgent` (PM) | Per-project autonomous management, IS the outer batch loop, quality oversight (sonnet) |
+| `LlmAgent` (Worker) | Planning, coding, reviewing -- probabilistic steps requiring LLM judgment |
+| `CustomAgent` (BaseAgent) | Linter, test runner, formatter, skill loader -- deterministic pipeline steps |
 | `SequentialAgent` | Inner deliverable pipeline (plan, code, lint, test, review) |
 | `ParallelAgent` | Concurrent deliverable execution within a batch |
 | `LoopAgent` | Review/fix cycles with max iteration bounds |
@@ -275,6 +278,8 @@ ADK runs inside workers, behind the anti-corruption layer. This section document
 | `InstructionProvider` | Dynamic context/knowledge loading per invocation |
 | `before_model_callback` | Context injection, token budget monitoring |
 | `DatabaseSessionService` | State persistence (adapter bridges to shared database) |
+| `transfer_to_agent` / `AgentTool` | Director → PM delegation; PM → Worker delegation |
+| `before_agent_callback` / `after_agent_callback` | Supervision hooks; Director monitors PM events |
 
 ### Multi-Model via LiteLLM
 
@@ -289,12 +294,21 @@ flowchart TB
         AppConfig["Context compression (EventsCompactionConfig)\nResumability (ResumabilityConfig)\nPlugins (TokenTracking, Logging)\nLifecycle hooks (on_startup, on_shutdown)"]
     end
 
-    subgraph ORCH["ORCHESTRATION LAYER"]
-        BatchOrch["BatchOrchestrator (CustomAgent)\n- Dynamic ParallelAgent batch construction\n- Dependency-aware deliverable selection\n- Checkpoint/resume\n- Regression test orchestration"]
+    subgraph DIRECTOR["DIRECTOR (LlmAgent, opus) — root_agent"]
+        DirAgent["Cross-project governance\nCEO liaison, resource allocation\nFull observability into all projects\nHard limit enforcement"]
+    end
+
+    subgraph PM["PM LAYER (LlmAgent, sonnet) — per project"]
+        PM1["PM: Project Alpha\nAutonomous project management\nBatch strategy, quality oversight"]
+        PM2["PM: Project Beta\n..."]
+    end
+
+    subgraph ORCH["ORCHESTRATION LAYER (PM manages outer loop)"]
+        PMLoop["PM (LlmAgent) IS the outer loop\n- tools: select_ready_batch, run_regression, checkpoint\n- after_agent_callback: verify_batch_completion\n- Reasons between batches (strategy, reorder, escalate)"]
         Batch1["Batch_001\nParallelAgent"]
         Batch2["Batch_002\nParallelAgent"]
         BatchN["Batch_N\nParallelAgent"]
-        BatchOrch --> Batch1 & Batch2 & BatchN
+        PMLoop --> Batch1 & Batch2 & BatchN
     end
 
     subgraph PIPELINE["PIPELINE LAYER (per deliverable)"]
@@ -317,22 +331,53 @@ flowchart TB
     subgraph INFRA["SHARED ENGINE INFRASTRUCTURE"]
         Tools["Tool Registry (FunctionTools)\nfile_read, file_write, file_edit\nbash_exec, git_*, web_*, todo_*"]
         Skills["Skill Library\n(Global + Project-local)\nMarkdown + YAML frontmatter\nDeterministic matching"]
-        Router["LLM Router\n(task_type to model)\nplanning: opus\ncoding: sonnet\nreview: sonnet\nclassification: haiku\nFallback chains"]
+        Router["LLM Router\n(task_type to model)\ndirector: opus\npm: sonnet\nplanning: opus\ncoding: sonnet\nreview: sonnet\nclassification: haiku\nFallback chains"]
         Models["Models (Shared Domain)\nenums.py, constants.py\nbase.py (Pydantic base models)"]
         State["State System (4 scopes)\nsession, user:, app:, temp:"]
         Memory["Memory Service (PostgreSQL)\ntsvector + pgvector\nCross-session learnings"]
         Observability["Observability\nADK Event stream\nOpenTelemetry native\nPython logging\nPlugin system"]
     end
 
-    APP --> ORCH
+    APP --> DIRECTOR
+    DIRECTOR --> PM
+    PM1 --> ORCH
     Batch1 & Batch2 & BatchN --> PIPELINE
     PIPELINE --> INFRA
+```
+
+### Hierarchical Agent Structure
+
+```python
+# Director + PM hierarchy -- the supervision layer
+director_agent = LlmAgent(
+    name="Director",
+    model="anthropic/claude-opus-4-6",
+    instruction="Cross-project governance agent. Manage PMs, allocate resources, "
+                "enforce hard limits, intervene when patterns go wrong.",
+    sub_agents=[pm_alpha, pm_beta],  # PMs are Director's sub_agents
+)
+
+pm_alpha = LlmAgent(
+    name="PM_ProjectAlpha",
+    model="anthropic/claude-sonnet-4-5-20250929",
+    instruction="Autonomous project manager for Project Alpha. You ARE the outer batch loop. "
+                "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
+                "run regression tests between batches, checkpoint progress, and escalate only "
+                "when you cannot resolve an issue.",
+    tools=[
+        FunctionTool(select_ready_batch),
+        FunctionTool(run_regression_tests),
+        FunctionTool(checkpoint_project),
+    ],
+    sub_agents=[],  # DeliverablePipeline instances added dynamically per batch
+    after_agent_callback=verify_batch_completion,
+)
 ```
 
 ### Inner Pipeline Composition
 
 ```python
-# Inner deliverable pipeline -- declarative composition
+# Inner deliverable pipeline -- declarative composition (worker-level)
 deliverable_pipeline = SequentialAgent(
     name="DeliverablePipeline",
     sub_agents=[
@@ -356,32 +401,54 @@ deliverable_pipeline = SequentialAgent(
 ```
 
 ```python
-# Outer loop -- dynamic orchestrator
-class BatchOrchestrator(BaseAgent):
-    """Dynamically constructs ParallelAgent batches per iteration."""
-    async def _run_async_impl(self, ctx):
-        while incomplete_deliverables_exist(ctx):
-            batch = select_next_batch(ctx)  # Dependency-aware, respects concurrency
-            parallel = ParallelAgent(
-                name=f"Batch_{batch.id}",
-                sub_agents=[create_pipeline(d) for d in batch.deliverables]
-            )
-            async for event in parallel.run_async(ctx):
-                yield event
-            await run_regression_tests(ctx)
-            await checkpoint(ctx)
+# PM-level tools -- the mechanical operations the PM calls as part of its outer loop
+def select_ready_batch(project_id: str) -> str:
+    """Dependency-aware batch selection via topological sort. Returns the next
+    set of deliverables whose prerequisites are satisfied."""
+    ...
+
+def run_regression_tests(project_id: str) -> str:
+    """Run cross-deliverable regression suite after a batch completes."""
+    ...
+
+def checkpoint_project(project_id: str) -> str:
+    """Persist current project state for resume."""
+    ...
+
+# The PM (LlmAgent) IS the outer loop -- it calls these tools and reasons
+# between batches. No separate BatchOrchestrator agent needed.
+# Dynamic ParallelAgent batch construction happens within the PM's tool calls.
 ```
 
 ---
 
 ## 9. The Autonomous Execution Loop
 
+The execution loop operates at two levels within the hierarchy:
+
+### Director-Level Loop
+
 ```
 1. Client submits spec via POST /specs
 2. Gateway enqueues decomposition job -> ARQ worker decomposes -> deliverables in DB
 3. Client triggers POST /workflows/{id}/run
 4. Gateway enqueues execution job -> ARQ worker picks up
-5. Worker runs ADK pipeline:
+5. Director (root_agent) receives the workflow:
+   a. Assigns project to a PM (creates PM agent if new project)
+   b. Sets hard limits (cost, time, concurrency) for the PM
+   c. Delegates execution to PM
+   d. Monitors PM progress via event stream
+   e. Intervenes if cross-project patterns go wrong
+   f. Manages multiple concurrent projects in parallel
+6. Director publishes completion event when PM reports done
+7. Client receives completion via SSE stream (or polls status endpoint)
+```
+
+### PM-Level Loop (per project)
+
+```
+1. PM receives project delegation from Director
+2. PM runs the autonomous execution loop:
    a. Load spec -> resolve dependencies (topological sort)
    b. While incomplete deliverables exist:
       i.   Select next batch (respecting deps + concurrency limits)
@@ -397,11 +464,12 @@ class BatchOrchestrator(BaseAgent):
       iv.  Run regression checks
       v.   Publish batch completion event -> Redis Streams
       vi.  Optional: pause for human review (intervention via API)
-6. Worker publishes completion event
-7. Client receives completion via SSE stream (or polls status endpoint)
+   c. Handle failures autonomously (retry, reorder, skip blocked deliverables)
+   d. Escalate to Director only when PM cannot resolve
+3. PM reports project completion to Director
 ```
 
-The loop runs autonomously until all deliverables are complete. No human prompting is required between iterations. Optional human-in-the-loop intervention points can be configured at the batch boundary (step 5b.vi), triggered via the intervention API endpoint.
+Each tier runs autonomously. No human prompting is required between iterations. The Director monitors all PMs and can intervene at any point. Optional human-in-the-loop intervention points can be configured at the batch boundary (step 2b.vi), triggered via the intervention API endpoint.
 
 Note: The specific deterministic agents in validation/verification steps vary by workflow. For auto-code: LinterAgent + TestRunnerAgent. For auto-research: SourceVerifierAgent + CitationCheckerAgent. The *pattern* (deterministic validation is mandatory) is universal; the *implementation* is workflow-specific.
 
@@ -506,6 +574,21 @@ Agents communicate via session state, not direct message passing. All state upda
 
 State values are injectable into agent instructions via `{key}` templating. For example: `"Implement the deliverable: {current_deliverable_spec}"` auto-resolves from `session.state['current_deliverable_spec']`. Use `{key?}` for optional keys that may not exist.
 
+### State Scope per Tier
+
+The 6-level memory architecture applies at each tier's scope:
+
+| Level | Director Scope | PM Scope | Worker Scope |
+|-------|---------------|----------|--------------|
+| Invocation (`temp:`) | Current decision cycle | Current batch management cycle | Current deliverable execution |
+| Pipeline (`session`) | Cross-project governance state | Project execution state | Deliverable pipeline state |
+| Project (`app:` + Skills) | Global conventions, all project configs | Project conventions, project skills | Deliverable-specific skills |
+| User (`user:`) | CEO preferences, global settings | Inherits from Director | Inherits from PM |
+| Cross-session (`MemoryService`) | Historical decisions, pattern library | Project history, past batch outcomes | Past deliverable patterns |
+| Business (Skills) | Global skills, governance rules | Project skills, workflow skills | Task-specific skills |
+
+Hard limits cascade through the hierarchy: CEO sets globals → Director enforces per-project limits → PM enforces per-worker constraints.
+
 ---
 
 ## 14. Multi-Agent Communication
@@ -519,7 +602,20 @@ Agents communicate via four mechanisms, all operating through session state:
 | 3 | `InstructionProvider` | Dynamic function reads state and constructs context-appropriate instructions at invocation time |
 | 4 | `before_model_callback` | Injects additional context (file contents, test results) right before LLM call |
 
-No agent calls another agent directly. All coordination flows through the shared state system, making data flow explicit and debuggable.
+Within a pipeline tier, no agent calls another agent directly. All coordination flows through the shared state system, making data flow explicit and debuggable.
+
+### Hierarchical Communication
+
+Between tiers, agents communicate via ADK's delegation primitives:
+
+| Pattern | Mechanism | Example |
+|---------|-----------|---------|
+| Director → PM delegation | `transfer_to_agent` or `AgentTool` | Director assigns a project to a PM |
+| PM -> Worker orchestration | `sub_agents` tree | PM constructs DeliverablePipeline workers per batch |
+| Worker → PM escalation | State write + event | Worker writes failure to state; PM reads and decides |
+| PM → Director escalation | State write + event | PM writes unresolvable issue; Director intervenes |
+| Director observation | `before_agent_callback` / `after_agent_callback` | Director monitors PM events via supervision hooks |
+| Cross-project state | `app:` scope prefix | Visible to Director and all PMs |
 
 ---
 
@@ -583,7 +679,7 @@ ADK's `App` class is the top-level container for the agent workflow, instantiate
 
 | Feature | Purpose | AutoBuilder Use |
 |---------|---------|----------------|
-| `root_agent` | The top-level agent tree | `BatchOrchestrator` (CustomAgent) |
+| `root_agent` | The top-level agent tree | `Director` (LlmAgent, opus) — permanent, not per-execution |
 | `events_compaction_config` | Context compression (sliding window summarization) | Keep long autonomous runs within context limits |
 | `resumability_config` | Workflow resume after interruption | Pick up where we left off after crash/power loss |
 | `plugins` | Global lifecycle hooks (logging, metrics, guardrails) | Token tracking, cost monitoring, security guardrails |
@@ -601,9 +697,10 @@ summarizer = LlmEventSummarizer(
     llm=LiteLlm(model="anthropic/claude-haiku-4-5-20251001")
 )
 
+# Director is the permanent root_agent -- created at worker startup, not per execution
 app = App(
     name="autobuilder",
-    root_agent=batch_orchestrator,
+    root_agent=director_agent,  # LlmAgent (opus) — hierarchical supervision root
 
     events_compaction_config=EventsCompactionConfig(
         compaction_interval=5,
@@ -626,11 +723,11 @@ app = App(
 
 ADK's Resume feature (v1.16+) tracks workflow execution and allows picking up after unexpected interruption:
 
-- Resume is not automatic for CustomAgents -- we must implement `BaseAgentState` subclass and define checkpoint steps in `BatchOrchestrator`
+- Resume is not automatic for CustomAgents -- we must implement `BaseAgentState` subclass and define checkpoint steps (PM uses `checkpoint_project` tool)
 - Tools may run more than once on resume -- git, file write, and bash tools must be idempotent or include duplicate-run protection
 - The system reinstates results from successfully completed tools and re-runs from the point of failure
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: February 2026*
+*Document Version: 2.2*
+*Last Updated: 2026-02-16*

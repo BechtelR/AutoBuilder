@@ -32,3 +32,14 @@ All major decisions recorded with rationale and date.
 | 26 | hey-api codegen for type safety | Pydantic models -> FastAPI -> OpenAPI spec -> hey-api -> typed TS client + TanStack Query hooks; build-time type safety without TS ORM | 2026-02-11 |
 | 27 | Redis Streams for event bus | Persistent, replayable, consumer groups; SSE reconnection via Last-Event-ID + stream replay; webhook dispatch via consumer | 2026-02-11 |
 | 28 | ARQ cron for scheduled jobs | Built-in to ARQ; no separate scheduler service needed | 2026-02-11 |
+| 29 | Director (LlmAgent, opus) as permanent root_agent | Cross-project governance requires LLM reasoning; ADK App.root_agent is the natural home | 2026-02-14 |
+| 30 | PMs (LlmAgent, sonnet) for per-project management | Autonomous project supervision requires reasoning, not just programmatic orchestration | 2026-02-14 |
+| 31 | Recursive autonomy at every tier | Each tier handles its problems; escalation is the exception | 2026-02-14 |
+| 32 | Director has full project observability | Can intervene when patterns go wrong; not blind delegation | 2026-02-14 |
+| 33 | Hard limits cascade CEO → Director → PM | Resource governance follows the hierarchy | 2026-02-14 |
+| 34 | 6-level memory applied per tier scope | Original memory architecture maps naturally to hierarchical supervision | 2026-02-14 |
+| 35 | All hierarchy is MVP scope | Not deferred; Director + PMs built in Phase 5, not Phase 8+ | 2026-02-14 |
+| 36 | Tool/Agent terminology aligned with ADK taxonomy | ADK separates tools (passive, LLM-discretionary) from agents (active, pipeline-structured); our docs conflated them | 2026-02-16 |
+| 37 | Skills adopts Agent Skills open standard file format | Interoperability with emerging standard; deterministic runtime stays custom | 2026-02-16 |
+| 38 | PM absorbs BatchOrchestrator -- no separate orchestrator agent | Single-use abstraction; PM needs inter-batch reasoning; mechanical parts become tools | 2026-02-16 |
+| 39 | Batch oversight via PM tools + deterministic callbacks | PM manages strategy; after_agent_callback provides intra-batch safety net | 2026-02-16 |

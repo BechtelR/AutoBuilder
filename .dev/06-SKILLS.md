@@ -56,11 +56,19 @@ Multiple skills can apply to a single task. An API endpoint feature might match 
 
 Skill matching is deterministic pattern matching: exact string comparison, glob matching, set intersection. No LLM call to decide which skills are relevant. This keeps matching fast, predictable, and debuggable.
 
+### 7. Agent Skills Open Standard
+
+The skill file format follows the [Agent Skills open standard](https://agentskills.io/specification) for interoperability. Our matching engine and deterministic loading via `SkillLoaderAgent` are custom -- ADK's experimental `SkillToolset` uses LLM-discretionary loading which does not meet our requirements for guaranteed knowledge injection. We adopt the standard's file format and progressive disclosure model while keeping full control over the runtime.
+
 ---
 
 ## Skill File Format
 
-Each skill is a single Markdown file with YAML frontmatter:
+Each skill is a `SKILL.md` file (per the Agent Skills open standard) with YAML frontmatter. The format follows the standard's three-level progressive disclosure model:
+
+- **L1 (Frontmatter metadata):** Lightweight index fields -- name, description, triggers, tags. Parsed for matching without reading the body.
+- **L2 (Instructions/body):** Full markdown content -- conventions, patterns, examples. Loaded into agent context only on match.
+- **L3 (References/assets):** Optional supporting files in `references/` and `assets/` subdirectories alongside the skill file.
 
 ```markdown
 ---
@@ -157,7 +165,7 @@ Project-local skills with the same `name` as a global skill replace the global s
 
 ## ADK Integration
 
-Skills integrate into the feature pipeline via `SkillLoaderAgent`, a deterministic `CustomAgent` that runs as the first step before any LLM agent. The entire skill loading process runs inside worker processes as part of the ADK pipeline.
+Skills are available to all agent tiers — Director loads governance skills, PMs load project management skills, and workers load task-specific skills. Skills integrate into pipelines via `SkillLoaderAgent`, a deterministic `CustomAgent` that runs as the first step before any LLM agent. The entire skill loading process runs inside worker processes as part of the ADK pipeline.
 
 ### SkillLoaderAgent Implementation
 
@@ -224,24 +232,36 @@ The `applies_to` field in skill frontmatter controls which agents receive the sk
 
 ## Directory Layout
 
+Per the Agent Skills open standard, each skill lives in its own directory named after the skill, containing a `SKILL.md` file and optional `references/` and `assets/` subdirectories.
+
 ### Global Skills (Ship with AutoBuilder)
 
 ```
 app/skills/
 ├── code/
-│   ├── api-endpoint.md
-│   ├── data-model.md
-│   └── database-migration.md
+│   ├── api-endpoint/
+│   │   ├── SKILL.md
+│   │   └── references/            # Optional: supporting docs
+│   ├── data-model/
+│   │   └── SKILL.md
+│   └── database-migration/
+│       └── SKILL.md
 ├── research/
-│   ├── source-evaluation.md
-│   └── citation-standards.md
+│   ├── source-evaluation/
+│   │   └── SKILL.md
+│   └── citation-standards/
+│       └── SKILL.md
 ├── review/
-│   ├── security-review.md
-│   └── performance-review.md
+│   ├── security-review/
+│   │   └── SKILL.md
+│   └── performance-review/
+│       └── SKILL.md
 ├── test/
-│   └── unit-test-patterns.md
+│   └── unit-test-patterns/
+│       └── SKILL.md
 └── planning/
-    └── task-decomposition.md
+    └── task-decomposition/
+        └── SKILL.md
 ```
 
 ### Project-Local Skills (Live in the User's Repo)
@@ -249,15 +269,18 @@ app/skills/
 ```
 user-project/.app/skills/
 ├── code/
-│   ├── api-endpoint.md            # Overrides global with project conventions
-│   └── auth-middleware.md         # Project-specific, no global equivalent
+│   ├── api-endpoint/
+│   │   └── SKILL.md               # Overrides global with project conventions
+│   └── auth-middleware/
+│       └── SKILL.md               # Project-specific, no global equivalent
 └── review/
-    └── compliance-review.md       # Project-specific compliance rules
+    └── compliance-review/
+        └── SKILL.md               # Project-specific compliance rules
 ```
 
-### Subdirectory Organization
+### Directory Organization
 
-Subdirectories (`code/`, `review/`, `test/`, `planning/`) are organizational conventions, not functional boundaries. The skill library scans all `.md` files recursively. Subdirectories help humans navigate the skill library but do not affect matching or loading behavior.
+Top-level subdirectories (`code/`, `review/`, `test/`, `planning/`) are organizational conventions, not functional boundaries. The skill library scans all `SKILL.md` files recursively. These categories help humans navigate the skill library but do not affect matching or loading behavior. Each skill's own directory can contain `references/` and `assets/` subdirs for L3 supporting content.
 
 ---
 
@@ -333,6 +356,6 @@ This is disproportionate value for the effort. Skills transform agents from gene
 
 ---
 
-**Document Version:** 2.0
-**Last Updated:** 2026-02-11
+**Document Version:** 2.1
+**Last Updated:** 2026-02-16
 **Status:** Framework Validated -- Prototyping Phase
