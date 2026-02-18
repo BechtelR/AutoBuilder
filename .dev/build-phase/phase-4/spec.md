@@ -14,7 +14,7 @@ Key constraints: All tools execute in ARQ worker processes, never in the gateway
 - **Filesystem tools** — Read, write, edit, search, and list files/directories within agent worktrees
 - **Shell execution** — Run shell commands with timeout, output capture, error reporting, and idempotency guards for ADK Resume
 - **Git operations** — Status, commit, branch, and diff for agent-managed repositories
-- **Web tools** — Fetch URL content and search the web via configurable provider
+- **Web tools** — Fetch URL content and search the web (Tavily primary, Brave fallback)
 - **Task management** — Session-state-backed todo list for agent work tracking via ADK ToolContext
 - **Project management tools** — Batch selection and CEO queue communication (placeholder backends, full integration in Phase 5/8)
 - **AutoBuilderToolset** — ADK-native `BaseToolset` subclass with per-role tool vending via `get_tools(readonly_context)`
@@ -24,11 +24,9 @@ Key constraints: All tools execute in ARQ worker processes, never in the gateway
 
 | Prerequisite | Status | Evidence |
 |---|---|---|
-| Phase 3: ADK Engine Integration | UNMET | Spec written (`.dev/build-phase/phase-3/spec.md`), not yet built. Phase 4 depends on ADK Runner, FunctionTool, and BaseToolset being operational in workers. |
-| Open Question #7: Web search provider | RESOLVED | Resolved in DD-3: Tavily as default, configurable provider via settings. |
-| Open Question #8: Agent-browser integration | **BLOCKED** | Open question targets Phase 4. Must be resolved (answer or retarget) before build begins. |
-
-**BLOCK: Do not begin Phase 4 build until Q8 (agent-browser integration approach) is resolved or explicitly retargeted to a later phase.** The roadmap assigns Q8 to Phase 4 but no BOM component exists for it. Resolution options: (a) add a browser tool to Phase 4 scope, (b) retarget Q8 to Phase 7/13+, or (c) close as out-of-scope for core toolset.
+| Phase 3: ADK Engine Integration | MET | 116 tests pass, 4 skipped (LLM), all quality gates clean. ADK Runner, FunctionTool, and BaseToolset operational in workers. |
+| Open Question #7: Web search provider | RESOLVED | Tavily primary, Brave fallback. Simple `if/elif` dispatch. Env vars: `TAVILY_API_KEY`, `BRAVE_API_KEY`. |
+| Open Question #8: Agent-browser integration | RESOLVED | Vercel `agent-browser` CLI (npm). Invoked via `bash_exec`. Implementation retargeted to Phase 7/13 (workflow-specific). |
 
 **Note:** Phase 4 can be spec'd and partially developed in parallel with Phase 3 since tool functions are pure Python. Full integration testing (tools inside ADK LlmAgent) requires Phase 3 completion.
 
@@ -62,12 +60,14 @@ ADK's Resume feature may re-execute tools that already completed successfully. A
 - **Todo tools**: Session state operations are naturally idempotent (set overwrites).
 
 ### DD-3: Web Search Provider
-Open Question #7 (SearXNG vs Brave vs Tavily). Phase 4 resolves this with a configurable provider:
+Q7 resolved: **Tavily primary, Brave fallback**. Simple `if/elif` dispatch — no abstract class hierarchy.
 
 - `web_fetch(url: str) -> str` — Direct URL fetching via `httpx` + HTML-to-text extraction via `beautifulsoup4` with `html.parser`. No provider dependency.
-- `web_search(query: str, tool_context: ToolContext) -> str` — Dispatches to a configured search provider. Settings: `AUTOBUILDER_SEARCH_PROVIDER` (default: `"tavily"`) and `AUTOBUILDER_SEARCH_API_KEY`.
+- `web_search(query: str, num_results: int = 5) -> str` — Dispatches to configured search provider. Settings: `AUTOBUILDER_SEARCH_PROVIDER` (default: `"tavily"`, fallback: `"brave"`), `TAVILY_API_KEY`, `BRAVE_API_KEY` (read from env directly, not `AUTOBUILDER_` prefixed — aligns with `.env`).
 
-Initial implementation supports Tavily (simple REST API, designed for AI agents, returns clean results). If no API key is configured, returns a clear error message. The provider interface is a simple function dispatch — no abstract class hierarchy. Adding a new provider is adding an `elif` branch and a function.
+Tavily is the default (simple REST API, designed for AI agents, returns clean results). Brave Search API is the fallback provider. If the configured provider's API key is missing, returns a clear error message. Adding a new provider is adding an `elif` branch and a function.
+
+Q8 resolved: Vercel `agent-browser` CLI (npm package). Agents invoke it via `bash_exec("agent-browser <command>")`. Implementation is workflow-specific (Phase 7/13) — no Phase 4 tooling needed beyond `bash_exec`.
 
 ### DD-4: Project Tools — Placeholder Backends
 `select_ready_batch` and `enqueue_ceo_item` require DB infrastructure that arrives in Phase 5 (CEO queue table D05) and Phase 8 (deliverable dependency resolution). In Phase 4:
@@ -198,7 +198,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 ### P4.D4: Web Tools
 **Files:** `app/tools/web.py`, `app/config/settings.py` (update)
 **Depends on:** —
-**Description:** URL fetching via `httpx` with HTML-to-text extraction, and web search via configurable provider (Tavily as initial default per DD-3). Settings extended with `search_provider` and `search_api_key` fields. `web_fetch` extracts text from HTML using `beautifulsoup4`. `web_search` dispatches to the configured provider's REST API.
+**Description:** URL fetching via `httpx` with HTML-to-text extraction, and web search via configurable provider (Tavily primary, Brave fallback per DD-3). Settings extended with `search_provider` field. `web_fetch` extracts text from HTML using `beautifulsoup4`. `web_search` dispatches to the configured provider's REST API.
 **BOM Components:**
 - [ ] `T11` — `web_search` FunctionTool
 - [ ] `T12` — `web_fetch` FunctionTool
@@ -206,9 +206,11 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Requirements:**
 - [ ] `web_fetch(url: str) -> str` fetches URL content via `httpx.AsyncClient` with 30s timeout; extracts text from HTML via `beautifulsoup4` `.get_text()`; returns raw content for non-HTML responses; truncates to 10000 characters
 - [ ] `web_search(query: str, num_results: int = 5) -> str` calls the configured search provider API; returns formatted results (title, URL, snippet per result)
-- [ ] `web_search` returns clear error message if `search_api_key` is not configured
-- [ ] `Settings` has `search_provider: str` defaulting to `"tavily"` and `search_api_key: str` defaulting to `""` (env vars: `AUTOBUILDER_SEARCH_PROVIDER`, `AUTOBUILDER_SEARCH_API_KEY`)
+- [ ] `web_search` returns clear error message if the provider's API key is not configured
+- [ ] `Settings` has `search_provider: str` defaulting to `"tavily"` (env var: `AUTOBUILDER_SEARCH_PROVIDER`)
+- [ ] API keys read from env directly: `TAVILY_API_KEY`, `BRAVE_API_KEY` (not `AUTOBUILDER_` prefixed — aligns with `.env`)
 - [ ] Tavily provider: POST to `https://api.tavily.com/search` with `api_key`, `query`, `max_results`; parse response `results` array
+- [ ] Brave provider: GET to `https://api.search.brave.com/res/v1/web/search` with `X-Subscription-Token` header, `q` and `count` params; parse response `web.results` array
 - [ ] Module importable as `from app.tools.web import web_search, web_fetch`
 **Validation:**
 - `uv run pyright app/tools/web.py app/config/settings.py`
@@ -304,7 +306,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [ ] **Filesystem tests**: `file_read` returns content of existing file; returns error for non-existent file; `file_write` creates file and returns byte count; `file_edit` replaces content; `file_edit` reports "already edited" when `old` not found but `new` present; `file_search` finds files by glob; `directory_list` returns tree output; path traversal (`../`) is rejected
 - [ ] **Execution tests**: `bash_exec("echo hello")` returns `"hello\n"`; `bash_exec` with timeout=1 on `sleep 10` returns timeout error; non-zero exit code includes exit code in output; output truncation at 10000 chars
 - [ ] **Git tests** (use `tmp_path` fixture with `git init`): `git_status` on clean repo returns clean message; `git_commit` after file creation returns success; `git_commit` on clean repo returns nothing-to-commit; `git_branch` create + switch works; `git_diff` shows changes
-- [ ] **Web tests**: `web_fetch` returns extracted text from HTML (mock httpx response); `web_search` with valid API key returns formatted results (mock Tavily API); `web_search` without API key returns error message
+- [ ] **Web tests**: `web_fetch` returns extracted text from HTML (mock httpx response); `web_fetch` truncates output at 10000 chars; `web_fetch` returns raw content for non-HTML; `web_search` with valid API key returns formatted results (mock Tavily API); `web_search` with Brave provider returns formatted results (mock Brave API); `web_search` without API key returns error message
 - [ ] **Task tests**: `todo_write` add creates task; `todo_list` returns all tasks; `todo_read` returns specific task; `todo_write` complete marks task done; `todo_list` with filter returns filtered results
 - [ ] **Project tests**: `select_ready_batch` returns placeholder message; `enqueue_ceo_item` with valid params returns confirmation; `enqueue_ceo_item` with invalid `item_type` returns validation error
 - [ ] **Toolset tests**: `AutoBuilderToolset` constructor creates 17 `FunctionTool` instances; `get_tools(None)` returns all tools; planner role gets exactly the read-only tool set; coder role gets full tools minus project tools; reviewer role matches planner; PM role includes `select_ready_batch`; Director role includes `enqueue_ceo_item`; `excluded_tools={"bash_exec"}` removes bash from coder role; `resolve_role` maps `"plan_agent"` → `"planner"`, `"code_agent"` → `"coder"`, unknown → `"default"`
@@ -466,7 +468,7 @@ httpx           # Already present (gateway tests) — verify
 ### Phase 3 Interfaces Phase 4 Depends On
 - **ADK App Container**: `create_app_container(root_agent)` in `app/workers/adk.py`
 - **Worker Context**: Shared resources in `ctx` dict (session_service, llm_router, redis)
-- **Settings**: `get_settings()` from `app.config` — Phase 4 extends with search provider fields
+- **Settings**: `get_settings()` from `app.config` — Phase 4 extends with `search_provider` field
 - **Logging**: `get_logger()` from `app.lib.logging`
 - **Exceptions**: `AutoBuilderError` hierarchy from `app.lib.exceptions`
 
@@ -485,5 +487,20 @@ Response: {
         {"title": "...", "url": "...", "content": "..."},
         ...
     ]
+}
+```
+
+### Brave Search API Reference
+```
+GET https://api.search.brave.com/res/v1/web/search
+Headers: X-Subscription-Token: <BRAVE_API_KEY>, Accept: application/json
+Params: q=<query>&count=<num_results>
+Response: {
+    "web": {
+        "results": [
+            {"title": "...", "url": "...", "description": "..."},
+            ...
+        ]
+    }
 }
 ```

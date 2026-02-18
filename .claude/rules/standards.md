@@ -39,6 +39,9 @@
 ### Zero Backwards-Compatibility Shims
 Early development = zero regression technical debt. Don't create it. Delete when found, deprecated code, obsolete elements. Ask user if in question.
 
+### Migrations
+Sequential `NNN_description.py` naming. Never hash-based IDs. `--rev-id NNN` on every `alembic revision`.
+
 ### Avoid
 - Abstractions for single use cases
 - Factories with <3 implementations

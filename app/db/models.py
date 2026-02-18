@@ -60,6 +60,7 @@ class Workflow(TimestampMixin, Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
     specification: Mapped[Specification | None] = relationship(
         back_populates="workflows", lazy="raise"

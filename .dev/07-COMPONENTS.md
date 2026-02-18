@@ -267,7 +267,7 @@ Source: `architecture/tools.md`
 | T08 | `git_commit` FunctionTool | tool | 4 | tools.md §3.5 | — |
 | T09 | `git_branch` FunctionTool | tool | 4 | tools.md §3.5 | — |
 | T10 | `git_diff` FunctionTool | tool | 4 | tools.md §3.5 | — |
-| T11 | `web_search` FunctionTool | tool | 4 | tools.md §3.3 | Search provider config |
+| T11 | `web_search` FunctionTool | tool | 4 | tools.md §3.3 | Tavily primary, Brave fallback |
 | T12 | `web_fetch` FunctionTool | tool | 4 | tools.md §3.3 | — |
 | T13 | `todo_read` FunctionTool | tool | 4 | tools.md §3.4 | Session state |
 | T14 | `todo_write` FunctionTool | tool | 4 | tools.md §3.4 | Session state |

@@ -41,6 +41,29 @@ class SpecificationStatus(enum.StrEnum):
     FAILED = "FAILED"
 
 
+class TaskType(enum.StrEnum):
+    """LLM task type for model routing."""
+
+    CODE = "CODE"
+    PLAN = "PLAN"
+    REVIEW = "REVIEW"
+    FAST = "FAST"
+
+
+class PipelineEventType(enum.StrEnum):
+    """Event types emitted during pipeline execution."""
+
+    WORKFLOW_STARTED = "WORKFLOW_STARTED"
+    WORKFLOW_COMPLETED = "WORKFLOW_COMPLETED"
+    WORKFLOW_FAILED = "WORKFLOW_FAILED"
+    AGENT_STARTED = "AGENT_STARTED"
+    AGENT_COMPLETED = "AGENT_COMPLETED"
+    TOOL_CALLED = "TOOL_CALLED"
+    TOOL_RESULT = "TOOL_RESULT"
+    STATE_UPDATED = "STATE_UPDATED"
+    ERROR = "ERROR"
+
+
 class ErrorCode(enum.StrEnum):
     """Machine-readable error codes for API error responses."""
 

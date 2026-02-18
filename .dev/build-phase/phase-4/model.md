@@ -30,12 +30,12 @@ flowchart TB
     end
 
     subgraph INFRA["INFRASTRUCTURE LAYER"]
-        SET["Settings\n(app/config/settings.py)\nsearch_provider, search_api_key"]
+        SET["Settings\n(app/config/settings.py)\nsearch_provider"]
         FSSYS["Filesystem\n(os, pathlib, glob)"]
         PROC["Subprocess\n(asyncio.create_subprocess_shell)"]
         GIT["Git CLI\n(subprocess)"]
         HTTP["httpx + beautifulsoup4\n(external web)"]
-        TAVILY["Tavily API\n(search provider)"]
+        SEARCH["Tavily / Brave API\n(search providers)"]
     end
 
     subgraph ADK["ADK FRAMEWORK (google.adk)"]
@@ -49,8 +49,7 @@ flowchart TB
     FS --> FSSYS
     EX --> PROC
     GI --> GIT
-    WB --> HTTP & TAVILY
-    WB --> SET
+    WB --> HTTP & SEARCH
     TK -->|state via| TC
     EX -->|idempotency via| TC
     ABT -->|extends| BTS
@@ -72,7 +71,7 @@ flowchart TB
 | P4.D1 | `filesystem.py`: `file_read`, `file_write`, `file_edit`, `file_search`, `directory_list`, path validation helper |
 | P4.D2 | `execution.py`: `bash_exec`, idempotency guard (`temp:tool_runs:{key}` check/store) |
 | P4.D3 | `git.py`: `git_status`, `git_commit`, `git_branch`, `git_diff`, git repo validation helper |
-| P4.D4 | `web.py`: `web_fetch`, `web_search`, Tavily provider dispatch; `Settings` extension (`search_provider`, `search_api_key`) |
+| P4.D4 | `web.py`: `web_fetch`, `web_search`, Tavily/Brave provider dispatch; `Settings` extension (`search_provider`) |
 | P4.D5 | `task.py`: `todo_read`, `todo_write`, `todo_list` |
 | P4.D6 | `project.py`: `select_ready_batch`, `enqueue_ceo_item`, validation constants |
 | P4.D7 | `toolset.py`: `AutoBuilderToolset`, `resolve_role`, `ROLE_PERMISSIONS`, `AGENT_ROLE_MAP` |
@@ -173,7 +172,7 @@ async def web_fetch(url: str) -> str:
     """Fetch URL content via httpx. Extracts text from HTML.""" ...
 
 async def web_search(query: str, num_results: int = 5) -> str:
-    """Search the web via configured provider (default: Tavily).""" ...
+    """Search the web via configured provider (Tavily primary, Brave fallback).""" ...
 ```
 
 ### Tool Function Signatures — Task Management
@@ -227,13 +226,13 @@ AGENT_ROLE_MAP: dict[str, str] = {
 # Role → allowed tool names
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "default":  {"file_read", "file_search", "directory_list", "git_status", "git_diff"},
-    "planner":  {"file_read", "file_search", "directory_list", "web_search", "web_fetch",
+    "planner":  {"file_read", "file_search", "directory_list", "web_fetch", "web_search",
                  "todo_read", "todo_list", "git_status", "git_diff"},
     "coder":    {"file_read", "file_write", "file_edit", "file_search", "directory_list",
                  "bash_exec", "git_status", "git_commit", "git_branch", "git_diff",
-                 "web_search", "web_fetch", "todo_read", "todo_write", "todo_list"},
+                 "web_fetch", "web_search", "todo_read", "todo_write", "todo_list"},
     "reviewer": {"file_read", "file_search", "directory_list", "git_status", "git_diff",
-                 "web_search", "web_fetch", "todo_read", "todo_list"},
+                 "web_fetch", "web_search", "todo_read", "todo_list"},
     "pm":       {"file_read", "file_search", "directory_list", "git_status", "git_diff",
                  "todo_read", "todo_write", "todo_list",
                  "select_ready_batch", "enqueue_ceo_item"},
@@ -292,9 +291,12 @@ class TaskItem(TypedDict):
 ### Settings Extension (app/config/settings.py)
 
 ```python
-# Added fields (Pydantic Settings, env prefix AUTOBUILDER_)
+# Added field (Pydantic Settings, env prefix AUTOBUILDER_)
 search_provider: str = "tavily"     # AUTOBUILDER_SEARCH_PROVIDER
-search_api_key: str = ""            # AUTOBUILDER_SEARCH_API_KEY
+
+# API keys read from env directly (not AUTOBUILDER_ prefixed):
+# TAVILY_API_KEY — Tavily search (primary)
+# BRAVE_API_KEY — Brave search (fallback)
 ```
 
 ### Output Truncation Constant
@@ -400,7 +402,7 @@ flowchart TD
 
 | Component | Interface | How This Phase Uses It |
 |-----------|-----------|----------------------|
-| `Settings` (`app/config/settings.py`) | `get_settings()` | Extended with `search_provider`, `search_api_key` fields |
+| `Settings` (`app/config/settings.py`) | `get_settings()` | Extended with `search_provider` field; API keys via `TAVILY_API_KEY`, `BRAVE_API_KEY` |
 | `get_logger()` (`app/lib/logging`) | `get_logger("tools.{category}")` | All tool modules use structured logging |
 | `AutoBuilderError` hierarchy (`app/lib/exceptions`) | `ValidationError`, `NotFoundError` | Tool internal errors (path validation, git repo check) — caught and returned as `str` to LLM |
 | ADK `FunctionTool` (`google.adk.tools.function_tool`) | `FunctionTool(func)` | Wraps all 17 tool functions for schema auto-generation |
@@ -419,7 +421,8 @@ flowchart TD
 | `excluded_tools` cascading | Phase 5 | Director/PM pass `excluded_tools` when constructing subordinate agents' toolsets |
 | `require_confirmation` | Phase 11 | `FunctionTool(bash_exec, require_confirmation=True)` for human-in-the-loop |
 | Tool authoring by Director | Phase 13+ | Director writes new tool functions; CEO approval gate before activation |
-| `web_search` providers | Phase 4+ | Add `elif provider == "brave":` branch for new search providers |
+| `web_search` providers | Phase 4+ | Add `elif provider == "new_provider":` branch for new search providers |
+| `agent-browser` integration | Phase 7/13 | Vercel `agent-browser` CLI invoked via `bash_exec`. Workflow-specific. |
 
 ## Notes
 
@@ -427,5 +430,6 @@ flowchart TD
 - **`tool_context` is auto-injected** by ADK when declared as a parameter. It does NOT appear in the schema sent to the LLM. Only `todo_*` tools and `bash_exec` (when using idempotency) need it.
 - **Async vs sync**: `bash_exec`, `git_*`, `web_*` are `async` (subprocess/network I/O). `todo_*`, `file_*`, `project.*` are sync (filesystem/state reads are fast, no I/O worth awaiting). ADK handles both.
 - **Path validation**: Filesystem tools validate that paths don't traverse outside the project root. This is a security boundary — tools run in worker processes with filesystem access.
-- **No abstract class hierarchy for search providers** — a simple `if/elif` dispatch suffices for 2-3 providers. Adding a provider is adding a function + branch. Over-abstracting this violates the "abstract after third occurrence" principle.
+- **No abstract class hierarchy for search providers** — a simple `if/elif` dispatch suffices. Tavily primary, Brave fallback. Adding a provider is adding a function + branch.
+- **`agent-browser` resolved**: Vercel `agent-browser` CLI (Q8). Invoked via `bash_exec`. Workflow-specific, implemented in Phase 7/13.
 - **`beautifulsoup4` dependency**: Required for `web_fetch` HTML-to-text extraction. Verify it's in `pyproject.toml` before building.

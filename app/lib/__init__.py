@@ -1,5 +1,6 @@
 """Shared libraries — logging, exceptions, decorators, base classes."""
 
+from app.lib.cache import cache_delete, cache_get, cache_set
 from app.lib.exceptions import (
     AutoBuilderError,
     ConfigurationError,
@@ -18,6 +19,9 @@ __all__ = [
     "NotFoundError",
     "ValidationError",
     "WorkerError",
+    "cache_delete",
+    "cache_get",
+    "cache_set",
     "get_logger",
     "setup_logging",
 ]

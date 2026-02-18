@@ -8,7 +8,7 @@ Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0-10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention -- through a production-grade API gateway with async worker execution.
 
-**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: NEXT**
+**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: NEXT**
 
 ---
 
@@ -83,7 +83,7 @@ FastAPI app factory with lifespan, health endpoint, CORS, error handling middlew
 ## Phase 3: ADK Engine Integration `L`
 
 **Goal**: ADK running inside ARQ workers behind the anti-corruption layer, with LLM routing via LiteLLM.
-**Status**: NEXT
+**Status**: DONE
 **Prerequisites**: Phase 2 (gateway + workers operational)
 
 
@@ -91,11 +91,11 @@ FastAPI app factory with lifespan, health endpoint, CORS, error handling middlew
 Anti-corruption layer translating gateway commands to ADK Runner calls and ADK Events to Redis Stream messages. ADK App container with context compression and resumability config. Static LLM routing (task_type x complexity to model) with fallback chains via LiteLLM. DatabaseSessionService for ADK session persistence with 4-scope state system. Worker pipeline bridge connecting ARQ jobs to ADK pipeline execution with event publishing.
 
 ### Completion Contract
-- [ ] Can enqueue a workflow job from gateway, have worker execute an ADK pipeline
-- [ ] LLM Router selects correct model per task type
-- [ ] Claude responds reliably via LiteLLM through ADK
-- [ ] Session state persists across worker invocations
-- [ ] ADK events translate to gateway events in Redis Streams
+- [x] Can enqueue a workflow job from gateway, have worker execute an ADK pipeline
+- [x] LLM Router selects correct model per task type
+- [x] Claude responds reliably via LiteLLM through ADK
+- [x] Session state persists across worker invocations
+- [x] ADK events translate to gateway events in Redis Streams
 
 ---
 
@@ -330,8 +330,8 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 4 | Reuse Automaker TS libs or rewrite in Python? | Open | Phase 8 |
 | 5 | Agent role system granularity | Open | Phase 11 |
 | 6 | Context budget strategy -- per-agent limits with pruning? | Open | Phase 11 |
-| 7 | Web search provider (SearXNG vs Brave vs Tavily) | Open | Phase 4 |
-| 8 | Agent-browser integration approach for UI testing | Open | Phase 4 |
+| 7 | Web search provider (SearXNG vs Brave vs Tavily) | Closed: Tavily primary, Brave fallback. Simple `if/elif` dispatch in `web_search`. Settings: `AUTOBUILDER_SEARCH_PROVIDER`, `AUTOBUILDER_SEARCH_API_KEY`. | Phase 4 |
+| 8 | Agent-browser integration approach for UI testing | Closed: Vercel `agent-browser` CLI (npm). Invoked via `bash_exec`. Implementation in Phase 7/13 (workflow-specific). | Phase 7 |
 | 9 | Durable execution -- native ADK resume sufficient or need Temporal? | Likely sufficient | Phase 11 |
 | 10 | Memory ingestion -- after each deliverable, each batch, or session end? | Open | Phase 9 |
 | 11 | pgvector embedding strategy for semantic memory | Closed: tsvector for keyword search; pgvector available when needed | Phase 9 |

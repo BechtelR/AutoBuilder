@@ -3,16 +3,17 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from arq.connections import ArqRedis, create_pool
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from redis.asyncio import Redis
 from sqlalchemy import text
 
-from app.config import get_settings
+from app.config import get_settings, parse_redis_settings
 from app.db import async_session_factory, create_engine
 from app.gateway.middleware.errors import ErrorHandlingMiddleware
 from app.gateway.middleware.logging import RequestLoggingMiddleware
 from app.gateway.routes.health import router as health_router
+from app.gateway.routes.workflows import router as workflow_router
 from app.lib import get_logger, setup_logging
 from app.models.constants import APP_VERSION
 
@@ -21,7 +22,7 @@ logger = get_logger("gateway")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Manage startup/shutdown of DB engine and Redis client."""
+    """Manage startup/shutdown of DB engine and ArqRedis pool."""
     settings = get_settings()
     setup_logging(settings.log_level)
 
@@ -30,9 +31,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.engine = engine
     app.state.session_factory = async_session_factory(engine)
 
-    # Create Redis client
-    redis: Redis = Redis.from_url(settings.redis_url)  # type: ignore[type-arg]
-    app.state.redis = redis
+    # Create ArqRedis pool (superset of redis.asyncio.Redis)
+    arq_pool: ArqRedis = await create_pool(parse_redis_settings(settings.redis_url))
+    app.state.arq_pool = arq_pool
 
     # Verify connectivity (warn but don't crash)
     try:
@@ -43,7 +44,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.warning("Database connection failed -- starting in degraded mode", exc_info=True)
 
     try:
-        await redis.ping()  # type: ignore[reportUnknownMemberType]
+        await arq_pool.ping()  # type: ignore[reportUnknownMemberType]
         logger.info("Redis connection verified")
     except Exception:
         logger.warning("Redis connection failed -- starting in degraded mode", exc_info=True)
@@ -51,7 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     # Shutdown
-    await redis.aclose()
+    await arq_pool.aclose()
     await engine.dispose()
     logger.info("Gateway shutdown complete")
 
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
 
     # Routes
     app.include_router(health_router)
+    app.include_router(workflow_router)
 
     return app
 

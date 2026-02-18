@@ -68,11 +68,11 @@ flowchart TB
 | Deliverable | Components |
 |---|---|
 | **P3.D1** Config + Domain Enums | `Settings` (4 model fields), `TaskType` enum, `PipelineEventType` enum, `app.models.__init__` re-exports |
-| **P3.D2** LLM Router + Model Override Callback | `LlmRouter` class, `FALLBACK_CHAINS` dict, `from_settings()`, `to_dict()`, `cache_to_redis()`, `create_model_override_callback()`, `AGENT_TASK_TYPES` dict |
+| **P3.D2** LLM Router + Model Override Callback | `LlmRouter` class, `_FALLBACK_CHAINS` dict (private, exposed via `get_fallbacks()`), `from_settings()`, `to_dict()`, `cache_to_redis()`, `create_model_override_callback()`, `AGENT_TASK_TYPES` dict |
 | **P3.D3** Redis Cache + Stream Helpers | `cache_get()`, `cache_set()`, `cache_delete()` in `lib/cache.py`; `stream_key()`, `stream_publish()`, `stream_read_range()` in `events/streams.py` |
 | **P3.D4** Gateway Event Schema + Event Translation | `PipelineEvent` model, `EventPublisher` class (`translate`, `publish`, `publish_lifecycle`) |
 | **P3.D5** ADK Engine Setup | `create_session_service()`, `create_app_container()`, `create_runner()`, `create_echo_agent()`, `LoggingPlugin` class |
-| **P3.D6** Worker Pipeline Bridge | `run_workflow()` task, `startup()`/`shutdown()` extensions, `create_or_resume_session()`, `update_workflow_state()`, Alembic migration (`error_message`), `app:` scope init |
+| **P3.D6** Worker Pipeline Bridge | `run_workflow()` task (session create/resume and status updates inline), `startup()`/`shutdown()` extensions, Alembic migration (`error_message`), `app:` scope init |
 | **P3.D7** Gateway Workflow Route | `WorkflowRunRequest`/`WorkflowRunResponse` models, `POST /workflows/run` handler, ArqRedis pool in lifespan, `get_arq_pool()` dep, `get_redis()` update |
 | **P3.D8** Test Suite | Router tests, callback tests, cache tests, stream tests, publisher tests, ADK engine tests, worker task tests, gateway route tests, session persistence tests, 4-scope state tests, app scope init tests |
 
@@ -188,18 +188,26 @@ class EventPublisher:
         ...
 
     async def publish_lifecycle(
-        self, workflow_id: str, event_type: PipelineEventType
+        self,
+        workflow_id: str,
+        event_type: PipelineEventType,
+        metadata: dict[str, object] | None = None,
     ) -> None:
-        """Publish synthetic lifecycle events (STARTED, COMPLETED, FAILED)."""
+        """Publish synthetic lifecycle events (STARTED, COMPLETED, FAILED).
+
+        Optional metadata carries context (e.g. error details on WORKFLOW_FAILED).
+        """
         ...
 ```
 
 ### ADK Factory Functions (Engine — `app/workers/adk.py`)
 
 ```python
-def create_session_service(db_url: str) -> DatabaseSessionService:
+def create_session_service(db_url: str) -> BaseSessionService:
     """Create ADK DatabaseSessionService connected to PostgreSQL.
 
+    Returns BaseSessionService (DatabaseSessionService is not in ADK's public __all__,
+    lazy-loaded — BaseSessionService is the stable type annotation).
     ADK creates its own tables lazily (sessions, events, app_states, user_states,
     adk_internal_metadata). No Alembic migration needed.
     """
@@ -217,7 +225,7 @@ def create_app_container(
     """
     ...
 
-def create_runner(app: App, session_service: DatabaseSessionService) -> Runner:
+def create_runner(app: App, session_service: BaseSessionService) -> Runner:
     """Create ADK Runner with auto_create_session=False (sessions managed explicitly)."""
     ...
 
@@ -242,27 +250,27 @@ class LoggingPlugin(BasePlugin):
     """
 
     async def before_agent_callback(
-        self, callback_context: CallbackContext, *args: object
+        self, callback_context: CallbackContext, **kwargs: object
     ) -> None:
         """Log agent start."""
         ...
 
     async def after_agent_callback(
-        self, callback_context: CallbackContext, *args: object
+        self, callback_context: CallbackContext, **kwargs: object
     ) -> None:
         """Log agent completion."""
         ...
 
     async def before_tool_callback(
-        self, callback_context: CallbackContext, *args: object
+        self, callback_context: CallbackContext, **kwargs: object
     ) -> None:
-        """Log tool_called."""
+        """Log tool_called. Reads tool name from kwargs."""
         ...
 
     async def after_tool_callback(
-        self, callback_context: CallbackContext, *args: object
+        self, callback_context: CallbackContext, **kwargs: object
     ) -> None:
-        """Log tool_result."""
+        """Log tool_result. Reads tool name from kwargs."""
         ...
 ```
 

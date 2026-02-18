@@ -5,24 +5,33 @@ clear message when the service is unreachable, rather than failing or mocking.
 """
 
 import asyncio
+import os
 import socket
 from collections.abc import AsyncIterator
+from pathlib import Path
 
-import asyncpg  # type: ignore[import-untyped]
-import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import (
+from dotenv import load_dotenv
+
+# Load .env before any os.environ checks (API keys, config)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+import asyncpg  # type: ignore[import-untyped]  # noqa: E402
+import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from arq.connections import ArqRedis, create_pool  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from redis.asyncio import Redis  # noqa: E402
+from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
 
-from app.db.models import Base
-from app.gateway.deps import get_db_session, get_redis
-from app.gateway.main import create_app
+from app.config import parse_redis_settings  # noqa: E402
+from app.db.models import Base  # noqa: E402
+from app.gateway.deps import get_db_session, get_redis  # noqa: E402
+from app.gateway.main import create_app  # noqa: E402
 
 TEST_DB_URL = "postgresql+asyncpg://autobuilder:autobuilder@localhost:5432/autobuilder_test"
 TEST_REDIS_URL = "redis://localhost:6379/1"  # DB 1 to isolate from dev
@@ -45,6 +54,7 @@ def _probe_tcp(host: str, port: int, timeout: float = 1.0) -> bool:
 
 _pg_available: bool = _probe_tcp("localhost", 5432)
 _redis_available: bool = _probe_tcp("localhost", 6379)
+_llm_available: bool = bool(os.environ.get("ANTHROPIC_API_KEY"))
 
 require_postgres = pytest.mark.skipif(
     not _pg_available,
@@ -58,6 +68,10 @@ require_infra = pytest.mark.skipif(
     not (_pg_available and _redis_available),
     reason=f"PostgreSQL and/or Redis not running. {_INFRA_HINT}",
 )
+require_llm = pytest.mark.skipif(
+    not _llm_available,
+    reason="ANTHROPIC_API_KEY not set. Set it to run LLM integration tests.",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -67,20 +81,32 @@ require_infra = pytest.mark.skipif(
 
 def pytest_report_header() -> list[str]:
     """Print infrastructure status at the top of every test run."""
+    lines: list[str] = []
     missing: list[str] = []
     if not _pg_available:
         missing.append("PostgreSQL (localhost:5432)")
     if not _redis_available:
         missing.append("Redis (localhost:6379)")
-    if not missing:
-        return []
-    services = ", ".join(missing)
-    return [
-        "",
-        f"  *** INFRASTRUCTURE UNAVAILABLE: {services} ***",
-        f"  *** Tests requiring these services will be SKIPPED. {_INFRA_HINT} ***",
-        "",
-    ]
+    if missing:
+        services = ", ".join(missing)
+        lines.extend(
+            [
+                "",
+                f"  *** INFRASTRUCTURE UNAVAILABLE: {services} ***",
+                f"  *** Tests requiring these services will be SKIPPED. {_INFRA_HINT} ***",
+                "",
+            ]
+        )
+    if not _llm_available:
+        lines.extend(
+            [
+                "",
+                "  *** LLM UNAVAILABLE: ANTHROPIC_API_KEY not set ***",
+                "  *** Tests requiring LLM will be SKIPPED. ***",
+                "",
+            ]
+        )
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +182,9 @@ async def test_client(
     app = create_app()
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+    # Create ArqRedis pool for job enqueueing
+    arq_pool: ArqRedis = await create_pool(parse_redis_settings(TEST_REDIS_URL))
+
     async def override_db_session() -> AsyncIterator[AsyncSession]:
         async with factory() as session:
             yield session
@@ -166,8 +195,14 @@ async def test_client(
     app.dependency_overrides[get_db_session] = override_db_session
     app.dependency_overrides[get_redis] = override_redis
 
+    # Set arq_pool on app.state
+    app.state.arq_pool = arq_pool
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
     ) as client:
         yield client
+
+    # Clean up ArqRedis pool
+    await arq_pool.aclose()
