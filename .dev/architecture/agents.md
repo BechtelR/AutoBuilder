@@ -133,7 +133,7 @@ def build_pm(project_id: str) -> LlmAgent:
     """Recreate PM agent from project config (DB entity). Stateless."""
     return LlmAgent(
         name=f"PM_{project_id}",
-        model="anthropic/claude-sonnet-4-5-20250929",
+        model="anthropic/claude-sonnet-4-6",
         instruction="Autonomous project manager. You manage batch execution. "
                     "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
                     "and escalate only when you cannot resolve an issue.",
@@ -242,7 +242,7 @@ PMs are per-project autonomous managers. They use LLM reasoning (not programmati
 |----------|-------|
 | **Role** | Autonomous project management, batch strategy, quality oversight, worker supervision. IS the outer batch loop. |
 | **ADK Type** | `LlmAgent` |
-| **Model** | `anthropic/claude-sonnet-4-5-20250929` (project management reasoning) |
+| **Model** | `anthropic/claude-sonnet-4-6` (project management reasoning) |
 | **Scope** | Single project |
 | **Lifecycle** | Stateless config, recreated per invocation. Session continuity in DB. Consistent with Director tier. |
 | **Tools** | `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies` (FunctionTools) |
@@ -282,7 +282,7 @@ The PM manages the batch execution loop directly, rather than delegating to a se
 ```python
 pm_alpha = LlmAgent(
     name="PM_ProjectAlpha",
-    model="anthropic/claude-sonnet-4-5-20250929",
+    model="anthropic/claude-sonnet-4-6",
     instruction="Autonomous project manager for Project Alpha. You ARE the outer batch loop. "
                 "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
                 "and escalate only when you cannot resolve an issue. "
@@ -374,7 +374,7 @@ The plan agent reads the deliverable specification, loaded skills, cross-session
 | **Role** | Implement code according to the plan, using project conventions from skills |
 | **Input** | `{implementation_plan}`, `{loaded_skills}`, `{app:coding_standards}` |
 | **Output** | `output_key: "code_output"` |
-| **Model** | `anthropic/claude-sonnet-4-5-20250929` (standard complexity) or `anthropic/claude-opus-4-6` (complex architecture) |
+| **Model** | `anthropic/claude-sonnet-4-6` (standard complexity) or `anthropic/claude-opus-4-6` (complex architecture) |
 | **Tool Access** | Full -- filesystem read/write/edit, bash execution, git operations |
 
 The code agent consumes the structured plan and writes implementation code. Model selection is handled dynamically by the LLM Router based on task complexity. The code agent has full write access to the filesystem within its git worktree.
@@ -386,7 +386,7 @@ The code agent consumes the structured plan and writes implementation code. Mode
 | **Role** | Evaluate code quality against project standards, lint results, and test results |
 | **Input** | `{code_output}`, `{lint_results}`, `{test_results}`, `{loaded_skills}` |
 | **Output** | `output_key: "review_result"` |
-| **Model** | `anthropic/claude-sonnet-4-5-20250929` |
+| **Model** | `anthropic/claude-sonnet-4-6` |
 | **Tool Access** | Read-only -- filesystem read, directory list, search. No write tools. |
 
 The review agent reads the code output alongside lint and test results written to state by deterministic agents. It evaluates quality and either approves the deliverable or produces structured feedback for the fix agent. If the review fails, the `LoopAgent` wrapper triggers another fix/lint/test/review cycle (up to `max_iterations`).
@@ -398,7 +398,7 @@ The review agent reads the code output alongside lint and test results written t
 | **Role** | Apply targeted fixes based on review feedback |
 | **Input** | `{review_result}`, `{code_output}`, `{lint_results}`, `{test_results}` |
 | **Output** | `output_key: "code_output"` (overwrites previous code output) |
-| **Model** | `anthropic/claude-sonnet-4-5-20250929` |
+| **Model** | `anthropic/claude-sonnet-4-6` |
 | **Tool Access** | Full -- filesystem read/write/edit, bash execution |
 
 The fix agent receives structured review feedback and applies targeted corrections. It operates within the `LoopAgent` review cycle, iterating until the review agent approves or `max_iterations` is reached.
@@ -575,19 +575,19 @@ The router selects the optimal model per task based on:
 
 ```yaml
 routing_rules:
-  - task_type: code_implementation
+  - model_role: code_implementation
     complexity: standard
-    model: "anthropic/claude-sonnet-4-5-20250929"
-  - task_type: code_implementation
+    model: "anthropic/claude-sonnet-4-6"
+  - model_role: code_implementation
     complexity: complex
     model: "anthropic/claude-opus-4-6"
-  - task_type: planning
+  - model_role: planning
     model: "anthropic/claude-opus-4-6"
-  - task_type: review
-    model: "anthropic/claude-sonnet-4-5-20250929"
-  - task_type: classification
+  - model_role: review
+    model: "anthropic/claude-sonnet-4-6"
+  - model_role: classification
     model: "anthropic/claude-haiku-4-5-20251001"
-  - task_type: summarization
+  - model_role: summarization
     model: "anthropic/claude-haiku-4-5-20251001"
 ```
 
@@ -603,12 +603,12 @@ class LlmRouter:
         self.rules = routing_config.rules
         self.fallback_chains = routing_config.fallback_chains
 
-    def select_model(self, task_type: str, complexity: str = "standard") -> str:
+    def select_model(self, model_role: str, complexity: str = "standard") -> str:
         """Returns LiteLLM model string for the given task context."""
         for rule in self.rules:
-            if rule.matches(task_type, complexity):
+            if rule.matches(model_role, complexity):
                 return rule.model
-        return self.fallback_chains.get(task_type, self.default_model)
+        return self.fallback_chains.get(model_role, self.default_model)
 ```
 
 ### Fallback Chain Resolution
@@ -630,7 +630,7 @@ Both approaches keep routing logic centralized rather than scattered across indi
 
 ### Phase 1 Implementation
 
-Start simple: static routing config mapping `task_type` to model. No ML-based routing, no cost optimization. A clean lookup table that is easy to change. Phase 2 adds cost tracking, latency monitoring, and adaptive selection.
+Start simple: static routing config mapping `model_role` to model. No ML-based routing, no cost optimization. A clean lookup table that is easy to change. Phase 2 adds cost tracking, latency monitoring, and adaptive selection.
 
 ---
 

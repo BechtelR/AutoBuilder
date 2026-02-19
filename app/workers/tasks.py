@@ -12,7 +12,7 @@ from app.db.models import Workflow
 from app.events.publisher import EventPublisher
 from app.lib import NotFoundError, get_logger
 from app.models.constants import APP_NAME, SYSTEM_USER_ID
-from app.models.enums import PipelineEventType, TaskType, WorkflowStatus
+from app.models.enums import ModelRole, PipelineEventType, WorkflowStatus
 from app.router import LlmRouter, create_model_override_callback
 from app.workers.adk import create_app_container, create_echo_agent, create_runner
 
@@ -69,7 +69,7 @@ async def run_workflow(ctx: dict[str, object], workflow_id: str) -> dict[str, st
         # Create ADK pipeline
         callback = create_model_override_callback(router)
         echo_agent = create_echo_agent(
-            model=router.select_model(TaskType.FAST),
+            model=router.select_model(ModelRole.FAST),
             before_model_callback=callback,
         )
         app_container = create_app_container(root_agent=echo_agent)

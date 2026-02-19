@@ -81,7 +81,7 @@ from google.adk.tools import FunctionTool
 from google.genai import types
 
 agent = LlmAgent(
-    model=LiteLlm(model="anthropic/claude-sonnet-4-5-20250929"),
+    model=LiteLlm(model="anthropic/claude-sonnet-4-6"),
     name="test_agent",
     instruction="You are a helpful assistant.",
     tools=[FunctionTool(file_read), FunctionTool(file_write)],
@@ -97,7 +97,7 @@ async for event in runner.run_async(
 ```
 
 **Acceptance criteria:**
-- [x] `LlmAgent` with `LiteLlm(model="anthropic/claude-sonnet-4-5-20250929")` produces a non-empty text response
+- [x] `LlmAgent` with `LiteLlm(model="anthropic/claude-sonnet-4-6")` produces a non-empty text response
 - [x] Agent successfully calls `file_read` tool and receives file contents
 - [x] Agent successfully calls `file_write` tool and file is created on disk
 - [x] Agent successfully calls `bash_exec` tool and receives command output

@@ -32,7 +32,7 @@ ADK runs inside workers, behind the anti-corruption layer. This section document
 
 ## 3. Multi-Model via LiteLLM
 
-LiteLLM provides the model abstraction layer. Model strings use the LiteLLM format (e.g., `anthropic/claude-sonnet-4-5-20250929`). The LLM Router selects models per task based on routing configuration.
+LiteLLM provides the model abstraction layer. Model strings use the LiteLLM format (e.g., `anthropic/claude-sonnet-4-6`). The LLM Router selects models per task based on routing configuration.
 
 ## 4. Architecture Diagram (Engine Internal)
 
@@ -80,7 +80,7 @@ flowchart TB
     subgraph INFRA["SHARED ENGINE INFRASTRUCTURE"]
         Tools["GlobalToolset (BaseToolset)\nADK-native get_tools(readonly_context)\nPer-role permission config\nfile_read, file_write, file_edit\nbash_exec, git_*, web_*, todo_*"]
         Skills["Skill Library\n(Global + Project-local)\nMarkdown + YAML frontmatter\nDeterministic matching"]
-        Router["LLM Router\n(task_type to model)\ndirector: opus\npm: sonnet\nplanning: opus\ncoding: sonnet\nreview: sonnet\nclassification: haiku\nFallback chains"]
+        Router["LLM Router\n(model_role to model)\ndirector: opus\npm: sonnet\nplanning: opus\ncoding: sonnet\nreview: sonnet\nclassification: haiku\nFallback chains"]
         Models["Models (Shared Domain)\nenums.py, constants.py\nbase.py (Pydantic base models)"]
         State["State System (4 scopes)\nsession, user:, app:, temp:"]
         Memory["Memory Service (PostgreSQL)\ntsvector + pgvector\nCross-session learnings"]

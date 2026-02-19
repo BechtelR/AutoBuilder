@@ -68,12 +68,12 @@ Each workflow execution maps 1:1 to an ADK session: `app_name="autobuilder"`, `u
 ### DD-5: LLM Router — Configuration via Settings + Runtime Override
 The router loads defaults from `app/config/settings.py` via `AUTOBUILDER_DEFAULT_*_MODEL` env vars (code, plan, review, fast). Fallback chains are defined in code — they change rarely and benefit from type safety. The router is a stateless lookup with no I/O.
 
-Runtime model override: `create_model_override_callback(router)` returns a `before_model_callback` function that maps agent names to TaskTypes and overrides `llm_request.model` via the router. This callback is set on the EchoAgent in Phase 3; in Phase 5, it's registered as a plugin on the App for all agents. The callback reads the agent name from `callback_context.agent_name` and an optional user override from `callback_context.state.get("user:model_override")`.
+Runtime model override: `create_model_override_callback(router)` returns a `before_model_callback` function that maps agent names to ModelRoles and overrides `llm_request.model` via the router. This callback is set on the EchoAgent in Phase 3; in Phase 5, it's registered as a plugin on the App for all agents. The callback reads the agent name from `callback_context.agent_name` and an optional user override from `callback_context.state.get("user:model_override")`.
 
 ```python
 router = LlmRouter.from_settings(get_settings())
-model = router.select_model(TaskType.CODE)  # → "anthropic/claude-sonnet-4-5-20250929"
-model = router.select_model(TaskType.PLAN, user_override="openai/gpt-5")  # → user override wins
+model = router.select_model(ModelRole.CODE)  # → "anthropic/claude-sonnet-4-6"
+model = router.select_model(ModelRole.PLAN, user_override="openai/gpt-5")  # → user override wins
 
 # before_model_callback wires the router into ADK
 callback = create_model_override_callback(router)
@@ -140,11 +140,11 @@ Worker startup initializes `app:`-scoped state keys as scaffolding for later pha
 - [x] `R02` — Routing rules (static config — settings fields for default models per task type)
 **Description:** Add LLM model default settings for each task type and new domain enums for LLM routing and event classification. Settings fields use `AUTOBUILDER_DEFAULT_*_MODEL` env vars with defaults pointing to Anthropic models per `06-PROVIDERS.md`.
 **Requirements:**
-- [x] `Settings` has `default_code_model: str` defaulting to `"anthropic/claude-sonnet-4-5-20250929"`
+- [x] `Settings` has `default_code_model: str` defaulting to `"anthropic/claude-sonnet-4-6"`
 - [x] `Settings` has `default_plan_model: str` defaulting to `"anthropic/claude-opus-4-6"`
-- [x] `Settings` has `default_review_model: str` defaulting to `"anthropic/claude-sonnet-4-5-20250929"`
+- [x] `Settings` has `default_review_model: str` defaulting to `"anthropic/claude-sonnet-4-6"`
 - [x] `Settings` has `default_fast_model: str` defaulting to `"anthropic/claude-haiku-4-5-20251001"`
-- [x] `TaskType` enum (StrEnum): `CODE`, `PLAN`, `REVIEW`, `FAST` — values match names
+- [x] `ModelRole` enum (StrEnum): `CODE`, `PLAN`, `REVIEW`, `FAST` — values match names
 - [x] `PipelineEventType` enum (StrEnum): `WORKFLOW_STARTED`, `WORKFLOW_COMPLETED`, `WORKFLOW_FAILED`, `AGENT_STARTED`, `AGENT_COMPLETED`, `TOOL_CALLED`, `TOOL_RESULT`, `STATE_UPDATED`, `ERROR` — values match names
 - [x] Both enums exported from `app.models`
 - [x] Settings fields loadable from env vars with `AUTOBUILDER_` prefix
@@ -162,18 +162,18 @@ Worker startup initializes `app:`-scoped state keys as scaffolding for later pha
 - [x] `R04` — `before_model_callback` model override
 - [x] `A44` — `before_model_callback` LLM Router override
 - [x] `M22` — Routing config cache (long TTL)
-**Description:** `LlmRouter` class that maps `TaskType` to LiteLLM model strings using configuration from Settings. Implements 3-step fallback chain resolution: user override → fallback chain → default. Also provides `create_model_override_callback()` — a factory that returns a `before_model_callback` function for ADK agents, enabling runtime model selection via the router. Includes `to_dict()` / `cache_to_redis()` for caching the routing config in Redis with long TTL.
+**Description:** `LlmRouter` class that maps `ModelRole` to LiteLLM model strings using configuration from Settings. Implements 3-step fallback chain resolution: user override → fallback chain → default. Also provides `create_model_override_callback()` — a factory that returns a `before_model_callback` function for ADK agents, enabling runtime model selection via the router. Includes `to_dict()` / `cache_to_redis()` for caching the routing config in Redis with long TTL.
 **Requirements:**
-- [x] `LlmRouter.select_model(task_type: TaskType, user_override: str | None = None) -> str` returns model string matching Settings defaults: `CODE`→`"anthropic/claude-sonnet-4-5-20250929"`, `PLAN`→`"anthropic/claude-opus-4-6"`, `REVIEW`→`"anthropic/claude-sonnet-4-5-20250929"`, `FAST`→`"anthropic/claude-haiku-4-5-20251001"`
+- [x] `LlmRouter.select_model(task_type: ModelRole, user_override: str | None = None) -> str` returns model string matching Settings defaults: `CODE`→`"anthropic/claude-sonnet-4-6"`, `PLAN`→`"anthropic/claude-opus-4-6"`, `REVIEW`→`"anthropic/claude-sonnet-4-6"`, `FAST`→`"anthropic/claude-haiku-4-5-20251001"`
 - [x] When `user_override` is a non-None string, `select_model()` returns that string regardless of task_type
-- [x] Default models per TaskType sourced from Settings fields (not hardcoded)
-- [x] Fallback chains: opus→`["anthropic/claude-sonnet-4-5-20250929", "anthropic/claude-haiku-4-5-20251001"]`, sonnet→`["anthropic/claude-haiku-4-5-20251001"]`, haiku→`[]` (empty, no fallback)
+- [x] Default models per ModelRole sourced from Settings fields (not hardcoded)
+- [x] Fallback chains: opus→`["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-4-5-20251001"]`, sonnet→`["anthropic/claude-haiku-4-5-20251001"]`, haiku→`[]` (empty, no fallback)
 - [x] `LlmRouter.get_fallbacks(model: str) -> list[str]` returns the ordered fallback list for a model string; returns `[]` for unknown models
 - [x] `LlmRouter.from_settings(settings: Settings) -> LlmRouter` creates router from settings defaults
 - [x] `LlmRouter.to_dict() -> dict[str, object]` serializes routing table for caching
 - [x] `LlmRouter.cache_to_redis(redis: Redis) -> None` (async) stores routing config in Redis with 1-hour TTL via `cache_set` from `app.lib.cache`
-- [x] `create_model_override_callback(router: LlmRouter) -> Callable` returns a `before_model_callback`-compatible function that: reads `callback_context.agent_name`, maps agent name → `TaskType` via `AGENT_TASK_TYPES` dict, calls `router.select_model()` with optional `user:model_override` from state, sets `llm_request.model` to result, returns `None`
-- [x] `AGENT_TASK_TYPES: dict[str, TaskType]` mapping at module level (initially: `echo_agent` → `FAST`)
+- [x] `create_model_override_callback(router: LlmRouter) -> Callable` returns a `before_model_callback`-compatible function that: reads `callback_context.agent_name`, maps agent name → `ModelRole` via `AGENT_MODEL_ROLES` dict, calls `router.select_model()` with optional `user:model_override` from state, sets `llm_request.model` to result, returns `None`
+- [x] `AGENT_MODEL_ROLES: dict[str, ModelRole]` mapping at module level (initially: `echo_agent` → `FAST`)
 - [x] All `select_model` / `get_fallbacks` / `from_settings` methods synchronous (pure lookup, no I/O)
 - [x] Importable as `from app.router import LlmRouter, create_model_override_callback`
 **Validation:**
@@ -331,8 +331,8 @@ Also adds `error_message` column to the Workflow model (D11) via Alembic migrati
 **Description:** Tests covering all Phase 3 deliverables. Tests use real infrastructure (PostgreSQL, Redis) per project testing standards — skip when unavailable. Tests requiring LLM calls (ADK pipeline execution, session persistence, 4-scope state) use real LLM APIs — skip when `ANTHROPIC_API_KEY` is not set (same `require_*` marker pattern as `require_postgres`/`require_redis`). No mocking of local infrastructure or LLM calls. The `before_model_callback` tests construct real `CallbackContext`/`LlmRequest` objects (no mocks) — these are pure in-process logic tests, no LLM call needed. Event publisher `translate()` tests construct ADK Event-like objects with the expected attributes (not mocks — real `object` instances with `getattr`-accessible fields).
 **Requirements:**
 - [x] `require_llm` marker added to `conftest.py`: skips test if `ANTHROPIC_API_KEY` env var is not set
-- [x] **Router tests** (no infra needed — pure logic): `select_model(TaskType.CODE)` returns `"anthropic/claude-sonnet-4-5-20250929"`; `select_model(TaskType.PLAN)` returns `"anthropic/claude-opus-4-6"`; `select_model(TaskType.CODE, user_override="openai/gpt-5")` returns `"openai/gpt-5"`; `get_fallbacks("anthropic/claude-opus-4-6")` returns list of 2 models
-- [x] **before_model_callback tests** (no infra needed — pure logic): callback reads agent name from `callback_context.agent_name`; maps `echo_agent` to `TaskType.FAST`; sets `llm_request.model` to router result; returns `None`; respects `user:model_override` from state
+- [x] **Router tests** (no infra needed — pure logic): `select_model(ModelRole.CODE)` returns `"anthropic/claude-sonnet-4-6"`; `select_model(ModelRole.PLAN)` returns `"anthropic/claude-opus-4-6"`; `select_model(ModelRole.CODE, user_override="openai/gpt-5")` returns `"openai/gpt-5"`; `get_fallbacks("anthropic/claude-opus-4-6")` returns list of 2 models
+- [x] **before_model_callback tests** (no infra needed — pure logic): callback reads agent name from `callback_context.agent_name`; maps `echo_agent` to `ModelRole.FAST`; sets `llm_request.model` to router result; returns `None`; respects `user:model_override` from state
 - [x] **Cache helper tests** (`require_redis`): `cache_set` + `cache_get` round-trips a value; `cache_get` returns `None` on miss; `cache_delete` removes the value; TTL expiry works
 - [x] **Stream helper tests** (`require_redis`): `stream_key("abc")` returns `"workflow:abc:events"`; `stream_publish` calls XADD and returns stream ID; `stream_read_range` reads published events
 - [x] **Event publisher tests** (`require_redis`): `translate()` maps an ADK Event-like object with `function_call` content to `PipelineEventType.TOOL_CALLED`; `publish()` publishes to correct stream via `stream_publish`; `publish_lifecycle()` publishes event with `WORKFLOW_STARTED` type
@@ -379,7 +379,7 @@ Batch 5: P3.D8
 | # | Roadmap Completion Contract Item | Covered By | Validation |
 |---|---|---|---|
 | 1 | Can enqueue a workflow job from gateway, have worker execute an ADK pipeline | P3.D6, P3.D7, P3.D8 | `POST /workflows/run` returns 202; worker processes job; workflow status updates to COMPLETED |
-| 2 | LLM Router selects correct model per task type | P3.D2, P3.D8 | Router unit tests verify correct model for each TaskType; fallback chains resolve correctly; `before_model_callback` overrides model at runtime |
+| 2 | LLM Router selects correct model per task type | P3.D2, P3.D8 | Router unit tests verify correct model for each ModelRole; fallback chains resolve correctly; `before_model_callback` overrides model at runtime |
 | 3 | Claude responds reliably via LiteLLM through ADK | P3.D5, P3.D6, P3.D8 | EchoAgent receives prompt, produces response via LiteLLM; `agent_response` key in session state |
 | 4 | Session state persists across worker invocations | P3.D5, P3.D6, P3.D8 | Integration test: first invocation writes state via output_key; second invocation reads persisted state from DatabaseSessionService |
 | 5 | ADK events translate to gateway events in Redis Streams | P3.D4, P3.D6, P3.D8 | Events appear in Redis Stream `workflow:{id}:events` with PipelineEventType enum values; no ADK types in published events |
@@ -542,7 +542,7 @@ router = LlmRouter.from_settings(settings)
 
 # Per-execution (in run_workflow)
 callback = create_model_override_callback(router)
-echo_agent = create_echo_agent(model=router.select_model(TaskType.FAST), before_model_callback=callback)
+echo_agent = create_echo_agent(model=router.select_model(ModelRole.FAST), before_model_callback=callback)
 app = create_app_container(root_agent=echo_agent)
 runner = Runner(app=app, session_service=session_service)
 

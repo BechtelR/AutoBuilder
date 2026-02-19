@@ -120,7 +120,7 @@ class FeatureDeps:
     deliverable_spec: DeliverableSpec
     db: DatabaseConnection
 
-agent = Agent('claude-sonnet-4-5-20250929', deps_type=FeatureDeps)
+agent = Agent('claude-sonnet-4-6', deps_type=FeatureDeps)
 
 result = await agent.run("implement this feature", deps=deps)
 # result.data is a typed Pydantic model
@@ -134,7 +134,7 @@ This is where your instinct matters, and it's worth being honest about the trade
 
 **Google ADK's model support reality:**
 - Gemini models: First-class, direct string support (`model="gemini-2.5-flash"`)
-- Claude/OpenAI/others: Require LiteLLM wrapper (`model=LiteLlm(model="anthropic/claude-sonnet-4-5-20250929")`)
+- Claude/OpenAI/others: Require LiteLLM wrapper (`model=LiteLlm(model="anthropic/claude-sonnet-4-6")`)
 - Google's built-in tools (SearchTool, etc.): **Only work with Gemini models**
 - Some documentation/examples assume Gemini by default
 - State-of-the-art features (Interactions API, background execution) are Gemini-optimized
@@ -144,7 +144,7 @@ This is where your instinct matters, and it's worth being honest about the trade
 **Pydantic AI's model support reality:**
 - All providers are equal citizens via built-in model connectors
 - No wrapper needed for any major provider
-- `Agent('anthropic:claude-sonnet-4-5-20250929')` and `Agent('openai:gpt-4o')` work identically
+- `Agent('anthropic:claude-sonnet-4-6')` and `Agent('openai:gpt-4o')` work identically
 - No provider-specific built-in tools that create asymmetry
 
 **Assessment:** Pydantic AI is genuinely model-agnostic. Google ADK is model-agnostic in theory but Gemini-first in practice. For AutoBuilder, where Claude will likely be the primary coding model and you want true provider flexibility, this distinction matters.
@@ -688,7 +688,7 @@ Current deliverable: {context.state.get('current_deliverable_spec')}
 
 code_agent = LlmAgent(
     name="code_agent",
-    model=LiteLlm(model="anthropic/claude-sonnet-4-5-20250929"),
+    model=LiteLlm(model="anthropic/claude-sonnet-4-6"),
     instruction=code_agent_instructions,
 )
 ```

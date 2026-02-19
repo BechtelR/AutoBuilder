@@ -11,7 +11,7 @@ from app.config import get_settings, parse_redis_settings
 from app.db.models import Base, Workflow
 from app.events.streams import stream_key
 from app.lib import NotFoundError
-from app.models.enums import TaskType, WorkflowStatus
+from app.models.enums import ModelRole, WorkflowStatus
 from app.router import LlmRouter
 from app.workers.adk import create_session_service
 from app.workers.tasks import heartbeat, run_workflow
@@ -186,10 +186,10 @@ class TestRunWorkflowIntegration:
             session_service = create_session_service(TEST_DB_URL)
             broken_router = LlmRouter(
                 defaults={
-                    TaskType.CODE: "invalid/nonexistent-model",
-                    TaskType.PLAN: "invalid/nonexistent-model",
-                    TaskType.REVIEW: "invalid/nonexistent-model",
-                    TaskType.FAST: "invalid/nonexistent-model",
+                    ModelRole.CODE: "invalid/nonexistent-model",
+                    ModelRole.PLAN: "invalid/nonexistent-model",
+                    ModelRole.REVIEW: "invalid/nonexistent-model",
+                    ModelRole.FAST: "invalid/nonexistent-model",
                 }
             )
 

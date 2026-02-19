@@ -86,8 +86,8 @@ required_tools: [file_read, file_write, file_edit, bash_exec, git_status, git_co
 optional_tools: [web_search, web_fetch, todo_read, todo_write]
 default_models:
   planning: anthropic/claude-opus-4-6
-  implementation: anthropic/claude-sonnet-4-5-20250929
-  review: anthropic/claude-sonnet-4-5-20250929
+  implementation: anthropic/claude-sonnet-4-6
+  review: anthropic/claude-sonnet-4-6
 pipeline_type: batch_parallel    # batch_parallel | sequential | single_pass
 supports_deliverables: true       # Can decompose spec into deliverables?
 supports_parallel: true           # Can run deliverables in parallel?
@@ -334,8 +334,8 @@ deliverable_pipeline = SequentialAgent(
 | `supports_parallel` | `true` |
 | Required tools | `file_read`, `file_write`, `file_edit`, `bash_exec`, `git_status`, `git_commit`, `git_diff` |
 | Default planning model | `anthropic/claude-opus-4-6` |
-| Default implementation model | `anthropic/claude-sonnet-4-5-20250929` |
-| Default review model | `anthropic/claude-sonnet-4-5-20250929` |
+| Default implementation model | `anthropic/claude-sonnet-4-6` |
+| Default review model | `anthropic/claude-sonnet-4-6` |
 | Isolation | Git worktree per deliverable (parallel deliverables write to separate filesystem locations) |
 | Quality gates | Lint pass, test pass, review approval (all mandatory, deterministic enforcement) |
 | Max review iterations | 3 (configurable via `LoopAgent.max_iterations`) |

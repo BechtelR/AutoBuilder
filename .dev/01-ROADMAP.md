@@ -8,7 +8,7 @@ Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0-10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention -- through a production-grade API gateway with async worker execution.
 
-**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: NEXT**
+**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5: NEXT**
 
 ---
 
@@ -88,7 +88,7 @@ FastAPI app factory with lifespan, health endpoint, CORS, error handling middlew
 
 
 ### Scope Summary
-Anti-corruption layer translating gateway commands to ADK Runner calls and ADK Events to Redis Stream messages. ADK App container with context compression and resumability config. Static LLM routing (task_type x complexity to model) with fallback chains via LiteLLM. DatabaseSessionService for ADK session persistence with 4-scope state system. Worker pipeline bridge connecting ARQ jobs to ADK pipeline execution with event publishing.
+Anti-corruption layer translating gateway commands to ADK Runner calls and ADK Events to Redis Stream messages. ADK App container with context compression and resumability config. Static LLM routing (model_role x complexity to model) with fallback chains via LiteLLM. DatabaseSessionService for ADK session persistence with 4-scope state system. Worker pipeline bridge connecting ARQ jobs to ADK pipeline execution with event publishing.
 
 ### Completion Contract
 - [x] Can enqueue a workflow job from gateway, have worker execute an ADK pipeline
@@ -102,7 +102,7 @@ Anti-corruption layer translating gateway commands to ADK Runner calls and ADK E
 ## Phase 4: Core Toolset `M`
 
 **Goal**: FunctionTool wrappers for all agent-accessible tools, with role-based restrictions.
-**Status**: PLANNED
+**Status**: DONE
 **Prerequisites**: Phase 3 (ADK engine running in workers)
 
 
@@ -110,15 +110,15 @@ Anti-corruption layer translating gateway commands to ADK Runner calls and ADK E
 42 FunctionTool wrappers across 8 categories: Filesystem (10 tools including glob, grep, multi-edit), Code Intelligence (2 tools — tree-sitter symbols + diagnostics), Execution (2 tools — bash + HTTP), Git (8 tools including log, show, worktree, apply), Web (2 tools), Task Management (6 tools — three-tier system with session todos, shared tasks, and PM-managed deliverables), PM Management (6 tools — batch selection, Director escalation, deliverable lifecycle), and Director Management (6 tools — CEO queue, project oversight, PM override). GlobalToolset (ADK-native BaseToolset) for per-role tool vending with cascading permission config.
 
 ### Completion Contract
-- [ ] All 42 tools callable from within an ADK LlmAgent
-- [ ] Tool schemas auto-generated from type hints + docstrings
-- [ ] GlobalToolset vends correct tool subsets per role configuration
-- [ ] bash_exec handles timeout, output capture, error reporting
-- [ ] Three-tier task system operational (todos, tasks, deliverables)
-- [ ] PM escalation routes to Director queue (not CEO queue)
-- [ ] code_symbols extracts structure via tree-sitter
-- [ ] run_diagnostics invokes configurable linter/type-checker
-- [ ] Director can override PM via override_pm tool
+- [x] All 42 tools callable from within an ADK LlmAgent
+- [x] Tool schemas auto-generated from type hints + docstrings
+- [x] GlobalToolset vends correct tool subsets per role configuration
+- [x] bash_exec handles timeout, output capture, error reporting
+- [x] Three-tier task system operational (todos, tasks, deliverables)
+- [x] PM escalation routes to Director queue (not CEO queue)
+- [x] code_symbols extracts structure via tree-sitter
+- [x] run_diagnostics invokes configurable linter/type-checker
+- [x] Director can override PM via override_pm tool
 
 ---
 
@@ -428,8 +428,9 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 1.7.1 | 2026-02-17 | Moved GlobalToolset from Phase 5 to Phase 4; removed redundant Deterministic Safety section; fixed Phase 4 completion contract to be verifiable in Phase 4 |
 | 2.0.0 | 2026-02-17 | Roadmap v2: slim format, component checklists moved to 07-COMPONENTS.md (BOM) |
 | 2.1.0 | 2026-02-18 | Phase 4 scope expanded: 42 tools, 8 categories, Director queue, three-tier task system |
+| 2.2.0 | 2026-02-18 | Phase 4 DONE: 273 tests pass, all quality gates clean; Phase 5 is NEXT |
 
 ---
 
-*Document Version: 2.1.0*
+*Document Version: 2.2.0*
 *Last Updated: 2026-02-18*

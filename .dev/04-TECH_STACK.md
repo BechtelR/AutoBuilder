@@ -93,9 +93,9 @@ ADK is used behind an **anti-corruption layer** to isolate the rest of the syste
 | Task Type | Model | Rationale |
 |-----------|-------|-----------|
 | Planning | `anthropic/claude-opus-4-6` | Complex reasoning and decomposition |
-| Implementation (standard) | `anthropic/claude-sonnet-4-5-20250929` | Strong execution, good cost/quality balance |
+| Implementation (standard) | `anthropic/claude-sonnet-4-6` | Strong execution, good cost/quality balance |
 | Implementation (complex) | `anthropic/claude-opus-4-6` | Maximum capability for difficult tasks |
-| Review | `anthropic/claude-sonnet-4-5-20250929` | Good judgment, reasonable cost |
+| Review | `anthropic/claude-sonnet-4-6` | Good judgment, reasonable cost |
 | Classification / summarization | `anthropic/claude-haiku-4-5-20251001` | Fast, cheap, sufficient for simple tasks |
 | Context compression (summarizer) | `anthropic/claude-haiku-4-5-20251001` | Fast summaries without burning expensive tokens |
 
@@ -103,27 +103,27 @@ ADK is used behind an **anti-corruption layer** to isolate the rest of the syste
 
 ```yaml
 routing_rules:
-  - task_type: implementation
+  - model_role: implementation
     complexity: standard
-    model: "anthropic/claude-sonnet-4-5-20250929"
-  - task_type: implementation
+    model: "anthropic/claude-sonnet-4-6"
+  - model_role: implementation
     complexity: complex
     model: "anthropic/claude-opus-4-6"
-  - task_type: planning
+  - model_role: planning
     model: "anthropic/claude-opus-4-6"
-  - task_type: review
-    model: "anthropic/claude-sonnet-4-5-20250929"
-  - task_type: classification
+  - model_role: review
+    model: "anthropic/claude-sonnet-4-6"
+  - model_role: classification
     model: "anthropic/claude-haiku-4-5-20251001"
-  - task_type: summarization
+  - model_role: summarization
     model: "anthropic/claude-haiku-4-5-20251001"
 
 fallback_chains:
-  anthropic/claude-opus-4-6: ["anthropic/claude-sonnet-4-5-20250929"]
-  anthropic/claude-sonnet-4-5-20250929: ["anthropic/claude-haiku-4-5-20251001"]
+  anthropic/claude-opus-4-6: ["anthropic/claude-sonnet-4-6"]
+  anthropic/claude-sonnet-4-6: ["anthropic/claude-haiku-4-5-20251001"]
 ```
 
-Phase 1 implements static routing (task_type to model lookup table). Adaptive routing with cost tracking and latency monitoring deferred to Phase 2.
+Phase 1 implements static routing (model_role to model lookup table). Adaptive routing with cost tracking and latency monitoring deferred to Phase 2.
 
 ### 1.5 Gateway API: FastAPI
 

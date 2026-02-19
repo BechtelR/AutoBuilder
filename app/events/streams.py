@@ -30,9 +30,7 @@ async def stream_read_range(
     """Read events from a workflow stream via XRANGE."""
     raw: list[  # type: ignore[reportUnknownMemberType]
         tuple[bytes, dict[bytes, bytes]]
-    ] = await redis.xrange(
-        stream_key(workflow_id), min=start, max=end, count=count
-    )
+    ] = await redis.xrange(stream_key(workflow_id), min=start, max=end, count=count)
     result: list[tuple[str, dict[str, str]]] = []
     for entry_id_raw, fields_raw in raw:
         entry_id = entry_id_raw.decode()

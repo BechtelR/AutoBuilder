@@ -171,31 +171,31 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Depends on:** —
 **Description:** Ten FunctionTool-compatible functions for filesystem operations within agent worktrees. Each function has full type hints and a docstring for ADK schema auto-generation. Operations are naturally idempotent per DD-2. All paths are validated to prevent directory traversal (must be within the working directory or configured project root).
 **BOM Components:**
-- [ ] `T01` — `file_read` FunctionTool
-- [ ] `T02` — `file_write` FunctionTool
-- [ ] `T03` — `file_edit` FunctionTool
-- [ ] `T04` — `file_glob` FunctionTool
-- [ ] `T04b` — `file_grep` FunctionTool
-- [ ] `T05` — `directory_list` FunctionTool
-- [ ] `T18` — `file_insert` FunctionTool
-- [ ] `T19` — `file_multi_edit` FunctionTool
-- [ ] `T20` — `file_move` FunctionTool
-- [ ] `T21` — `file_delete` FunctionTool
-- [ ] `TM01` — `app/tools/filesystem.py` module
+- [x] `T01` — `file_read` FunctionTool
+- [x] `T02` — `file_write` FunctionTool
+- [x] `T03` — `file_edit` FunctionTool
+- [x] `T04` — `file_glob` FunctionTool
+- [x] `T04b` — `file_grep` FunctionTool
+- [x] `T05` — `directory_list` FunctionTool
+- [x] `T18` — `file_insert` FunctionTool
+- [x] `T19` — `file_multi_edit` FunctionTool
+- [x] `T20` — `file_move` FunctionTool
+- [x] `T21` — `file_delete` FunctionTool
+- [x] `TM01` — `app/tools/filesystem.py` module
 **Requirements:**
-- [ ] `file_read(path: str, offset: int | None = None, limit: int | None = None) -> str` reads and returns file contents with optional line offset and limit; returns error message for non-existent files (no exception to LLM)
-- [ ] `file_write(path: str, content: str) -> str` creates or overwrites a file; creates parent directories if needed; returns confirmation with byte count
-- [ ] `file_edit(path: str, old: str, new: str, replace_all: bool = False) -> str` performs targeted string replacement; returns error if `old` not found in file (idempotent — if `old` not found but `new` is present, reports already edited)
-- [ ] `file_insert(path: str, line: int, content: str) -> str` inserts content at a specific line number, shifting existing lines down; returns confirmation
-- [ ] `file_multi_edit(path: str, edits: list[dict[str, str]]) -> str` applies multiple non-overlapping edits atomically in a single pass; returns confirmation with edit count
-- [ ] `file_glob(pattern: str, path: str | None = None) -> str` searches for files by glob pattern; returns matching file paths sorted by modification time
-- [ ] `file_grep(pattern: str, path: str | None = None, glob: str | None = None, context: int | None = None) -> str` searches file contents by regex pattern with optional file filtering and context lines; returns matching lines with file paths and line numbers
-- [ ] `file_move(src: str, dst: str) -> str` moves or renames a file; returns confirmation
-- [ ] `file_delete(path: str) -> str` deletes a file; returns confirmation or error if not found
-- [ ] `directory_list(path: str, depth: int | None = None) -> str` lists directory contents as a formatted tree with optional depth control (default 2 levels)
-- [ ] All functions validate paths — reject absolute paths outside configured project root, reject `..` traversal
-- [ ] All functions return `str` (error messages for failures, not exceptions)
-- [ ] Module importable as `from app.tools.filesystem import file_read, file_write, file_edit, file_insert, file_multi_edit, file_glob, file_grep, file_move, file_delete, directory_list`
+- [x] `file_read(path: str, offset: int | None = None, limit: int | None = None) -> str` reads and returns file contents with optional line offset and limit; returns error message for non-existent files (no exception to LLM)
+- [x] `file_write(path: str, content: str) -> str` creates or overwrites a file; creates parent directories if needed; returns confirmation with byte count
+- [x] `file_edit(path: str, old: str, new: str, replace_all: bool = False) -> str` performs targeted string replacement; returns error if `old` not found in file (idempotent — if `old` not found but `new` is present, reports already edited)
+- [x] `file_insert(path: str, line: int, content: str) -> str` inserts content at a specific line number, shifting existing lines down; returns confirmation
+- [x] `file_multi_edit(path: str, edits: list[dict[str, str]]) -> str` applies multiple non-overlapping edits atomically in a single pass; returns confirmation with edit count
+- [x] `file_glob(pattern: str, path: str | None = None) -> str` searches for files by glob pattern; returns matching file paths sorted by modification time
+- [x] `file_grep(pattern: str, path: str | None = None, glob: str | None = None, context: int | None = None) -> str` searches file contents by regex pattern with optional file filtering and context lines; returns matching lines with file paths and line numbers
+- [x] `file_move(src: str, dst: str) -> str` moves or renames a file; returns confirmation
+- [x] `file_delete(path: str) -> str` deletes a file; returns confirmation or error if not found
+- [x] `directory_list(path: str, depth: int | None = None) -> str` lists directory contents as a formatted tree with optional depth control (default 2 levels)
+- [x] All functions validate paths — reject absolute paths outside configured project root, reject `..` traversal
+- [x] All functions return `str` (error messages for failures, not exceptions)
+- [x] Module importable as `from app.tools.filesystem import file_read, file_write, file_edit, file_insert, file_multi_edit, file_glob, file_grep, file_move, file_delete, directory_list`
 **Validation:**
 - `uv run pyright app/tools/filesystem.py`
 - `python -c "from app.tools.filesystem import file_read, file_write, file_edit, file_insert, file_multi_edit, file_glob, file_grep, file_move, file_delete, directory_list"`
@@ -208,19 +208,19 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Depends on:** —
 **Description:** Shell execution tool with timeout, output capture, error reporting, and idempotency guards. Uses `asyncio.create_subprocess_shell` for async subprocess management. Includes the idempotency mechanism (E11) that checks `temp:tool_runs:{key}` in session state before executing when an idempotency key is provided. Also includes `http_request` for structured HTTP calls (API testing, webhooks).
 **BOM Components:**
-- [ ] `T06` — `bash_exec` FunctionTool
-- [ ] `T24` — `http_request` FunctionTool
-- [ ] `TM03` — `app/tools/execution.py` module
-- [ ] `E11` — Idempotent tool execution guards
+- [x] `T06` — `bash_exec` FunctionTool
+- [x] `T24` — `http_request` FunctionTool
+- [x] `TM03` — `app/tools/execution.py` module
+- [x] `E11` — Idempotent tool execution guards
 **Requirements:**
-- [ ] `bash_exec(command: str, cwd: str | None = None, timeout: int = 120, idempotency_key: str | None = None, tool_context: ToolContext | None = None) -> str` runs a shell command via `asyncio.create_subprocess_shell`
-- [ ] Returns combined stdout + stderr output, truncated to 10000 characters with truncation notice
-- [ ] On timeout: kills the process and returns error message with the timeout value
-- [ ] On non-zero exit code: returns output prefixed with `"Exit code: {code}\n"`
-- [ ] When `idempotency_key` is provided and `tool_context` is available: checks `temp:tool_runs:{key}` in state; if present, returns cached result without executing; after execution, stores result in state via `tool_context.actions.state_delta`
-- [ ] When `cwd` is provided: validates directory exists before execution
-- [ ] `http_request(method: str, url: str, headers: dict[str, str] | None = None, body: str | None = None) -> str` makes a structured HTTP call via `httpx.AsyncClient`; returns status code + response body; truncates to 10000 characters
-- [ ] Module importable as `from app.tools.execution import bash_exec, http_request`
+- [x] `bash_exec(command: str, cwd: str | None = None, timeout: int = 120, idempotency_key: str | None = None, tool_context: ToolContext | None = None) -> str` runs a shell command via `asyncio.create_subprocess_shell`
+- [x] Returns combined stdout + stderr output, truncated to 10000 characters with truncation notice
+- [x] On timeout: kills the process and returns error message with the timeout value
+- [x] On non-zero exit code: returns output prefixed with `"Exit code: {code}\n"`
+- [x] When `idempotency_key` is provided and `tool_context` is available: checks `temp:tool_runs:{key}` in state; if present, returns cached result without executing; after execution, stores result in state via `tool_context.actions.state_delta`
+- [x] When `cwd` is provided: validates directory exists before execution
+- [x] `http_request(method: str, url: str, headers: dict[str, str] | None = None, body: str | None = None) -> str` makes a structured HTTP call via `httpx.AsyncClient`; returns status code + response body; truncates to 10000 characters
+- [x] Module importable as `from app.tools.execution import bash_exec, http_request`
 **Validation:**
 - `uv run pyright app/tools/execution.py`
 - `python -c "from app.tools.execution import bash_exec, http_request"`
@@ -233,28 +233,28 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Depends on:** —
 **Description:** Eight git operation tools for agent-managed repositories. All operations use `asyncio.create_subprocess_exec` with `git` CLI (not a Python git library). State-checking before mutation per DD-2 (idempotency). Adds `GitBranchAction` enum to `app/models/enums.py`.
 **BOM Components:**
-- [ ] `T07` — `git_status` FunctionTool
-- [ ] `T08` — `git_commit` FunctionTool
-- [ ] `T09` — `git_branch` FunctionTool
-- [ ] `T10` — `git_diff` FunctionTool
-- [ ] `T25` — `git_log` FunctionTool
-- [ ] `T26` — `git_show` FunctionTool
-- [ ] `T27` — `git_worktree` FunctionTool
-- [ ] `T28` — `git_apply` FunctionTool
-- [ ] `TM02` — `app/tools/git.py` module
+- [x] `T07` — `git_status` FunctionTool
+- [x] `T08` — `git_commit` FunctionTool
+- [x] `T09` — `git_branch` FunctionTool
+- [x] `T10` — `git_diff` FunctionTool
+- [x] `T25` — `git_log` FunctionTool
+- [x] `T26` — `git_show` FunctionTool
+- [x] `T27` — `git_worktree` FunctionTool
+- [x] `T28` — `git_apply` FunctionTool
+- [x] `TM02` — `app/tools/git.py` module
 **Requirements:**
-- [ ] `git_status(path: str) -> str` returns `git status --porcelain` output; returns clean message if working tree is clean
-- [ ] `git_commit(path: str, message: str, files: list[str] | None = None) -> str` stages changes and commits; when `files` provided, stages only those files; otherwise stages all changes (`git add -A`); returns error if nothing to commit (checks status first — idempotent)
-- [ ] `GitBranchAction` enum (StrEnum) in `app/models/enums.py`: `CREATE = "CREATE"`, `SWITCH = "SWITCH"`, `DELETE = "DELETE"` — values match names (uppercase)
-- [ ] `git_branch(path: str, name: str, action: GitBranchAction) -> str` checks branch existence before create (idempotent — returns success if branch already exists for create)
-- [ ] `git_diff(path: str, ref: str | None = None) -> str` shows diff against `ref` (default: `HEAD`); truncates output to 10000 characters
-- [ ] `git_log(path: str, count: int | None = None, ref: str | None = None) -> str` shows commit history with optional count limit and ref filter
-- [ ] `git_show(path: str, ref: str) -> str` inspects a specific commit (message, diff, metadata)
-- [ ] `git_worktree(path: str, action: str, branch: str | None = None) -> str` manages git worktrees for parallel execution across branches (add, remove, list)
-- [ ] `git_apply(path: str, patch: str) -> str` applies a unified diff patch to the working tree
-- [ ] All functions validate `path` is a git repository (contains `.git`)
-- [ ] All git commands use `cwd=path` for subprocess execution
-- [ ] Module importable as `from app.tools.git import git_status, git_commit, git_branch, git_diff, git_log, git_show, git_worktree, git_apply`
+- [x] `git_status(path: str) -> str` returns `git status --porcelain` output; returns clean message if working tree is clean
+- [x] `git_commit(path: str, message: str, files: list[str] | None = None) -> str` stages changes and commits; when `files` provided, stages only those files; otherwise stages all changes (`git add -A`); returns error if nothing to commit (checks status first — idempotent)
+- [x] `GitBranchAction` enum (StrEnum) in `app/models/enums.py`: `CREATE = "CREATE"`, `SWITCH = "SWITCH"`, `DELETE = "DELETE"` — values match names (uppercase)
+- [x] `git_branch(path: str, name: str, action: GitBranchAction) -> str` checks branch existence before create (idempotent — returns success if branch already exists for create)
+- [x] `git_diff(path: str, ref: str | None = None) -> str` shows diff against `ref` (default: `HEAD`); truncates output to 10000 characters
+- [x] `git_log(path: str, count: int | None = None, ref: str | None = None) -> str` shows commit history with optional count limit and ref filter
+- [x] `git_show(path: str, ref: str) -> str` inspects a specific commit (message, diff, metadata)
+- [x] `git_worktree(path: str, action: str, branch: str | None = None) -> str` manages git worktrees for parallel execution across branches (add, remove, list)
+- [x] `git_apply(path: str, patch: str) -> str` applies a unified diff patch to the working tree
+- [x] All functions validate `path` is a git repository (contains `.git`)
+- [x] All git commands use `cwd=path` for subprocess execution
+- [x] Module importable as `from app.tools.git import git_status, git_commit, git_branch, git_diff, git_log, git_show, git_worktree, git_apply`
 **Validation:**
 - `uv run pyright app/tools/git.py`
 - `python -c "from app.tools.git import git_status, git_commit, git_branch, git_diff, git_log, git_show, git_worktree, git_apply"`
@@ -267,18 +267,18 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Depends on:** —
 **Description:** URL fetching via `httpx` with HTML-to-text extraction, and web search via configurable provider (Tavily primary, Brave fallback per DD-3). Settings extended with `search_provider` field. `web_fetch` extracts text from HTML using `beautifulsoup4`. `web_search` dispatches to the configured provider's REST API.
 **BOM Components:**
-- [ ] `T11` — `web_search` FunctionTool
-- [ ] `T12` — `web_fetch` FunctionTool
-- [ ] `TM04` — `app/tools/web.py` module
+- [x] `T11` — `web_search` FunctionTool
+- [x] `T12` — `web_fetch` FunctionTool
+- [x] `TM04` — `app/tools/web.py` module
 **Requirements:**
-- [ ] `web_fetch(url: str) -> str` fetches URL content via `httpx.AsyncClient` with 30s timeout; extracts text from HTML via `beautifulsoup4` `.get_text()`; returns raw content for non-HTML responses; truncates to 10000 characters
-- [ ] `web_search(query: str, num_results: int = 5) -> str` calls the configured search provider API; returns formatted results (title, URL, snippet per result)
-- [ ] `web_search` returns clear error message if the provider's API key is not configured
-- [ ] `Settings` has `search_provider: str` defaulting to `"tavily"` (env var: `AUTOBUILDER_SEARCH_PROVIDER`)
-- [ ] API keys read from env directly: `TAVILY_API_KEY`, `BRAVE_API_KEY` (not `AUTOBUILDER_` prefixed — aligns with `.env`)
-- [ ] Tavily provider: POST to `https://api.tavily.com/search` with `api_key`, `query`, `max_results`; parse response `results` array
-- [ ] Brave provider: GET to `https://api.search.brave.com/res/v1/web/search` with `X-Subscription-Token` header, `q` and `count` params; parse response `web.results` array
-- [ ] Module importable as `from app.tools.web import web_search, web_fetch`
+- [x] `web_fetch(url: str) -> str` fetches URL content via `httpx.AsyncClient` with 30s timeout; extracts text from HTML via `beautifulsoup4` `.get_text()`; returns raw content for non-HTML responses; truncates to 10000 characters
+- [x] `web_search(query: str, num_results: int = 5) -> str` calls the configured search provider API; returns formatted results (title, URL, snippet per result)
+- [x] `web_search` returns clear error message if the provider's API key is not configured
+- [x] `Settings` has `search_provider: str` defaulting to `"tavily"` (env var: `AUTOBUILDER_SEARCH_PROVIDER`)
+- [x] API keys read from env directly: `TAVILY_API_KEY`, `BRAVE_API_KEY` (not `AUTOBUILDER_` prefixed — aligns with `.env`)
+- [x] Tavily provider: POST to `https://api.tavily.com/search` with `api_key`, `query`, `max_results`; parse response `results` array
+- [x] Brave provider: GET to `https://api.search.brave.com/res/v1/web/search` with `X-Subscription-Token` header, `q` and `count` params; parse response `web.results` array
+- [x] Module importable as `from app.tools.web import web_search, web_fetch`
 **Validation:**
 - `uv run pyright app/tools/web.py app/config/settings.py`
 - `python -c "from app.tools.web import web_search, web_fetch"`
@@ -289,26 +289,27 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 ### P4.D5: Task Management Tools
 **Files:** `app/tools/task.py`, `app/models/enums.py` (update)
 **Depends on:** —
-**Description:** Six task management tools operating at two tiers: session-scoped todos (via ADK `ToolContext` for state access, DD-7) and cross-session shared tasks (placeholder backend until Phase 5). Session todos are stored in session state under the key `"tasks"` as a list of dicts. Each todo has `id`, `content`, `status` (TodoStatus enum). ToolContext provides read access via `tool_context.state` and write access via `tool_context.actions.state_delta`. Shared tasks (`task_create`, `task_update`, `task_query`) have correct signatures but return placeholder responses until Phase 5 provides the DB backend. Adds `TodoAction` and `TodoStatus` enums to `app/models/enums.py`.
+**Description:** Six task management tools operating at two tiers: session-scoped todos (via ADK `ToolContext` for state access, DD-7) and cross-session shared tasks (placeholder backend until Phase 5). Session todos are stored in session state under the key `"tasks"` as a list of dicts. Each todo has `id`, `content`, `status` (TodoStatus enum). ToolContext provides read access via `tool_context.state` and write access via `tool_context.actions.state_delta`. Shared tasks (`task_create`, `task_update`, `task_query`) have correct signatures but return placeholder responses until Phase 5 provides the DB backend. Adds `TodoAction`, `TodoStatus`, and `TaskStatus` enums to `app/models/enums.py`.
 **BOM Components:**
-- [ ] `T13` — `todo_read` FunctionTool
-- [ ] `T14` — `todo_write` FunctionTool
-- [ ] `T15` — `todo_list` FunctionTool
-- [ ] `T29` — `task_create` FunctionTool
-- [ ] `T30b` — `task_update` FunctionTool
-- [ ] `T30c` — `task_query` FunctionTool
-- [ ] `TM05` — `app/tools/task.py` module
+- [x] `T13` — `todo_read` FunctionTool
+- [x] `T14` — `todo_write` FunctionTool
+- [x] `T15` — `todo_list` FunctionTool
+- [x] `T29` — `task_create` FunctionTool
+- [x] `T30b` — `task_update` FunctionTool
+- [x] `T30c` — `task_query` FunctionTool
+- [x] `TM05` — `app/tools/task.py` module
 **Requirements:**
-- [ ] `todo_read(task_id: str, tool_context: ToolContext) -> str` reads a specific task by ID from session state; returns task content and status; returns error message if not found
-- [ ] `TodoAction` enum (StrEnum) in `app/models/enums.py`: `ADD = "ADD"`, `UPDATE = "UPDATE"`, `COMPLETE = "COMPLETE"`, `REMOVE = "REMOVE"` — values match names
-- [ ] `TodoStatus` enum (StrEnum) in `app/models/enums.py`: `PENDING = "PENDING"`, `DONE = "DONE"` — values match names
-- [ ] `todo_write(action: TodoAction, task_id: str, content: str, tool_context: ToolContext) -> str` writes updated task list to state via `tool_context.actions.state_delta["tasks"]`; generates UUID-based `task_id` for `ADD` action (ignores provided `task_id`); returns confirmation
-- [ ] `todo_list(status_filter: TodoStatus | None = None, tool_context: ToolContext) -> str` lists all tasks with optional status filter; returns formatted list
-- [ ] `task_create(title: str, description: str, assignee: str | None = None, tags: list[str] | None = None) -> str` creates a cross-session task; placeholder backend returns confirmation with generated UUID
-- [ ] `task_update(task_id: str, status: str | None = None, notes: str | None = None) -> str` updates a shared task; placeholder backend returns confirmation
-- [ ] `task_query(filter: str | None = None, assignee: str | None = None) -> str` queries shared tasks; placeholder backend returns "No shared tasks configured (Phase 5)"
-- [ ] `tool_context` parameter excluded from LLM-visible tool schema (ADK auto-injection)
-- [ ] Module importable as `from app.tools.task import todo_read, todo_write, todo_list, task_create, task_update, task_query`
+- [x] `todo_read(task_id: str, tool_context: ToolContext) -> str` reads a specific task by ID from session state; returns task content and status; returns error message if not found
+- [x] `TodoAction` enum (StrEnum) in `app/models/enums.py`: `ADD = "ADD"`, `UPDATE = "UPDATE"`, `COMPLETE = "COMPLETE"`, `REMOVE = "REMOVE"` — values match names
+- [x] `TodoStatus` enum (StrEnum) in `app/models/enums.py`: `PENDING = "PENDING"`, `DONE = "DONE"` — values match names
+- [x] `TaskStatus` enum (StrEnum) in `app/models/enums.py`: `PENDING = "PENDING"`, `IN_PROGRESS = "IN_PROGRESS"`, `COMPLETED = "COMPLETED"`, `BLOCKED = "BLOCKED"` — values match names
+- [x] `todo_write(action: TodoAction, task_id: str, content: str, tool_context: ToolContext) -> str` writes updated task list to state via `tool_context.actions.state_delta["tasks"]`; generates UUID-based `task_id` for `ADD` action (ignores provided `task_id`); returns confirmation
+- [x] `todo_list(status_filter: TodoStatus | None = None, tool_context: ToolContext) -> str` lists all tasks with optional status filter; returns formatted list
+- [x] `task_create(title: str, description: str, assignee: str | None = None, tags: list[str] | None = None) -> str` creates a cross-session task; placeholder backend returns confirmation with generated UUID
+- [x] `task_update(task_id: str, status: TaskStatus | None = None, notes: str | None = None) -> str` updates a shared task; placeholder backend returns confirmation
+- [x] `task_query(status: TaskStatus | None = None, assignee: str | None = None) -> str` queries shared tasks; placeholder backend returns "No shared tasks configured (Phase 5)"
+- [x] `tool_context` parameter excluded from LLM-visible tool schema (ADK auto-injection)
+- [x] Module importable as `from app.tools.task import todo_read, todo_write, todo_list, task_create, task_update, task_query`
 **Validation:**
 - `uv run pyright app/tools/task.py`
 - `python -c "from app.tools.task import todo_read, todo_write, todo_list, task_create, task_update, task_query"`
@@ -321,36 +322,36 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Depends on:** —
 **Description:** PM-level (6) and Director-level (6) management tools for batch operations, escalation, deliverable lifecycle, project oversight, and CEO communication. Per DD-4, all tools have correct signatures and validation but use placeholder backends. PM escalates via `escalate_to_director`; Director escalates via `escalate_to_ceo`. Real backends arrive in Phase 5 (CEO queue table, Director queue table, project configs) and Phase 8 (deliverable dependency resolution).
 **BOM Components:**
-- [ ] `T16` — `select_ready_batch` FunctionTool
-- [ ] `T17` — `escalate_to_ceo` FunctionTool
-- [ ] `T31` — `escalate_to_director` FunctionTool
-- [ ] `T32b` — `update_deliverable` FunctionTool
-- [ ] `T33b` — `query_deliverables` FunctionTool
-- [ ] `T34b` — `reorder_deliverables` FunctionTool
-- [ ] `T35b` — `manage_dependencies` FunctionTool
-- [ ] `T36b` — `list_projects` FunctionTool
-- [ ] `T37b` — `query_project_status` FunctionTool
-- [ ] `T38` — `override_pm` FunctionTool
-- [ ] `T39` — `get_project_context` FunctionTool
-- [ ] `T40` — `query_dependency_graph` FunctionTool
-- [ ] `TM06` — `app/tools/management.py` module
+- [x] `T16` — `select_ready_batch` FunctionTool
+- [x] `T17` — `escalate_to_ceo` FunctionTool
+- [x] `T31` — `escalate_to_director` FunctionTool
+- [x] `T32b` — `update_deliverable` FunctionTool
+- [x] `T33b` — `query_deliverables` FunctionTool
+- [x] `T34b` — `reorder_deliverables` FunctionTool
+- [x] `T35b` — `manage_dependencies` FunctionTool
+- [x] `T36b` — `list_projects` FunctionTool
+- [x] `T37b` — `query_project_status` FunctionTool
+- [x] `T38` — `override_pm` FunctionTool
+- [x] `T39` — `get_project_context` FunctionTool
+- [x] `T40` — `query_dependency_graph` FunctionTool
+- [x] `TM06` — `app/tools/management.py` module
 **Requirements:**
-- [ ] **PM tools (6):**
-- [ ] `select_ready_batch(project_id: str) -> str` accepts a project ID; returns `"No deliverables configured for project {project_id}. Batch selection requires deliverable infrastructure (Phase 8)."`
-- [ ] `escalate_to_director(priority: str, context: str, request_type: str) -> str` validates `request_type` is one of `"ESCALATION"`, `"STATUS_REPORT"`, `"RESOURCE_REQUEST"`, `"PATTERN_ALERT"`; validates `priority` is one of `"LOW"`, `"NORMAL"`, `"HIGH"`, `"CRITICAL"`; returns validation error for invalid values; logs via `get_logger("tools.management")` and returns confirmation with a generated UUID placeholder ID
-- [ ] `update_deliverable(deliverable_id: str, status: str, notes: str | None = None) -> str` validates parameters; returns placeholder confirmation
-- [ ] `query_deliverables(project_id: str, status: str | None = None) -> str` returns placeholder "No deliverable infrastructure (Phase 5)"
-- [ ] `reorder_deliverables(project_id: str, order: list[str]) -> str` validates parameters; returns placeholder confirmation
-- [ ] `manage_dependencies(action: str, source_id: str, target_id: str | None = None) -> str` validates `action` is one of `"ADD"`, `"REMOVE"`, `"QUERY"`; returns placeholder response
-- [ ] **Director tools (6):**
-- [ ] `escalate_to_ceo(item_type: str, priority: str, message: str, metadata: str) -> str` validates `item_type` is one of `"NOTIFICATION"`, `"APPROVAL"`, `"ESCALATION"`, `"TASK"`; validates `priority` is one of `"LOW"`, `"NORMAL"`, `"HIGH"`, `"CRITICAL"`; returns validation error message for invalid values; logs via `get_logger("tools.management")` and returns confirmation with a generated UUID placeholder ID
-- [ ] `list_projects(status: str | None = None) -> str` returns placeholder "No project infrastructure (Phase 5)"
-- [ ] `query_project_status(project_id: str) -> str` returns placeholder response with project ID
-- [ ] `override_pm(project_id: str, action: str, reason: str) -> str` validates `action` is one of `"PAUSE"`, `"RESUME"`, `"REORDER"`, `"CORRECT"`; returns placeholder confirmation
-- [ ] `get_project_context(path: str | None = None) -> str` detects project type from filesystem (reads `package.json`, `pyproject.toml`, etc.); functional even in Phase 4
-- [ ] `query_dependency_graph(project_id: str, deliverable_id: str | None = None) -> str` returns placeholder "No dependency infrastructure (Phase 8)"
-- [ ] Validation uses string comparison against known values (not enum imports — CEO/Director queue enums arrive in Phase 5)
-- [ ] Module importable as `from app.tools.management import select_ready_batch, escalate_to_director, update_deliverable, query_deliverables, reorder_deliverables, manage_dependencies, escalate_to_ceo, list_projects, query_project_status, override_pm, get_project_context, query_dependency_graph`
+- [x] **PM tools (6):**
+- [x] `select_ready_batch(project_id: str) -> str` accepts a project ID; returns `"No deliverables configured for project {project_id}. Batch selection requires deliverable infrastructure (Phase 8)."`
+- [x] `escalate_to_director(priority: str, context: str, request_type: str) -> str` validates `request_type` is one of `"ESCALATION"`, `"STATUS_REPORT"`, `"RESOURCE_REQUEST"`, `"PATTERN_ALERT"`; validates `priority` is one of `"LOW"`, `"NORMAL"`, `"HIGH"`, `"CRITICAL"`; returns validation error for invalid values; logs via `get_logger("tools.management")` and returns confirmation with a generated UUID placeholder ID
+- [x] `update_deliverable(deliverable_id: str, status: str, notes: str | None = None) -> str` validates parameters; returns placeholder confirmation
+- [x] `query_deliverables(project_id: str, status: str | None = None) -> str` returns placeholder "No deliverable infrastructure (Phase 5)"
+- [x] `reorder_deliverables(project_id: str, order: list[str]) -> str` validates parameters; returns placeholder confirmation
+- [x] `manage_dependencies(action: str, source_id: str, target_id: str | None = None) -> str` validates `action` is one of `"ADD"`, `"REMOVE"`, `"QUERY"`; returns placeholder response
+- [x] **Director tools (6):**
+- [x] `escalate_to_ceo(item_type: str, priority: str, message: str, metadata: str) -> str` validates `item_type` is one of `"NOTIFICATION"`, `"APPROVAL"`, `"ESCALATION"`, `"TASK"`; validates `priority` is one of `"LOW"`, `"NORMAL"`, `"HIGH"`, `"CRITICAL"`; returns validation error message for invalid values; logs via `get_logger("tools.management")` and returns confirmation with a generated UUID placeholder ID
+- [x] `list_projects(status: str | None = None) -> str` returns placeholder "No project infrastructure (Phase 5)"
+- [x] `query_project_status(project_id: str) -> str` returns placeholder response with project ID
+- [x] `override_pm(project_id: str, action: str, reason: str) -> str` validates `action` is one of `"PAUSE"`, `"RESUME"`, `"REORDER"`, `"CORRECT"`; returns placeholder confirmation
+- [x] `get_project_context(path: str | None = None) -> str` detects project type from filesystem (reads `package.json`, `pyproject.toml`, etc.); functional even in Phase 4
+- [x] `query_dependency_graph(project_id: str, deliverable_id: str | None = None) -> str` returns placeholder "No dependency infrastructure (Phase 8)"
+- [x] Validation uses string comparison against known values (not enum imports — CEO/Director queue enums arrive in Phase 5)
+- [x] Module importable as `from app.tools.management import select_ready_batch, escalate_to_director, update_deliverable, query_deliverables, reorder_deliverables, manage_dependencies, escalate_to_ceo, list_projects, query_project_status, override_pm, get_project_context, query_dependency_graph`
 **Validation:**
 - `uv run pyright app/tools/management.py`
 - `python -c "from app.tools.management import select_ready_batch, escalate_to_ceo, escalate_to_director"`
@@ -363,14 +364,14 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Depends on:** —
 **Description:** Two code intelligence tools: tree-sitter-based symbol extraction and on-demand diagnostics (lint/type-check). `code_symbols` uses tree-sitter to parse source files and extract classes, functions, and imports. Language is auto-detected from file extension. `run_diagnostics` runs configurable lint/type-check tools on a file.
 **BOM Components:**
-- [ ] `T22` — `code_symbols` FunctionTool
-- [ ] `T23` — `run_diagnostics` FunctionTool
-- [ ] `TM07` — `app/tools/code.py` module
+- [x] `T22` — `code_symbols` FunctionTool
+- [x] `T23` — `run_diagnostics` FunctionTool
+- [x] `TM07` — `app/tools/code.py` module
 **Requirements:**
-- [ ] `code_symbols(path: str, language: str | None = None) -> str` extracts symbols (classes, functions, imports) via tree-sitter; language auto-detected from file extension; returns formatted symbol list
-- [ ] `run_diagnostics(path: str, tool: str | None = None) -> str` runs lint or type-check on a file; tool selection configurable per project; returns diagnostics output
-- [ ] All functions validate paths within project root
-- [ ] Module importable as `from app.tools.code import code_symbols, run_diagnostics`
+- [x] `code_symbols(path: str, language: str | None = None) -> str` extracts symbols (classes, functions, imports) via tree-sitter; language auto-detected from file extension; returns formatted symbol list
+- [x] `run_diagnostics(path: str, tool: str | None = None) -> str` runs lint or type-check on a file; tool selection configurable per project; returns diagnostics output
+- [x] All functions validate paths within project root
+- [x] Module importable as `from app.tools.code import code_symbols, run_diagnostics`
 **Validation:**
 - `uv run pyright app/tools/code.py`
 - `python -c "from app.tools.code import code_symbols, run_diagnostics"`
@@ -383,29 +384,29 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Depends on:** P4.D1, P4.D2, P4.D3, P4.D4, P4.D5, P4.D6, P4.D6b
 **Description:** ADK-native `BaseToolset` subclass that vends per-role tool subsets. `GlobalToolset` wraps all tool functions as `FunctionTool` instances and filters them based on the requesting agent's role (resolved from `ReadonlyContext`). Includes `resolve_role()` function, `ROLE_PERMISSIONS` config, and `AGENT_ROLE_MAP` for agent-name-to-role resolution per DD-5 and DD-6.
 **BOM Components:**
-- [ ] `TS01` — `GlobalToolset` (BaseToolset)
-- [ ] `TS02` — `resolve_role()` (role from ReadonlyContext)
-- [ ] `TS03` — Cascading permission config
-- [ ] `TS04` — Role scoping: `plan_agent` (read-only)
-- [ ] `TS05` — Role scoping: `code_agent` (full tools)
-- [ ] `TS06` — Role scoping: `review_agent` (read-only)
-- [ ] `TS07` — Role scoping: `fix_agent` (full FS, limited exec/git)
-- [ ] `TS08` — Role scoping: PM (management + shared)
-- [ ] `TS09` — Role scoping: Director (governance + shared)
+- [x] `TS01` — `GlobalToolset` (BaseToolset)
+- [x] `TS02` — `resolve_role()` (role from ReadonlyContext)
+- [x] `TS03` — Cascading permission config
+- [x] `TS04` — Role scoping: `plan_agent` (read-only)
+- [x] `TS05` — Role scoping: `code_agent` (full tools)
+- [x] `TS06` — Role scoping: `review_agent` (read-only)
+- [x] `TS07` — Role scoping: `fix_agent` (full FS, limited exec/git)
+- [x] `TS08` — Role scoping: PM (management + shared)
+- [x] `TS09` — Role scoping: Director (governance + shared)
 **Requirements:**
-- [ ] `GlobalToolset` extends `BaseToolset` from `google.adk.tools.base_toolset`
-- [ ] Constructor creates exactly 42 `FunctionTool` instances (one per tool function from D1-D6b modules); accepts optional `excluded_tools: set[str]` for cascading restriction
-- [ ] `get_tools(readonly_context: ReadonlyContext | None = None) -> list[BaseTool]` returns filtered tool list based on resolved role; returns all tools if `readonly_context` is `None`
-- [ ] `resolve_role(readonly_context: ReadonlyContext) -> str` maps agent name to role via `AGENT_ROLE_MAP`; PM agents matched via `name.startswith("pm_")` prefix; unknown agents return `"default"`
-- [ ] `"default"` role has read-only tools: `{"file_read", "file_glob", "file_grep", "directory_list", "git_status", "git_diff"}`
-- [ ] `"planner"` role: read-only filesystem + code intelligence + git read + web + session todos
-- [ ] `"coder"` role: full filesystem (10) + code intelligence (2) + full execution (2) + full git (8) + web (2) + session todos (3) = 27 tools
-- [ ] `"reviewer"` role: read-only filesystem + code intelligence + git read + web + session todos (same as planner)
-- [ ] `"fix_agent"` role: full filesystem (10) + code intelligence (2) + `bash_exec` only (no `http_request`) + read-only git (no commit/branch/worktree/apply) + web (2) + session todos (3)
-- [ ] `"pm"` role: PM management (6) + shared tasks (3) + session todos (3) = 12 tools
-- [ ] `"director"` role: Director management (6) + shared tasks (3) + session todos (3) = 12 tools
-- [ ] `excluded_tools` parameter removes tools from the role's allowed set (cascading restriction)
-- [ ] Module importable as `from app.tools._toolset import GlobalToolset, resolve_role`
+- [x] `GlobalToolset` extends `BaseToolset` from `google.adk.tools.base_toolset`
+- [x] Constructor creates exactly 42 `FunctionTool` instances (one per tool function from D1-D6b modules); accepts optional `excluded_tools: set[str]` for cascading restriction
+- [x] `get_tools(readonly_context: ReadonlyContext | None = None) -> list[BaseTool]` returns filtered tool list based on resolved role; returns all tools if `readonly_context` is `None`
+- [x] `resolve_role(readonly_context: ReadonlyContext) -> str` maps agent name to role via `AGENT_ROLE_MAP`; PM agents matched via `name.startswith("pm_")` prefix; unknown agents return `"default"`
+- [x] `"default"` role has read-only tools: `{"file_read", "file_glob", "file_grep", "directory_list", "git_status", "git_diff"}`
+- [x] `"planner"` role: read-only filesystem + code intelligence + git read + web + session todos
+- [x] `"coder"` role: full filesystem (10) + code intelligence (2) + full execution (2) + full git (8) + web (2) + session todos (3) = 27 tools
+- [x] `"reviewer"` role: read-only filesystem + code intelligence + git read + web + session todos (same as planner)
+- [x] `"fix_agent"` role: full filesystem (10) + code intelligence (2) + `bash_exec` only (no `http_request`) + read-only git (no commit/branch/worktree/apply) + web (2) + session todos (3)
+- [x] `"pm"` role: PM management (6) + shared tasks (3) + session todos (3) = 12 tools
+- [x] `"director"` role: Director management (6) + shared tasks (3) + session todos (3) = 12 tools
+- [x] `excluded_tools` parameter removes tools from the role's allowed set (cascading restriction)
+- [x] Module importable as `from app.tools._toolset import GlobalToolset, resolve_role`
 **Validation:**
 - `uv run pyright app/tools/_toolset.py`
 - `python -c "from app.tools._toolset import GlobalToolset, resolve_role"`
@@ -419,17 +420,17 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 **Description:** Tests covering all Phase 4 deliverables. Tool function tests use real filesystem/subprocess (per project testing standards — never mock local infrastructure). Web search tests mock external API calls (Tavily). ToolContext-dependent tests construct real ToolContext objects or test the underlying logic separately. Toolset tests verify role-based filtering with constructed ReadonlyContext objects.
 **BOM Components:** *(none — testing infrastructure, not a BOM component)*
 **Requirements:**
-- [ ] **Filesystem tests**: `file_read` returns content of existing file (with and without offset/limit); returns error for non-existent file; `file_write` creates file and returns byte count; `file_edit` replaces content; `file_edit` reports "already edited" when `old` not found but `new` present; `file_insert` inserts at correct line; `file_multi_edit` applies multiple edits atomically; `file_glob` finds files by pattern; `file_grep` searches content with regex; `file_move` moves file; `file_delete` removes file; `directory_list` returns tree output with depth control; path traversal (`../`) is rejected
-- [ ] **Execution tests**: `bash_exec("echo hello")` returns `"hello\n"`; `bash_exec` with timeout=1 on `sleep 10` returns timeout error; non-zero exit code includes exit code in output; output truncation at 10000 chars; `http_request` returns status code and response body (mock httpx)
-- [ ] **Git tests** (use `tmp_path` fixture with `git init`): `git_status` on clean repo returns clean message; `git_commit` after file creation returns success; `git_commit` with selective `files` parameter stages only specified files; `git_commit` on clean repo returns nothing-to-commit; `git_branch` create + switch works; `git_diff` shows changes; `git_log` returns commit history; `git_show` displays commit details; `git_worktree` add/list/remove works; `git_apply` applies patch
-- [ ] **Web tests**: `web_fetch` returns extracted text from HTML (mock httpx response); `web_fetch` truncates output at 10000 chars; `web_fetch` returns raw content for non-HTML; `web_search` with valid API key returns formatted results (mock Tavily API); `web_search` with Brave provider returns formatted results (mock Brave API); `web_search` without API key returns error message
-- [ ] **Task tests**: `todo_write` add creates task; `todo_list` returns all tasks; `todo_read` returns specific task; `todo_write` complete marks task done; `todo_list` with filter returns filtered results; `task_create` returns placeholder confirmation; `task_update` returns placeholder confirmation; `task_query` returns placeholder message
-- [ ] **Management tests**: `select_ready_batch` returns placeholder message; `escalate_to_ceo` with valid params returns confirmation; `escalate_to_ceo` with invalid `item_type` returns validation error; `escalate_to_director` with valid params returns confirmation; `escalate_to_director` with invalid `request_type` returns validation error; `get_project_context` detects project type from filesystem; all other management tools return appropriate placeholder responses
-- [ ] **Code intelligence tests**: `code_symbols` extracts symbols from Python file; `code_symbols` auto-detects language from extension; `run_diagnostics` runs lint tool and returns output
-- [ ] **Toolset tests**: `GlobalToolset` constructor creates 42 `FunctionTool` instances; `get_tools(None)` returns all tools; planner role gets read-only + code intelligence + web + todos; coder role gets 27 tools (full set minus management); reviewer role matches planner; fix_agent role gets full FS + limited exec/git; PM role includes 12 tools (PM management + shared tasks + todos); Director role includes 12 tools (Director management + shared tasks + todos); `excluded_tools={"bash_exec"}` removes bash from coder role; `resolve_role` maps `"plan_agent"` -> `"planner"`, `"code_agent"` -> `"coder"`, `"fix_agent"` -> `"fix_agent"`, unknown -> `"default"`
-- [ ] **Schema generation tests**: Each `FunctionTool(func)` produces a schema where `name` matches `func.__name__`, description is a non-empty string derived from `func.__doc__`, and parameter names match the function signature (excluding `tool_context`)
-- [ ] All Phase 2-3 tests continue to pass (no regressions)
-- [ ] All quality gates exit 0: `uv run ruff check .`, `uv run pyright`, `uv run pytest`
+- [x] **Filesystem tests**: `file_read` returns content of existing file (with and without offset/limit); returns error for non-existent file; `file_write` creates file and returns byte count; `file_edit` replaces content; `file_edit` reports "already edited" when `old` not found but `new` present; `file_insert` inserts at correct line; `file_multi_edit` applies multiple edits atomically; `file_glob` finds files by pattern; `file_grep` searches content with regex; `file_move` moves file; `file_delete` removes file; `directory_list` returns tree output with depth control; path traversal (`../`) is rejected
+- [x] **Execution tests**: `bash_exec("echo hello")` returns `"hello\n"`; `bash_exec` with timeout=1 on `sleep 10` returns timeout error; non-zero exit code includes exit code in output; output truncation at 10000 chars; `http_request` returns status code and response body (mock httpx)
+- [x] **Git tests** (use `tmp_path` fixture with `git init`): `git_status` on clean repo returns clean message; `git_commit` after file creation returns success; `git_commit` with selective `files` parameter stages only specified files; `git_commit` on clean repo returns nothing-to-commit; `git_branch` create + switch works; `git_diff` shows changes; `git_log` returns commit history; `git_show` displays commit details; `git_worktree` add/list/remove works; `git_apply` applies patch
+- [x] **Web tests**: `web_fetch` returns extracted text from HTML (mock httpx response); `web_fetch` truncates output at 10000 chars; `web_fetch` returns raw content for non-HTML; `web_search` with valid API key returns formatted results (mock Tavily API); `web_search` with Brave provider returns formatted results (mock Brave API); `web_search` without API key returns error message
+- [x] **Task tests**: `todo_write` add creates task; `todo_list` returns all tasks; `todo_read` returns specific task; `todo_write` complete marks task done; `todo_list` with filter returns filtered results; `task_create` returns placeholder confirmation; `task_update` returns placeholder confirmation; `task_query` returns placeholder message
+- [x] **Management tests**: `select_ready_batch` returns placeholder message; `escalate_to_ceo` with valid params returns confirmation; `escalate_to_ceo` with invalid `item_type` returns validation error; `escalate_to_director` with valid params returns confirmation; `escalate_to_director` with invalid `request_type` returns validation error; `get_project_context` detects project type from filesystem; all other management tools return appropriate placeholder responses
+- [x] **Code intelligence tests**: `code_symbols` extracts symbols from Python file; `code_symbols` auto-detects language from extension; `run_diagnostics` runs lint tool and returns output
+- [x] **Toolset tests**: `GlobalToolset` constructor creates 42 `FunctionTool` instances; `get_tools(None)` returns all tools; planner role gets read-only + code intelligence + web + todos; coder role gets 27 tools (full set minus management); reviewer role matches planner; fix_agent role gets full FS + limited exec/git; PM role includes 12 tools (PM management + shared tasks + todos); Director role includes 12 tools (Director management + shared tasks + todos); `excluded_tools={"bash_exec"}` removes bash from coder role; `resolve_role` maps `"plan_agent"` -> `"planner"`, `"code_agent"` -> `"coder"`, `"fix_agent"` -> `"fix_agent"`, unknown -> `"default"`
+- [x] **Schema generation tests**: Each `FunctionTool(func)` produces a schema where `name` matches `func.__name__`, description is a non-empty string derived from `func.__doc__`, and parameter names match the function signature (excluding `tool_context`)
+- [x] All Phase 2-3 tests continue to pass (no regressions)
+- [x] All quality gates exit 0: `uv run ruff check .`, `uv run pyright`, `uv run pytest`
 **Validation:**
 - `uv run pytest tests/tools/ -v`
 - `uv run pytest tests/ --ignore=tests/phase1 --cov=app -v`

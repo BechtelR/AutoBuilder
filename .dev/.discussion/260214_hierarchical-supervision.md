@@ -99,10 +99,10 @@ Follows the original 6-level memory architecture (260211_plan-shaping.md §11), 
 | Tier | Default Model | Rationale |
 |------|--------------|-----------|
 | Director | `anthropic/claude-opus-4-6` | Strategic decisions, cross-project reasoning |
-| PM | `anthropic/claude-sonnet-4-5-20250929` | Project management, batch strategy |
+| PM | `anthropic/claude-sonnet-4-6` | Project management, batch strategy |
 | Worker (plan) | `anthropic/claude-opus-4-6` | Complex planning benefits from strongest reasoning |
-| Worker (code) | `anthropic/claude-sonnet-4-5-20250929` | Standard implementation |
-| Worker (review) | `anthropic/claude-sonnet-4-5-20250929` | Quality assessment |
+| Worker (code) | `anthropic/claude-sonnet-4-6` | Standard implementation |
+| Worker (review) | `anthropic/claude-sonnet-4-6` | Quality assessment |
 | Worker (classify) | `anthropic/claude-haiku-4-5-20251001` | Quick classification |
 
 ## Impact on Existing Architecture

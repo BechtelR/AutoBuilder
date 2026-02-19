@@ -76,7 +76,7 @@ AutoBuilder/
 │   │   ├── auto-design/            # Future
 │   │   └── auto-market/            # Future
 │   │
-│   ├── router/                     # LLM Router (task_type to model mapping)
+│   ├── router/                     # LLM Router (model_role to model mapping)
 │   ├── memory/                     # Memory service (PostgreSQL tsvector + pgvector)
 │   │
 │   ├── db/                         # Database layer

@@ -119,7 +119,8 @@ Launch parallel `reviewer` subagents scaled to spec size:
 |--------------|-------------------|
 | 1-4          | 2                 |
 | 5-8          | 3                 |
-| 9+           | 4                 |
+| 9-19         | 4                 |
+| 20+          | 6                 |
 
 Split files evenly across reviewers. Each checks:
 - Correctness against spec.md requirements

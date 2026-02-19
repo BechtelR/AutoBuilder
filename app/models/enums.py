@@ -41,8 +41,8 @@ class SpecificationStatus(enum.StrEnum):
     FAILED = "FAILED"
 
 
-class TaskType(enum.StrEnum):
-    """LLM task type for model routing."""
+class ModelRole(enum.StrEnum):
+    """LLM model role for routing — which persona handles a job."""
 
     CODE = "CODE"
     PLAN = "PLAN"
@@ -62,6 +62,91 @@ class PipelineEventType(enum.StrEnum):
     TOOL_RESULT = "TOOL_RESULT"
     STATE_UPDATED = "STATE_UPDATED"
     ERROR = "ERROR"
+
+
+class GitBranchAction(enum.StrEnum):
+    """Action to perform on a git branch."""
+
+    CREATE = "CREATE"
+    SWITCH = "SWITCH"
+    DELETE = "DELETE"
+
+
+class TodoAction(enum.StrEnum):
+    """Action to perform on a todo item."""
+
+    ADD = "ADD"
+    UPDATE = "UPDATE"
+    COMPLETE = "COMPLETE"
+    REMOVE = "REMOVE"
+
+
+class TodoStatus(enum.StrEnum):
+    """Status of a todo item."""
+
+    PENDING = "PENDING"
+    DONE = "DONE"
+
+
+class GitWorktreeAction(enum.StrEnum):
+    """Action to perform on a git worktree."""
+
+    ADD = "ADD"
+    LIST = "LIST"
+    REMOVE = "REMOVE"
+
+
+class EscalationPriority(enum.StrEnum):
+    """Priority level for escalations."""
+
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class EscalationRequestType(enum.StrEnum):
+    """Type of escalation request from PM to Director."""
+
+    ESCALATION = "ESCALATION"
+    STATUS_REPORT = "STATUS_REPORT"
+    RESOURCE_REQUEST = "RESOURCE_REQUEST"
+    PATTERN_ALERT = "PATTERN_ALERT"
+
+
+class CeoItemType(enum.StrEnum):
+    """Type of item escalated to the CEO queue."""
+
+    NOTIFICATION = "NOTIFICATION"
+    APPROVAL = "APPROVAL"
+    ESCALATION = "ESCALATION"
+    TASK = "TASK"
+
+
+class DependencyAction(enum.StrEnum):
+    """Action to perform on deliverable dependencies."""
+
+    ADD = "ADD"
+    REMOVE = "REMOVE"
+    QUERY = "QUERY"
+
+
+class PmOverrideAction(enum.StrEnum):
+    """Action for Director to override a PM."""
+
+    PAUSE = "PAUSE"
+    RESUME = "RESUME"
+    REORDER = "REORDER"
+    CORRECT = "CORRECT"
+
+
+class TaskStatus(enum.StrEnum):
+    """Status of a shared cross-session task."""
+
+    OPEN = "OPEN"
+    IN_PROGRESS = "IN_PROGRESS"
+    DONE = "DONE"
+    BLOCKED = "BLOCKED"
 
 
 class ErrorCode(enum.StrEnum):

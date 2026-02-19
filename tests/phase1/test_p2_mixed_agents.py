@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 pytestmark = [requires_api_key, pytest.mark.integration]
 
-SONNET_MODEL = "anthropic/claude-sonnet-4-5-20250929"
+SONNET_MODEL = "anthropic/claude-sonnet-4-6"
 
 
 class LinterAgent(BaseAgent):

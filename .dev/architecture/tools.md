@@ -147,11 +147,11 @@ Note: `bash_exec` must be idempotent or include duplicate-run protection for com
 |------|--------|---------|
 | `git_status(path)` | Keep | Repo state |
 | `git_commit(path, message, files?)` | Enhanced | Add selective file staging |
-| `git_branch(path, name, action)` | Keep | Branch management |
+| `git_branch(path, name, action: GitBranchAction)` | Keep | Branch management |
 | `git_diff(path, ref?)` | Keep | Show changes |
 | `git_log(path, count?, ref?)` | **New** | Commit history |
 | `git_show(path, ref)` | **New** | Inspect specific commit |
-| `git_worktree(path, action, branch?)` | **New** | Manage worktrees (parallel execution) |
+| `git_worktree(path, action: GitWorktreeAction, branch?)` | **New** | Manage worktrees (parallel execution) |
 | `git_apply(path, patch)` | **New** | Apply unified diff patch |
 
 ```python
@@ -161,7 +161,7 @@ def git_status(path: str) -> str:
 def git_commit(path: str, message: str, files: list[str] | None = None) -> str:
     """Stage and commit changes. Optional selective file staging."""
 
-def git_branch(path: str, name: str, action: str) -> str:
+def git_branch(path: str, name: str, action: GitBranchAction) -> str:
     """Create, switch, or delete branches."""
 
 def git_diff(path: str, ref: str | None = None) -> str:
@@ -173,7 +173,7 @@ def git_log(path: str, count: int | None = None, ref: str | None = None) -> str:
 def git_show(path: str, ref: str) -> str:
     """Inspect a specific commit (message, diff, metadata)."""
 
-def git_worktree(path: str, action: str, branch: str | None = None) -> str:
+def git_worktree(path: str, action: GitWorktreeAction, branch: str | None = None) -> str:
     """Manage git worktrees for parallel execution across branches."""
 
 def git_apply(path: str, patch: str) -> str:
@@ -183,14 +183,14 @@ def git_apply(path: str, patch: str) -> str:
 ### 3.5 Web Tools (2 tools)
 
 ```python
-def web_search(query: str) -> str:
+def web_search(query: str, num_results: int = 5, provider: str | None = None) -> str:
     """Search the web via SearXNG, Brave, or Tavily API. No Gemini dependency."""
 
 def web_fetch(url: str) -> str:
     """Fetch and extract content from a URL. Supplements ADK's load_web_page if needed."""
 ```
 
-Web search provider selection (SearXNG vs Brave vs Tavily) is an open design question. See consolidated planning doc, Open Questions #7.
+Search provider defaults to `settings.search_provider` (Tavily). Override per-call via `provider` param.
 
 ### 3.6 Task Management (6 tools)
 
@@ -213,7 +213,7 @@ Task management operates at three tiers:
 def todo_read() -> str:
     """Read current task list from session state."""
 
-def todo_write(action: str, task_id: str, content: str) -> str:
+def todo_write(action: TodoAction, task_id: str, content: str) -> str:
     """Add, update, complete, or remove tasks."""
 
 def todo_list(filter: str | None = None) -> str:
@@ -222,10 +222,10 @@ def todo_list(filter: str | None = None) -> str:
 def task_create(title: str, description: str, assignee: str | None = None, tags: list[str] | None = None) -> str:
     """Create a cross-session task visible to all agents in the project."""
 
-def task_update(task_id: str, status: str | None = None, notes: str | None = None) -> str:
+def task_update(task_id: str, status: TaskStatus | None = None, notes: str | None = None) -> str:
     """Update a shared task's status or add notes."""
 
-def task_query(filter: str | None = None, assignee: str | None = None) -> str:
+def task_query(status: TaskStatus | None = None, assignee: str | None = None) -> str:
     """Query shared tasks with optional status filter and assignee."""
 ```
 
@@ -234,21 +234,21 @@ def task_query(filter: str | None = None, assignee: str | None = None) -> str:
 | Tool | Status | Purpose |
 |------|--------|---------|
 | `select_ready_batch(project_id)` | Keep | Dependency-aware batch selection |
-| `escalate_to_director(priority, context, request_type)` | **New** | PM → Director queue |
+| `escalate_to_director(priority: EscalationPriority, context, request_type: EscalationRequestType)` | **New** | PM → Director queue |
 | `update_deliverable(deliverable_id, status, notes?)` | **New** | Deliverable lifecycle management |
 | `query_deliverables(project_id, status?)` | **New** | Query deliverable state |
 | `reorder_deliverables(project_id, order)` | **New** | Change execution priority |
-| `manage_dependencies(action, source_id, target_id?)` | **New** | Add/remove/query deliverable deps |
+| `manage_dependencies(action: DependencyAction, source_id, target_id?)` | **New** | Add/remove/query deliverable deps |
 
 ```python
 def select_ready_batch(project_id: str) -> str:
     """Dependency-aware batch selection via topological sort. Returns the next
     set of deliverables whose prerequisites are satisfied."""
 
-def escalate_to_director(priority: str, context: str, request_type: str) -> str:
+def escalate_to_director(priority: EscalationPriority, context: str, request_type: EscalationRequestType) -> str:
     """Escalate an issue from PM to the Director queue for resolution."""
 
-def update_deliverable(deliverable_id: str, status: str, notes: str | None = None) -> str:
+def update_deliverable(deliverable_id: str, status: DeliverableStatus, notes: str | None = None) -> str:
     """Update a deliverable's lifecycle status with optional notes."""
 
 def query_deliverables(project_id: str, status: str | None = None) -> str:
@@ -257,7 +257,7 @@ def query_deliverables(project_id: str, status: str | None = None) -> str:
 def reorder_deliverables(project_id: str, order: list[str]) -> str:
     """Change execution priority by reordering deliverables."""
 
-def manage_dependencies(action: str, source_id: str, target_id: str | None = None) -> str:
+def manage_dependencies(action: DependencyAction, source_id: str, target_id: str | None = None) -> str:
     """Add, remove, or query deliverable dependency relationships."""
 ```
 
@@ -267,15 +267,15 @@ def manage_dependencies(action: str, source_id: str, target_id: str | None = Non
 
 | Tool | Status | Purpose |
 |------|--------|---------|
-| `escalate_to_ceo(type, priority, message, metadata)` | Keep (Director-only now) | Director → CEO queue |
+| `escalate_to_ceo(type: CeoItemType, priority: EscalationPriority, message, metadata)` | Keep (Director-only now) | Director → CEO queue |
 | `list_projects(status?)` | **New** | Cross-project visibility |
 | `query_project_status(project_id)` | **New** | PM status, batch progress, cost |
-| `override_pm(project_id, action, reason)` | **New** | Direct PM intervention (pause/resume/reorder/correct) |
+| `override_pm(project_id, action: PmOverrideAction, reason)` | **New** | Direct PM intervention (pause/resume/reorder/correct) |
 | `get_project_context(path?)` | **New** | Detect project type, stack, conventions |
 | `query_dependency_graph(project_id, deliverable_id?)` | **New** | Query/visualize dependency graph |
 
 ```python
-def escalate_to_ceo(item_type: str, priority: str, message: str, metadata: str) -> str:
+def escalate_to_ceo(item_type: CeoItemType, priority: EscalationPriority, message: str, metadata: str) -> str:
     """Push a notification, approval request, escalation, or task to the unified
     CEO queue. Director-only — PM uses escalate_to_director instead."""
 
@@ -285,7 +285,7 @@ def list_projects(status: str | None = None) -> str:
 def query_project_status(project_id: str) -> str:
     """Query detailed project status including PM state, batch progress, and cost."""
 
-def override_pm(project_id: str, action: str, reason: str) -> str:
+def override_pm(project_id: str, action: PmOverrideAction, reason: str) -> str:
     """Direct PM intervention: pause, resume, reorder, or correct a PM's behavior."""
 
 def get_project_context(path: str | None = None) -> str:
@@ -382,28 +382,28 @@ Different tasks have different optimal models. The LLM Router is a centralized l
 
 ### 6.2 Phase 1 Implementation
 
-Static routing config mapping `task_type` to model. No ML-based routing, no cost optimization. A clean lookup table that is easy to change.
+Static routing config mapping `model_role` to model. No ML-based routing, no cost optimization. A clean lookup table that is easy to change.
 
 ```yaml
 routing_rules:
-  - task_type: implementation
+  - model_role: implementation
     complexity: standard
-    model: "anthropic/claude-sonnet-4-5-20250929"
-  - task_type: implementation
+    model: "anthropic/claude-sonnet-4-6"
+  - model_role: implementation
     complexity: complex
     model: "anthropic/claude-opus-4-6"
-  - task_type: planning
+  - model_role: planning
     model: "anthropic/claude-opus-4-6"
-  - task_type: review
-    model: "anthropic/claude-sonnet-4-5-20250929"
-  - task_type: classification
+  - model_role: review
+    model: "anthropic/claude-sonnet-4-6"
+  - model_role: classification
     model: "anthropic/claude-haiku-4-5-20251001"
-  - task_type: summarization
+  - model_role: summarization
     model: "anthropic/claude-haiku-4-5-20251001"
 
 fallback_chains:
-  anthropic/claude-opus-4-6: ["anthropic/claude-sonnet-4-5-20250929"]
-  anthropic/claude-sonnet-4-5-20250929: ["anthropic/claude-haiku-4-5-20251001"]
+  anthropic/claude-opus-4-6: ["anthropic/claude-sonnet-4-6"]
+  anthropic/claude-sonnet-4-6: ["anthropic/claude-haiku-4-5-20251001"]
 ```
 
 ### 6.3 ADK Integration
@@ -526,5 +526,5 @@ Director can author new tools (writes Python functions to the tools module). **C
 
 ---
 
-*Document Version: 4.0*
+*Document Version: 4.1*
 *Last Updated: 2026-02-18*

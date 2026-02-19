@@ -299,7 +299,7 @@ Dev dependencies:
 | Issue | Solution |
 |-------|----------|
 | `ModuleNotFoundError: google.adk` | Ensure `uv sync` completed and you are running via `uv run` |
-| LiteLLM model not found | Check that the model string matches LiteLLM's expected format (e.g., `anthropic/claude-sonnet-4-5-20250929`) |
+| LiteLLM model not found | Check that the model string matches LiteLLM's expected format (e.g., `anthropic/claude-sonnet-4-6`) |
 | `ANTHROPIC_API_KEY` not set | Ensure `.env` file exists and is loaded; some shells require `source .env` or use `python-dotenv` |
 | PostgreSQL not running | Run `docker compose up -d` |
 | ADK Dev UI not starting | Ensure `google-adk[cli]` is installed; check that `app.py` exports an `app` variable |

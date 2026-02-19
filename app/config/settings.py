@@ -14,10 +14,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     log_level: str = "INFO"
 
-    default_code_model: str = "anthropic/claude-sonnet-4-5-20250929"
+    default_code_model: str = "anthropic/claude-sonnet-4-6"
     default_plan_model: str = "anthropic/claude-opus-4-6"
-    default_review_model: str = "anthropic/claude-sonnet-4-5-20250929"
+    default_review_model: str = "anthropic/claude-sonnet-4-6"
     default_fast_model: str = "anthropic/claude-haiku-4-5-20251001"
+
+    search_provider: str = "tavily"
 
     model_config = {
         "env_prefix": "AUTOBUILDER_",

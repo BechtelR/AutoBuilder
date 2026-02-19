@@ -468,39 +468,39 @@ class LlmRouter:
         self.rules = routing_config.rules
         self.fallback_chains = routing_config.fallback_chains
     
-    def select_model(self, task_type: str, complexity: str = "standard") -> str:
+    def select_model(self, model_role: str, complexity: str = "standard") -> str:
         """Returns LiteLLM model string for the given task context."""
         # Match against routing rules
         for rule in self.rules:
-            if rule.matches(task_type, complexity):
+            if rule.matches(model_role, complexity):
                 return rule.model
-        return self.fallback_chains.get(task_type, self.default_model)
+        return self.fallback_chains.get(model_role, self.default_model)
 
 # Example routing config (YAML or Python dict)
 routing_rules:
-  - task_type: code_implementation
+  - model_role: code_implementation
     complexity: standard
-    model: "anthropic/claude-sonnet-4-5-20250929"
-  - task_type: code_implementation
+    model: "anthropic/claude-sonnet-4-6"
+  - model_role: code_implementation
     complexity: complex  
     model: "anthropic/claude-opus-4-6"
-  - task_type: planning
+  - model_role: planning
     model: "anthropic/claude-opus-4-6"
-  - task_type: review
-    model: "anthropic/claude-sonnet-4-5-20250929"
-  - task_type: classification
+  - model_role: review
+    model: "anthropic/claude-sonnet-4-6"
+  - model_role: classification
     model: "anthropic/claude-haiku-4-5-20251001"
-  - task_type: summarization
+  - model_role: summarization
     model: "anthropic/claude-haiku-4-5-20251001"
 
 fallback_chains:
-  anthropic/claude-opus-4-6: ["anthropic/claude-sonnet-4-5-20250929"]
-  anthropic/claude-sonnet-4-5-20250929: ["anthropic/claude-haiku-4-5-20251001"]
+  anthropic/claude-opus-4-6: ["anthropic/claude-sonnet-4-6"]
+  anthropic/claude-sonnet-4-6: ["anthropic/claude-haiku-4-5-20251001"]
 ```
 
 **Integration with ADK:** Each `LlmAgent` can have its model set dynamically. The router runs as part of agent construction (in the PM outer loop) or via `before_model_callback` to override the model on the `LlmRequest` at invocation time. This keeps routing logic centralized rather than scattered across agent definitions.
 
-**Phase 1 implementation:** Start simple — static routing config mapping task_type → model. No ML-based routing, no cost optimization. Just a clean lookup table that's easy to change. Sophisticate in Phase 2 with cost tracking, latency monitoring, and adaptive selection.
+**Phase 1 implementation:** Start simple — static routing config mapping model_role → model. No ML-based routing, no cost optimization. Just a clean lookup table that's easy to change. Sophisticate in Phase 2 with cost tracking, latency monitoring, and adaptive selection.
 
 ---
 
@@ -551,8 +551,8 @@ required_tools: [file_read, file_write, file_edit, bash_exec, git_status, git_co
 optional_tools: [web_search, web_fetch, todo_read, todo_write]
 default_models:
   planning: anthropic/claude-opus-4-6
-  implementation: anthropic/claude-sonnet-4-5-20250929
-  review: anthropic/claude-sonnet-4-5-20250929
+  implementation: anthropic/claude-sonnet-4-6
+  review: anthropic/claude-sonnet-4-6
 pipeline_type: batch_parallel    # batch_parallel | sequential | single_pass
 supports_decomposition: true      # Can decompose spec into deliverables?
 supports_parallel: true           # Can run deliverables in parallel?
@@ -831,7 +831,7 @@ Estimated scope: ~200-500 lines for `SqliteFtsMemoryService` implementing `BaseM
 2. Core toolset (filesystem, bash, git, web, todo — as FunctionTools)
 3. Skills system (SkillLibrary + SkillLoaderAgent)
 4. Workflow composition system (WorkflowRegistry + auto-code as first workflow)
-5. LLM Router (static routing config: task_type → model)
+5. LLM Router (static routing config: model_role → model)
 6. Multi-level memory (DatabaseSessionService + 4 state scopes + SqliteFtsMemoryService)
 7. Plan/Execute agent separation
 8. Autonomous continuation loop ("run until done")

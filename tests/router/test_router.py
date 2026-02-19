@@ -1,47 +1,47 @@
 """Tests for LLM Router."""
 
 from app.config.settings import Settings
-from app.models.enums import TaskType
-from app.router.router import AGENT_TASK_TYPES, LlmRouter, create_model_override_callback
+from app.models.enums import ModelRole
+from app.router.router import AGENT_MODEL_ROLES, LlmRouter, create_model_override_callback
 
 
 class TestLlmRouter:
     def test_from_settings(self) -> None:
         settings = Settings()
         router = LlmRouter.from_settings(settings)
-        assert router.select_model(TaskType.CODE) == "anthropic/claude-sonnet-4-5-20250929"
+        assert router.select_model(ModelRole.CODE) == "anthropic/claude-sonnet-4-6"
 
     def test_select_code_model(self) -> None:
         router = LlmRouter.from_settings(Settings())
-        assert router.select_model(TaskType.CODE) == "anthropic/claude-sonnet-4-5-20250929"
+        assert router.select_model(ModelRole.CODE) == "anthropic/claude-sonnet-4-6"
 
     def test_select_plan_model(self) -> None:
         router = LlmRouter.from_settings(Settings())
-        assert router.select_model(TaskType.PLAN) == "anthropic/claude-opus-4-6"
+        assert router.select_model(ModelRole.PLAN) == "anthropic/claude-opus-4-6"
 
     def test_select_review_model(self) -> None:
         router = LlmRouter.from_settings(Settings())
-        assert router.select_model(TaskType.REVIEW) == "anthropic/claude-sonnet-4-5-20250929"
+        assert router.select_model(ModelRole.REVIEW) == "anthropic/claude-sonnet-4-6"
 
     def test_select_fast_model(self) -> None:
         router = LlmRouter.from_settings(Settings())
-        assert router.select_model(TaskType.FAST) == "anthropic/claude-haiku-4-5-20251001"
+        assert router.select_model(ModelRole.FAST) == "anthropic/claude-haiku-4-5-20251001"
 
     def test_user_override_wins(self) -> None:
         router = LlmRouter.from_settings(Settings())
-        result = router.select_model(TaskType.CODE, user_override="openai/gpt-5")
+        result = router.select_model(ModelRole.CODE, user_override="openai/gpt-5")
         assert result == "openai/gpt-5"
 
     def test_get_fallbacks_opus(self) -> None:
         router = LlmRouter.from_settings(Settings())
         fallbacks = router.get_fallbacks("anthropic/claude-opus-4-6")
         assert len(fallbacks) == 2
-        assert "anthropic/claude-sonnet-4-5-20250929" in fallbacks
+        assert "anthropic/claude-sonnet-4-6" in fallbacks
         assert "anthropic/claude-haiku-4-5-20251001" in fallbacks
 
     def test_get_fallbacks_sonnet(self) -> None:
         router = LlmRouter.from_settings(Settings())
-        fallbacks = router.get_fallbacks("anthropic/claude-sonnet-4-5-20250929")
+        fallbacks = router.get_fallbacks("anthropic/claude-sonnet-4-6")
         assert len(fallbacks) == 1
         assert "anthropic/claude-haiku-4-5-20251001" in fallbacks
 
@@ -60,9 +60,9 @@ class TestLlmRouter:
         assert "defaults" in d
         assert "fallback_chains" in d
 
-    def test_agent_task_types_has_echo_agent(self) -> None:
-        assert "echo_agent" in AGENT_TASK_TYPES
-        assert AGENT_TASK_TYPES["echo_agent"] == TaskType.FAST
+    def test_agent_model_roles_has_echo_agent(self) -> None:
+        assert "echo_agent" in AGENT_MODEL_ROLES
+        assert AGENT_MODEL_ROLES["echo_agent"] == ModelRole.FAST
 
 
 class TestModelOverrideCallback:

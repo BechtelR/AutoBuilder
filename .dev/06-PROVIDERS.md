@@ -13,7 +13,7 @@ Update this file when models change, new providers are added, or pricing shifts.
 | Model | LiteLLM String | Input $/1M | Output $/1M | Context | Strengths |
 |-------|---------------|-----------|-------------|---------|-----------|
 | Claude Opus 4.6 | `anthropic/claude-opus-4-6` | $15.00 | $75.00 | 200K | Strongest reasoning, complex planning |
-| Claude Sonnet 4.5 | `anthropic/claude-sonnet-4-5-20250929` | $3.00 | $15.00 | 200K | Best code generation, strong review |
+| Claude Sonnet 4.5 | `anthropic/claude-sonnet-4-6` | $3.00 | $15.00 | 200K | Best code generation, strong review |
 | Claude Haiku 4.5 | `anthropic/claude-haiku-4-5-20251001` | $0.80 | $4.00 | 200K | Fast classification, summarization |
 
 ## Provider: OpenAI (Fallback)
@@ -43,8 +43,8 @@ Default model assignments by task type. Configured via `AUTOBUILDER_DEFAULT_*_MO
 | Task Type | Default Model | Env Var | Rationale |
 |-----------|---------------|---------|-----------|
 | Planning | `anthropic/claude-opus-4-6` | `AUTOBUILDER_DEFAULT_PLAN_MODEL` | Benefits from strongest reasoning |
-| Code Implementation | `anthropic/claude-sonnet-4-5-20250929` | `AUTOBUILDER_DEFAULT_CODE_MODEL` | Best code generation |
-| Review | `anthropic/claude-sonnet-4-5-20250929` | `AUTOBUILDER_DEFAULT_REVIEW_MODEL` | Strong analytical capability |
+| Code Implementation | `anthropic/claude-sonnet-4-6` | `AUTOBUILDER_DEFAULT_CODE_MODEL` | Best code generation |
+| Review | `anthropic/claude-sonnet-4-6` | `AUTOBUILDER_DEFAULT_REVIEW_MODEL` | Strong analytical capability |
 | Classification / Summarization | `anthropic/claude-haiku-4-5-20251001` | `AUTOBUILDER_DEFAULT_FAST_MODEL` | Fast, cost-effective |
 
 ### Complexity Escalation
@@ -66,7 +66,7 @@ When the primary model is unavailable or rate-limited, the router walks the fall
 | Tier | Primary (Anthropic) | Fallback 1 (OpenAI) | Fallback 2 (Google) |
 |------|--------------------|--------------------|-------------------|
 | Strongest reasoning | `anthropic/claude-opus-4-6` | `openai/gpt-5.2` | `gemini/gemini-2.5-pro` |
-| Standard coding | `anthropic/claude-sonnet-4-5-20250929` | `openai/gpt-5` | `gemini/gemini-2.5-pro` |
+| Standard coding | `anthropic/claude-sonnet-4-6` | `openai/gpt-5` | `gemini/gemini-2.5-pro` |
 | Fast/cheap | `anthropic/claude-haiku-4-5-20251001` | `openai/gpt-5-nano` | `gemini/gemini-2.5-flash-lite` |
 
 ---
@@ -75,9 +75,9 @@ When the primary model is unavailable or rate-limited, the router walks the fall
 
 ```bash
 # Primary model defaults (AUTOBUILDER_ prefix via pydantic-settings)
-AUTOBUILDER_DEFAULT_CODE_MODEL=anthropic/claude-sonnet-4-5-20250929
+AUTOBUILDER_DEFAULT_CODE_MODEL=anthropic/claude-sonnet-4-6
 AUTOBUILDER_DEFAULT_PLAN_MODEL=anthropic/claude-opus-4-6
-AUTOBUILDER_DEFAULT_REVIEW_MODEL=anthropic/claude-sonnet-4-5-20250929
+AUTOBUILDER_DEFAULT_REVIEW_MODEL=anthropic/claude-sonnet-4-6
 AUTOBUILDER_DEFAULT_FAST_MODEL=anthropic/claude-haiku-4-5-20251001
 
 # API keys (no prefix — provider standard)

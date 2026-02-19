@@ -247,13 +247,13 @@ def task_create(
 
 def task_update(
     task_id: str,
-    status: str | None = None,
+    status: TaskStatus | None = None,
     notes: str | None = None,
 ) -> str:
     """Update a shared task's status or add notes.""" ...
 
 def task_query(
-    filter: str | None = None,
+    status: TaskStatus | None = None,
     assignee: str | None = None,
 ) -> str:
     """Query shared tasks with optional status filter and assignee.""" ...

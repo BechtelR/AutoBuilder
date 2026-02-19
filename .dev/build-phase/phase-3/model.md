@@ -24,7 +24,7 @@ flowchart TB
     subgraph ENGINE["ENGINE LAYER"]
         direction TB
         Router["LlmRouter\n- from_settings()\n- select_model()\n- get_fallbacks()\n- to_dict() / cache_to_redis()\n(router/router.py)"]
-        ModelCallback["create_model_override_callback()\nAGENT_TASK_TYPES mapping\n(router/router.py)"]
+        ModelCallback["create_model_override_callback()\nAGENT_MODEL_ROLES mapping\n(router/router.py)"]
         ADKFactories["ADK Factories\n- create_session_service()\n- create_app_container()\n- create_runner()\n- create_echo_agent()\n(workers/adk.py)"]
         LogPlugin["LoggingPlugin\n(BasePlugin)\n(workers/adk.py)"]
         EchoAgent["EchoAgent\nLlmAgent (test pipeline)\n(workers/adk.py)"]
@@ -36,7 +36,7 @@ flowchart TB
         StreamHelpers["Redis Stream Helpers\nstream_key / stream_publish / stream_read_range\n(events/streams.py)"]
         Redis["Redis Streams\nworkflow:{id}:events"]
         PG["PostgreSQL\n(ADK tables + AutoBuilder tables)"]
-        ConfigEnums["Settings extensions\nTaskType, PipelineEventType\n(config/ + models/)"]
+        ConfigEnums["Settings extensions\nModelRole, PipelineEventType\n(config/ + models/)"]
     end
 
     %% Data flow
@@ -67,8 +67,8 @@ flowchart TB
 
 | Deliverable | Components |
 |---|---|
-| **P3.D1** Config + Domain Enums | `Settings` (4 model fields), `TaskType` enum, `PipelineEventType` enum, `app.models.__init__` re-exports |
-| **P3.D2** LLM Router + Model Override Callback | `LlmRouter` class, `_FALLBACK_CHAINS` dict (private, exposed via `get_fallbacks()`), `from_settings()`, `to_dict()`, `cache_to_redis()`, `create_model_override_callback()`, `AGENT_TASK_TYPES` dict |
+| **P3.D1** Config + Domain Enums | `Settings` (4 model fields), `ModelRole` enum, `PipelineEventType` enum, `app.models.__init__` re-exports |
+| **P3.D2** LLM Router + Model Override Callback | `LlmRouter` class, `_FALLBACK_CHAINS` dict (private, exposed via `get_fallbacks()`), `from_settings()`, `to_dict()`, `cache_to_redis()`, `create_model_override_callback()`, `AGENT_MODEL_ROLES` dict |
 | **P3.D3** Redis Cache + Stream Helpers | `cache_get()`, `cache_set()`, `cache_delete()` in `lib/cache.py`; `stream_key()`, `stream_publish()`, `stream_read_range()` in `events/streams.py` |
 | **P3.D4** Gateway Event Schema + Event Translation | `PipelineEvent` model, `EventPublisher` class (`translate`, `publish`, `publish_lifecycle`) |
 | **P3.D5** ADK Engine Setup | `create_session_service()`, `create_app_container()`, `create_runner()`, `create_echo_agent()`, `LoggingPlugin` class |
@@ -82,7 +82,7 @@ flowchart TB
 
 ```python
 class LlmRouter:
-    """Maps TaskType to LiteLLM model strings with fallback chain resolution."""
+    """Maps ModelRole to LiteLLM model strings with fallback chain resolution."""
 
     @classmethod
     def from_settings(cls, settings: Settings) -> LlmRouter:
@@ -90,7 +90,7 @@ class LlmRouter:
         ...
 
     def select_model(
-        self, task_type: TaskType, user_override: str | None = None
+        self, task_type: ModelRole, user_override: str | None = None
     ) -> str:
         """Resolve model: user_override → default for task_type."""
         ...
@@ -111,16 +111,16 @@ class LlmRouter:
 ### Model Override Callback Factory (Engine)
 
 ```python
-AGENT_TASK_TYPES: dict[str, TaskType]
-"""Module-level mapping: agent name → TaskType. Initially: echo_agent → FAST."""
+AGENT_MODEL_ROLES: dict[str, ModelRole]
+"""Module-level mapping: agent name → ModelRole. Initially: echo_agent → FAST."""
 
 def create_model_override_callback(
     router: LlmRouter,
 ) -> Callable[[CallbackContext, LlmRequest], LlmResponse | None]:
     """Return a before_model_callback that overrides llm_request.model via router.
 
-    Reads agent name from callback_context.agent_name, maps to TaskType
-    via AGENT_TASK_TYPES, calls router.select_model() with optional
+    Reads agent name from callback_context.agent_name, maps to ModelRole
+    via AGENT_MODEL_ROLES, calls router.select_model() with optional
     user:model_override from state. Returns None (proceed normally).
     """
     ...
@@ -320,7 +320,7 @@ def get_redis(request: Request) -> Redis:
 ### Enums (`app/models/enums.py`)
 
 ```python
-class TaskType(enum.StrEnum):
+class ModelRole(enum.StrEnum):
     """LLM task categories for model routing."""
     CODE = "CODE"          # Code generation and modification
     PLAN = "PLAN"          # Planning and decomposition
@@ -373,9 +373,9 @@ class WorkflowRunResponse(BaseModel):
 class Settings(BaseSettings):
     """Extended with LLM model defaults per task type."""
     # ... existing fields ...
-    default_code_model: str = "anthropic/claude-sonnet-4-5-20250929"
+    default_code_model: str = "anthropic/claude-sonnet-4-6"
     default_plan_model: str = "anthropic/claude-opus-4-6"
-    default_review_model: str = "anthropic/claude-sonnet-4-5-20250929"
+    default_review_model: str = "anthropic/claude-sonnet-4-6"
     default_fast_model: str = "anthropic/claude-haiku-4-5-20251001"
 ```
 
@@ -430,9 +430,9 @@ sequenceDiagram
 flowchart LR
     Settings["Settings\n(Pydantic)\ndefault_*_model: str"]
     Router["LlmRouter\n(from_settings)"]
-    TaskType["TaskType enum"]
+    ModelRole["ModelRole enum"]
     Callback["before_model_callback\n(create_model_override_callback)"]
-    AgentMap["AGENT_TASK_TYPES\necho_agent → FAST"]
+    AgentMap["AGENT_MODEL_ROLES\necho_agent → FAST"]
     ModelStr["LiteLLM model string"]
     LiteLlm["LiteLlm(model=...)"]
     EchoAgent["LlmAgent\n(model=LiteLlm)"]
@@ -441,7 +441,7 @@ flowchart LR
     Router --> Callback
     AgentMap --> Callback
     Callback -->|"overrides llm_request.model"| ModelStr
-    TaskType --> Router
+    ModelRole --> Router
     Router -->|"select_model()"| ModelStr
     ModelStr --> LiteLlm
     LiteLlm --> EchoAgent
@@ -566,7 +566,7 @@ Priority order (first match wins):
 |----------------|-------------|-------------|
 | `create_app_container(root_agent)` | Phase 5 (Agents) | Accepts any `BaseAgent`; Phase 5 passes Director (opus) instead of EchoAgent |
 | `LlmRouter.select_model()` | Phase 5 (Agents) | Real agents use CODE/PLAN/REVIEW task types |
-| `AGENT_TASK_TYPES` mapping | Phase 5 (Agents) | Extended with real agent names → task types |
+| `AGENT_MODEL_ROLES` mapping | Phase 5 (Agents) | Extended with real agent names → task types |
 | `before_model_callback` | Phase 5 (Agents) | Wired per-agent in Phase 3; becomes App-level plugin in Phase 5 |
 | `LlmRouter.get_fallbacks()` | Phase 11 (Adaptive) | Fallback chains defined now; consumed by LiteLLM retry logic |
 | `PipelineEvent` schema | Phase 10 (SSE) | SSE endpoint reads from Streams and pushes PipelineEvent JSON |
