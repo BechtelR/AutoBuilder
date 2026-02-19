@@ -1,6 +1,6 @@
 [← Architecture Overview](../02-ARCHITECTURE.md)
 
-# Tools & AutoBuilderToolset
+# Tools & GlobalToolset
 
 ## Overview
 
@@ -60,35 +60,127 @@ Each of these is a thin Python function (~5-30 lines) that ADK auto-wraps via `F
 
 All FunctionTools execute inside worker processes. They have direct access to the worker's filesystem and subprocess environment. The gateway never calls these tools directly -- it only enqueues workflow jobs that workers execute.
 
-### 3.1 Filesystem Tools
+**42 tools across 8 categories.**
+
+### 3.1 Filesystem Tools (10 tools)
+
+| Tool | Status | Purpose |
+|------|--------|---------|
+| `file_read(path, offset?, limit?)` | Keep | Read file contents |
+| `file_write(path, content)` | Keep | Create/overwrite file |
+| `file_edit(path, old, new, replace_all?)` | Keep | Targeted string replacement |
+| `file_insert(path, line, content)` | **New** | Insert content at line number |
+| `file_multi_edit(path, edits)` | **New** | Atomic multi-site replacements |
+| `file_glob(pattern, path?)` | **New** (replaces file_search) | Find files by name pattern |
+| `file_grep(pattern, path?, glob?, context?)` | **New** (replaces file_search) | Search file contents by regex |
+| `file_move(src, dst)` | **New** | Move/rename file |
+| `file_delete(path)` | **New** | Delete file |
+| `directory_list(path, depth?)` | Enhanced | Add depth control |
 
 ```python
-def file_read(path: str) -> str:
-    """Read file contents."""
+def file_read(path: str, offset: int | None = None, limit: int | None = None) -> str:
+    """Read file contents with optional line offset and limit."""
 
 def file_write(path: str, content: str) -> str:
     """Write or create a file with the given content."""
 
-def file_edit(path: str, old: str, new: str) -> str:
+def file_edit(path: str, old: str, new: str, replace_all: bool = False) -> str:
     """Targeted string replacement within a file."""
 
-def file_search(pattern: str, path: str) -> str:
-    """Search for files or content across the codebase (grep/find)."""
+def file_insert(path: str, line: int, content: str) -> str:
+    """Insert content at a specific line number, shifting existing lines down."""
 
-def directory_list(path: str) -> str:
-    """List directory contents as a tree."""
+def file_multi_edit(path: str, edits: list[dict[str, str]]) -> str:
+    """Apply multiple non-overlapping edits atomically in a single pass."""
+
+def file_glob(pattern: str, path: str | None = None) -> str:
+    """Find files by name pattern (glob syntax). Returns matching paths."""
+
+def file_grep(pattern: str, path: str | None = None, glob: str | None = None, context: int | None = None) -> str:
+    """Search file contents by regex pattern with optional file filtering and context lines."""
+
+def file_move(src: str, dst: str) -> str:
+    """Move or rename a file."""
+
+def file_delete(path: str) -> str:
+    """Delete a file."""
+
+def directory_list(path: str, depth: int | None = None) -> str:
+    """List directory contents as a tree with optional depth control."""
 ```
 
-### 3.2 Execution Tools
+### 3.2 Code Intelligence (2 tools)
+
+| Tool | Purpose |
+|------|---------|
+| `code_symbols(path, language?)` | Tree-sitter symbol extraction (classes, functions, imports). Language auto-detected. Grammars are runtime config. |
+| `run_diagnostics(path, tool?)` | On-demand lint/type-check. Tool selection configurable per project. |
 
 ```python
-def bash_exec(command: str, cwd: str | None = None) -> str:
+def code_symbols(path: str, language: str | None = None) -> str:
+    """Extract symbols (classes, functions, imports) via tree-sitter. Language auto-detected from extension."""
+
+def run_diagnostics(path: str, tool: str | None = None) -> str:
+    """Run lint or type-check on a file. Tool selection configurable per project."""
+```
+
+### 3.3 Execution Tools (2 tools)
+
+| Tool | Status | Purpose |
+|------|--------|---------|
+| `bash_exec(command, cwd?, timeout?)` | Keep | Shell execution with timeout/capture |
+| `http_request(method, url, headers?, body?)` | **New** | Structured HTTP calls (API testing, webhooks) |
+
+```python
+def bash_exec(command: str, cwd: str | None = None, timeout: int | None = None) -> str:
     """Run a shell command. Subprocess wrapper with timeout and output capture."""
+
+def http_request(method: str, url: str, headers: dict[str, str] | None = None, body: str | None = None) -> str:
+    """Structured HTTP call for API testing, webhooks, and external service interaction."""
 ```
 
 Note: `bash_exec` must be idempotent or include duplicate-run protection for compatibility with ADK's Resume feature (tools may run more than once on resume).
 
-### 3.3 Web Tools
+### 3.4 Git Tools (8 tools)
+
+| Tool | Status | Purpose |
+|------|--------|---------|
+| `git_status(path)` | Keep | Repo state |
+| `git_commit(path, message, files?)` | Enhanced | Add selective file staging |
+| `git_branch(path, name, action)` | Keep | Branch management |
+| `git_diff(path, ref?)` | Keep | Show changes |
+| `git_log(path, count?, ref?)` | **New** | Commit history |
+| `git_show(path, ref)` | **New** | Inspect specific commit |
+| `git_worktree(path, action, branch?)` | **New** | Manage worktrees (parallel execution) |
+| `git_apply(path, patch)` | **New** | Apply unified diff patch |
+
+```python
+def git_status(path: str) -> str:
+    """Current repository state."""
+
+def git_commit(path: str, message: str, files: list[str] | None = None) -> str:
+    """Stage and commit changes. Optional selective file staging."""
+
+def git_branch(path: str, name: str, action: str) -> str:
+    """Create, switch, or delete branches."""
+
+def git_diff(path: str, ref: str | None = None) -> str:
+    """Show changes against a reference."""
+
+def git_log(path: str, count: int | None = None, ref: str | None = None) -> str:
+    """Show commit history with optional count limit and ref filter."""
+
+def git_show(path: str, ref: str) -> str:
+    """Inspect a specific commit (message, diff, metadata)."""
+
+def git_worktree(path: str, action: str, branch: str | None = None) -> str:
+    """Manage git worktrees for parallel execution across branches."""
+
+def git_apply(path: str, patch: str) -> str:
+    """Apply a unified diff patch to the working tree."""
+```
+
+### 3.5 Web Tools (2 tools)
 
 ```python
 def web_search(query: str) -> str:
@@ -100,7 +192,22 @@ def web_fetch(url: str) -> str:
 
 Web search provider selection (SearXNG vs Brave vs Tavily) is an open design question. See consolidated planning doc, Open Questions #7.
 
-### 3.4 Task Management Tools
+### 3.6 Task Management (6 tools)
+
+Task management operates at three tiers:
+
+- **Deliverables** (DB truth source) -- PM-managed, dependency-tracked, lifecycle-managed
+- **Tasks** (cross-session shared) -- visible across agent sessions within a project
+- **Todos** (session-scoped) -- agent scratchpad, dies with session
+
+| Tool | Tier | Status | Purpose |
+|------|------|--------|---------|
+| `todo_read()` | Session | Keep | Read session todo list |
+| `todo_write(action, task_id, content)` | Session | Keep | Modify session todo |
+| `todo_list(filter?)` | Session | Keep | List session todos |
+| `task_create(title, description, assignee?, tags?)` | Shared | **New** | Create cross-session task |
+| `task_update(task_id, status?, notes?)` | Shared | **New** | Update shared task |
+| `task_query(filter?, assignee?)` | Shared | **New** | Query shared tasks |
 
 ```python
 def todo_read() -> str:
@@ -111,25 +218,84 @@ def todo_write(action: str, task_id: str, content: str) -> str:
 
 def todo_list(filter: str | None = None) -> str:
     """List tasks with optional status filter."""
+
+def task_create(title: str, description: str, assignee: str | None = None, tags: list[str] | None = None) -> str:
+    """Create a cross-session task visible to all agents in the project."""
+
+def task_update(task_id: str, status: str | None = None, notes: str | None = None) -> str:
+    """Update a shared task's status or add notes."""
+
+def task_query(filter: str | None = None, assignee: str | None = None) -> str:
+    """Query shared tasks with optional status filter and assignee."""
 ```
 
-### 3.5 Git Tools
+### 3.7 PM Management Tools (6 tools)
+
+| Tool | Status | Purpose |
+|------|--------|---------|
+| `select_ready_batch(project_id)` | Keep | Dependency-aware batch selection |
+| `escalate_to_director(priority, context, request_type)` | **New** (replaces PM's `enqueue_ceo_item`) | PM → Director queue |
+| `update_deliverable(deliverable_id, status, notes?)` | **New** | Deliverable lifecycle management |
+| `query_deliverables(project_id, status?)` | **New** | Query deliverable state |
+| `reorder_deliverables(project_id, order)` | **New** | Change execution priority |
+| `manage_dependencies(action, source_id, target_id?)` | **New** | Add/remove/query deliverable deps |
 
 ```python
-def git_status(path: str) -> str:
-    """Current repository state."""
+def select_ready_batch(project_id: str) -> str:
+    """Dependency-aware batch selection via topological sort. Returns the next
+    set of deliverables whose prerequisites are satisfied."""
 
-def git_commit(path: str, message: str) -> str:
-    """Stage and commit changes."""
+def escalate_to_director(priority: str, context: str, request_type: str) -> str:
+    """Escalate an issue from PM to the Director queue for resolution."""
 
-def git_branch(path: str, name: str, action: str) -> str:
-    """Create, switch, or delete branches."""
+def update_deliverable(deliverable_id: str, status: str, notes: str | None = None) -> str:
+    """Update a deliverable's lifecycle status with optional notes."""
 
-def git_diff(path: str, ref: str | None = None) -> str:
-    """Show changes against a reference."""
+def query_deliverables(project_id: str, status: str | None = None) -> str:
+    """Query deliverable state for a project, optionally filtered by status."""
+
+def reorder_deliverables(project_id: str, order: list[str]) -> str:
+    """Change execution priority by reordering deliverables."""
+
+def manage_dependencies(action: str, source_id: str, target_id: str | None = None) -> str:
+    """Add, remove, or query deliverable dependency relationships."""
 ```
 
-### 3.6 FunctionTool Registration
+**Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment. `checkpoint_project` is an `after_agent_callback` on DeliverablePipeline that fires after each deliverable completes, persisting state via `CallbackContext`. `run_regression_tests` is a `RegressionTestAgent` (CustomAgent) wired into the pipeline after each batch -- it reads the PM's regression policy from session state, runs tests when the policy says to, and no-ops otherwise. Always present in the pipeline, policy-aware. See [Agents](./agents.md) for details.
+
+### 3.8 Director Management Tools (6 tools)
+
+| Tool | Status | Purpose |
+|------|--------|---------|
+| `enqueue_ceo_item(type, priority, message, metadata)` | Keep (Director-only now) | Director → CEO queue |
+| `list_projects(status?)` | **New** | Cross-project visibility |
+| `query_project_status(project_id)` | **New** | PM status, batch progress, cost |
+| `override_pm(project_id, action, reason)` | **New** | Direct PM intervention (pause/resume/reorder/correct) |
+| `get_project_context(path?)` | **New** | Detect project type, stack, conventions |
+| `query_dependency_graph(project_id, deliverable_id?)` | **New** | Query/visualize dependency graph |
+
+```python
+def enqueue_ceo_item(item_type: str, priority: str, message: str, metadata: str) -> str:
+    """Push a notification, approval request, escalation, or task to the unified
+    CEO queue. Director-only — PM uses escalate_to_director instead."""
+
+def list_projects(status: str | None = None) -> str:
+    """List all projects with optional status filter for cross-project visibility."""
+
+def query_project_status(project_id: str) -> str:
+    """Query detailed project status including PM state, batch progress, and cost."""
+
+def override_pm(project_id: str, action: str, reason: str) -> str:
+    """Direct PM intervention: pause, resume, reorder, or correct a PM's behavior."""
+
+def get_project_context(path: str | None = None) -> str:
+    """Detect project type, technology stack, and conventions from the codebase."""
+
+def query_dependency_graph(project_id: str, deliverable_id: str | None = None) -> str:
+    """Query or visualize the deliverable dependency graph for a project."""
+```
+
+### 3.9 FunctionTool Registration
 
 Tools are Python functions in the `app/tools/` module, organized by function type. ADK auto-wraps them via `FunctionTool`:
 
@@ -140,24 +306,7 @@ from google.adk.tools.function_tool import FunctionTool
 tool = FunctionTool(file_read)
 ```
 
-`AutoBuilderToolset` (see Section 7) handles per-role tool filtering via ADK's native `BaseToolset.get_tools(readonly_context)`. Workflows declare which tools they require in their `WORKFLOW.yaml` manifest via `required_tools` and `optional_tools`.
-
-### 3.7 PM & Director Tools
-
-The PM uses FunctionTools for batch composition and escalation. The Director uses the same escalation tool for CEO communication.
-
-```python
-def select_ready_batch(project_id: str) -> str:
-    """Dependency-aware batch selection via topological sort. Returns the next
-    set of deliverables whose prerequisites are satisfied."""
-
-def enqueue_ceo_item(item_type: str, priority: str, message: str, metadata: str) -> str:
-    """Push a notification, approval request, escalation, or task to the unified
-    CEO queue. Used by PM and Director to communicate with the CEO without
-    injecting items into chat sessions."""
-```
-
-**Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment. `checkpoint_project` is an `after_agent_callback` on DeliverablePipeline that fires after each deliverable completes, persisting state via `CallbackContext`. `run_regression_tests` is a `RegressionTestAgent` (CustomAgent) wired into the pipeline after each batch -- it reads the PM's regression policy from session state, runs tests when the policy says to, and no-ops otherwise. Always present in the pipeline, policy-aware. See [Agents](./agents.md) for details.
+`GlobalToolset` (see Section 7) handles per-role tool filtering via ADK's native `BaseToolset.get_tools(readonly_context)`. Workflows declare which tools they require in their `WORKFLOW.yaml` manifest via `required_tools` and `optional_tools`.
 
 ---
 
@@ -265,38 +414,38 @@ Phase 2 will add cost tracking, latency monitoring, and adaptive selection.
 
 ---
 
-## 7. AutoBuilderToolset (ADK-Native Tool Authorization)
+## 7. GlobalToolset (ADK-Native Tool Authorization)
 
-Tools live in one place: the `app/tools/` module, organized by function type (filesystem, git, execution, web, task, project). Authorization is separate: a config-driven permission layer powered by ADK's native `BaseToolset` mechanism. We use ADK's primitives, not a custom registry.
+Tools live in one place: the `app/tools/` module, organized by function type (filesystem, code, git, execution, web, task, management). Authorization is separate: a config-driven permission layer powered by ADK's native `BaseToolset` mechanism. We use ADK's primitives, not a custom registry.
 
 ### 7.1 Architecture
 
 ```
-Tools (code)          ->  app/tools/filesystem.py, git.py, execution.py, web.py, ...
+Tools (code)          ->  app/tools/filesystem.py, code.py, git.py, execution.py, web.py, task.py, management.py
 Authorization (config)->  permission config defining which role gets which tools
-Vending (ADK-native)  ->  AutoBuilderToolset(BaseToolset).get_tools(readonly_context)
+Vending (ADK-native)  ->  GlobalToolset(BaseToolset).get_tools(readonly_context)
 ```
 
-**Separation of concerns:** Tool implementations are pure Python functions. Permission logic is centralized in `AutoBuilderToolset`. ADK's `get_tools(readonly_context)` is the native mechanism for context-sensitive tool vending -- the readonly context carries the agent's role, and the toolset returns only the tools that role is permitted to use.
+**Separation of concerns:** Tool implementations are pure Python functions. Permission logic is centralized in `GlobalToolset`. ADK's `get_tools(readonly_context)` is the native mechanism for context-sensitive tool vending -- the readonly context carries the agent's role, and the toolset returns only the tools that role is permitted to use.
 
 ### 7.2 Tool Registry Summary
 
 | Concern | Mechanism |
 |---------|-----------|
-| Tool code | `app/tools/` module, organized by function type |
-| Per-role filtering | `AutoBuilderToolset.get_tools(readonly_context)` |
+| Tool code | `app/tools/` module -- 8 categories: filesystem, code intelligence, execution, git, web, task management, PM management, Director management |
+| Per-role filtering | `GlobalToolset.get_tools(readonly_context)` |
 | Permission config | Config-driven: CEO restricts Director, Director restricts PM, PM restricts Worker |
-| Role scoping | `plan_agent` gets read-only tools, `code_agent` gets full tools, etc. |
+| Role scoping | Worker agents get category-specific subsets (see 7.5); PM gets PM management tools; Director gets Director management tools |
 | Tool authoring | Director can write new tool functions; CEO approval required by default |
 
 Restrictions cascade downward through the permission config -- a PM cannot access Director tools, a Worker cannot access PM tools. Within each tier, individual agents have further role-based scoping enforced by the toolset at agent construction time.
 
-### 7.3 AutoBuilderToolset Implementation
+### 7.3 GlobalToolset Implementation
 
 ```python
 from google.adk.tools import BaseToolset, BaseTool
 
-class AutoBuilderToolset(BaseToolset):
+class GlobalToolset(BaseToolset):
     """Vends per-role tools based on permission config.
 
     ADK calls get_tools() during agent construction, passing a
@@ -327,15 +476,27 @@ All restrictions flow through the same config mechanism. A parent tier can disab
 
 ### 7.5 Role-Based Tool Scoping
 
-Within each tier, individual agents have further scoping based on their role:
+Within each tier, individual agents have scoping based on their role. The table below shows which tool categories and specific tools each role can access:
 
-- `plan_agent` (worker) -- read-only filesystem tools, no `file_write` or `bash_exec`
-- `code_agent` (worker) -- full filesystem and execution tools
-- `review_agent` (worker) -- read-only tools, no mutation
-- PM -- batch selection tool (`select_ready_batch`) + shared tools. Note: `checkpoint_project` (`after_agent_callback` on DeliverablePipeline) and `run_regression_tests` (`RegressionTestAgent`, CustomAgent in pipeline) are not tools -- they are not LLM-discretionary.
-- Director -- governance tools, resource management, cross-project tools + shared tools
+| Role | Filesystem | Code Intelligence | Execution | Git | Web | Task Mgmt | Management |
+|------|-----------|-------------------|-----------|-----|-----|-----------|------------|
+| `plan_agent` | Read-only | Full | -- | Read-only | Full | Session todos | -- |
+| `code_agent` | Full | Full | Full | Full | Full | Session todos | -- |
+| `review_agent` | Read-only | Full | -- | Read-only | Full | Session todos | -- |
+| `fix_agent` | Full | Full | `bash_exec` only | Read-only (no commit) | Full | Session todos | -- |
+| PM | -- | -- | -- | -- | -- | Shared tasks | PM tools (6) |
+| Director | -- | -- | -- | -- | -- | Shared tasks | Director tools (6) |
 
-`AutoBuilderToolset.get_tools()` enforces this scoping at agent construction time, not through directory placement.
+**Detailed per-role breakdown:**
+
+- **`plan_agent`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
+- **`code_agent`** (worker): Full filesystem (all 10), full code intelligence (2), full execution (`bash_exec`, `http_request`), full git (all 8), full web (2), session todos (3)
+- **`review_agent`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
+- **`fix_agent`** (worker): Full filesystem (all 10), full code intelligence (2), `bash_exec` (no `http_request`), read-only git (`git_status`, `git_diff`, `git_log`, `git_show` -- no `git_commit`, `git_branch`, `git_worktree`, `git_apply`; `code_agent` handles commits), `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
+- **PM**: `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`. Note: `checkpoint_project` (`after_agent_callback` on DeliverablePipeline) and `run_regression_tests` (`RegressionTestAgent`, CustomAgent in pipeline) are not tools -- they are not LLM-discretionary.
+- **Director**: `enqueue_ceo_item`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`
+
+`GlobalToolset.get_tools()` enforces this scoping at agent construction time, not through directory placement.
 
 ### 7.6 Director Tool Authoring
 
@@ -346,7 +507,7 @@ Director can author new tools (writes Python functions to the tools module). **C
 | Primitive | Purpose | AutoBuilder Use |
 |-----------|---------|-----------------|
 | `FunctionTool` | Wrap Python function as LLM-callable tool | All core tools (filesystem, git, bash, etc.) |
-| `BaseToolset` | Context-sensitive tool vending via `get_tools()` | `AutoBuilderToolset` for role-based filtering |
+| `BaseToolset` | Context-sensitive tool vending via `get_tools()` | `GlobalToolset` for role-based filtering |
 | `tool_filter` | Additional per-agent tool filtering | Fine-grained restrictions within a role |
 | `McpToolset` | Connect MCP servers | Reserved for complex integrations (used sparingly) |
 | `OpenAPIToolset` | Generate tools from OpenAPI spec | Potential future use for external API integration |
@@ -365,5 +526,5 @@ Director can author new tools (writes Python functions to the tools module). **C
 
 ---
 
-*Document Version: 3.0*
-*Last Updated: 2026-02-17*
+*Document Version: 4.0*
+*Last Updated: 2026-02-18*

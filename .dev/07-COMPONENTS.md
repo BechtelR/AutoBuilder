@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 1.1.0*
+*Version: 1.2.2*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -157,10 +157,14 @@ Source: `architecture/events.md`
 | V13 | CEO queue type enum (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) | config | 5 | events.md §4 | — |
 | V14 | CEO queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 5 | events.md §4 | — |
 | V15 | CEO queue status enum (`PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`) | config | 5 | events.md §4 | — |
-| V16 | `enqueue_ceo_item` FunctionTool | tool | 4 | events.md §4 | CEO queue table |
 | V17 | CEO queue Redis Stream trigger consumer | mechanism | DROP | events.md §4 | `enqueue_ceo_item` FunctionTool is the write path; second write path via stream consumer is over-engineering |
 | V18 | CEO resolved approval → session state writeback | mechanism | 5 | events.md §4 | CEO queue, ADK session |
 | V19 | Batch completion event publishing | mechanism | 8 | events.md §4 | Redis Streams |
+| V20 | Director queue type enum (`ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT`) | config | 4 | events.md §Director Queue | — |
+| V21 | Director queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 4 | events.md §Director Queue | — |
+| V22 | Director queue status enum (`PENDING`, `IN_PROGRESS`, `RESOLVED`, `FORWARDED_TO_CEO`) | config | 4 | events.md §Director Queue | — |
+| V23 | `director_queue` table | db | 5 | events.md §Director Queue | Alembic |
+| V24 | `director_queue` migration | migration | 5 | events.md §Director Queue | Alembic |
 
 ---
 
@@ -183,7 +187,7 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 | A09 | Director personality seed config file | config | 5 | agents.md §4 | — |
 | A10 | Director tool authoring + CEO approval gate | mechanism | 13+ | agents.md §4 | Tool registry, CEO queue |
 | A11 | Director cross-project pattern propagation | mechanism | 14 | agents.md §4 | `MemoryService` |
-| A12 | Director governance tools | tool | 13+ | agents.md §4 | `AutoBuilderToolset` |
+| A12 | Director governance tools | tool | 13+ | agents.md §4 | `GlobalToolset` |
 | A13 | Director "Main" project (permanent chat session) | mechanism | 5 | agents.md §4 | Session model |
 | A14 | `before_agent_callback` (Director supervision) | callback | 5 | agents.md §5 | Director agent |
 | A15 | `after_agent_callback` (Director supervision) | callback | 5 | agents.md §5 | Director agent |
@@ -260,44 +264,71 @@ Source: `architecture/tools.md`
 | T01 | `file_read` FunctionTool | tool | 4 | tools.md §3.1 | — |
 | T02 | `file_write` FunctionTool | tool | 4 | tools.md §3.1 | — |
 | T03 | `file_edit` FunctionTool | tool | 4 | tools.md §3.1 | — |
-| T04 | `file_search` FunctionTool | tool | 4 | tools.md §3.1 | — |
+| T04 | `file_glob` FunctionTool | tool | 4 | tools.md §3.1 | — |
+| T04b | `file_grep` FunctionTool | tool | 4 | tools.md §3.1 | — |
 | T05 | `directory_list` FunctionTool | tool | 4 | tools.md §3.1 | — |
-| T06 | `bash_exec` FunctionTool | tool | 4 | tools.md §3.2 | — |
-| T07 | `git_status` FunctionTool | tool | 4 | tools.md §3.5 | — |
-| T08 | `git_commit` FunctionTool | tool | 4 | tools.md §3.5 | — |
-| T09 | `git_branch` FunctionTool | tool | 4 | tools.md §3.5 | — |
-| T10 | `git_diff` FunctionTool | tool | 4 | tools.md §3.5 | — |
-| T11 | `web_search` FunctionTool | tool | 4 | tools.md §3.3 | Tavily primary, Brave fallback |
-| T12 | `web_fetch` FunctionTool | tool | 4 | tools.md §3.3 | — |
-| T13 | `todo_read` FunctionTool | tool | 4 | tools.md §3.4 | Session state |
-| T14 | `todo_write` FunctionTool | tool | 4 | tools.md §3.4 | Session state |
-| T15 | `todo_list` FunctionTool | tool | 4 | tools.md §3.4 | Session state |
+| T06 | `bash_exec` FunctionTool | tool | 4 | tools.md §3.3 | — |
+| T07 | `git_status` FunctionTool | tool | 4 | tools.md §3.4 | — |
+| T08 | `git_commit` FunctionTool | tool | 4 | tools.md §3.4 | — |
+| T09 | `git_branch` FunctionTool | tool | 4 | tools.md §3.4 | — |
+| T10 | `git_diff` FunctionTool | tool | 4 | tools.md §3.4 | — |
+| T11 | `web_search` FunctionTool | tool | 4 | tools.md §3.5 | Tavily primary, Brave fallback |
+| T12 | `web_fetch` FunctionTool | tool | 4 | tools.md §3.5 | — |
+| T13 | `todo_read` FunctionTool | tool | 4 | tools.md §3.6 | Session state |
+| T14 | `todo_write` FunctionTool | tool | 4 | tools.md §3.6 | Session state |
+| T15 | `todo_list` FunctionTool | tool | 4 | tools.md §3.6 | Session state |
 | T16 | `select_ready_batch` FunctionTool | tool | 4 | tools.md §3.7 | Deliverable state |
-| T17 | `enqueue_ceo_item` FunctionTool | tool | 4 | tools.md §3.7 | CEO queue |
+| T17 | `enqueue_ceo_item` FunctionTool | tool | 4 | tools.md §3.8 | CEO queue |
+| T18 | `file_insert` FunctionTool | tool | 4 | tools.md §3.1 | — |
+| T19 | `file_multi_edit` FunctionTool | tool | 4 | tools.md §3.1 | — |
+| T20 | `file_move` FunctionTool | tool | 4 | tools.md §3.1 | — |
+| T21 | `file_delete` FunctionTool | tool | 4 | tools.md §3.1 | — |
+| T22 | `code_symbols` FunctionTool | tool | 4 | tools.md §3.2 | tree-sitter |
+| T23 | `run_diagnostics` FunctionTool | tool | 4 | tools.md §3.2 | Project config |
+| T24 | `http_request` FunctionTool | tool | 4 | tools.md §3.3 | — |
+| T25 | `git_log` FunctionTool | tool | 4 | tools.md §3.4 | — |
+| T26 | `git_show` FunctionTool | tool | 4 | tools.md §3.4 | — |
+| T27 | `git_worktree` FunctionTool | tool | 4 | tools.md §3.4 | — |
+| T28 | `git_apply` FunctionTool | tool | 4 | tools.md §3.4 | — |
+| T29 | `task_create` FunctionTool | tool | 4 | tools.md §3.6 | Shared task store |
+| T30b | `task_update` FunctionTool | tool | 4 | tools.md §3.6 | Shared task store |
+| T30c | `task_query` FunctionTool | tool | 4 | tools.md §3.6 | Shared task store |
+| T31 | `escalate_to_director` FunctionTool | tool | 4 | tools.md §3.7 | Director queue |
+| T32b | `update_deliverable` FunctionTool | tool | 4 | tools.md §3.7 | Deliverable state |
+| T33b | `query_deliverables` FunctionTool | tool | 4 | tools.md §3.7 | Deliverable state |
+| T34b | `reorder_deliverables` FunctionTool | tool | 4 | tools.md §3.7 | Deliverable state |
+| T35b | `manage_dependencies` FunctionTool | tool | 4 | tools.md §3.7 | Deliverable state |
+| T36b | `list_projects` FunctionTool | tool | 4 | tools.md §3.8 | Project state |
+| T37b | `query_project_status` FunctionTool | tool | 4 | tools.md §3.8 | Project state |
+| T38 | `override_pm` FunctionTool | tool | 4 | tools.md §3.8 | PM agent, event stream |
+| T39 | `get_project_context` FunctionTool | tool | 4 | tools.md §3.8 | Filesystem |
+| T40 | `query_dependency_graph` FunctionTool | tool | 4 | tools.md §3.8 | Deliverable state |
 
 ### 7.2 Tool Modules
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| T20 | `app/tools/filesystem.py` | module | 4 | tools.md §7.1 | — |
-| T21 | `app/tools/git.py` | module | 4 | tools.md §7.1 | — |
-| T22 | `app/tools/execution.py` | module | 4 | tools.md §7.1 | — |
-| T23 | `app/tools/web.py` | module | 4 | tools.md §7.1 | — |
-| T24 | `app/tools/task.py` | module | 4 | tools.md §7.1 | — |
-| T25 | `app/tools/project.py` | module | 4 | tools.md §7.1 | — |
+| TM01 | `app/tools/filesystem.py` | module | 4 | tools.md §7.1 | — |
+| TM02 | `app/tools/git.py` | module | 4 | tools.md §7.1 | — |
+| TM03 | `app/tools/execution.py` | module | 4 | tools.md §7.1 | — |
+| TM04 | `app/tools/web.py` | module | 4 | tools.md §7.1 | — |
+| TM05 | `app/tools/task.py` | module | 4 | tools.md §7.1 | — |
+| TM06 | `app/tools/management.py` | module | 4 | tools.md §7.1 | — |
+| TM07 | `app/tools/code.py` | module | 4 | tools.md §7.1 | tree-sitter |
 
-### 7.3 Toolset & Permissions
+### 7.3 GlobalToolset & Permissions
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| T30 | `AutoBuilderToolset` (BaseToolset) | module | 4 | tools.md §7.3 | All FunctionTools |
-| T31 | `resolve_role()` (role from ReadonlyContext) | module | 4 | tools.md §7.3 | ADK ReadonlyContext |
-| T32 | Cascading permission config | config | 4 | tools.md §7.4 | — |
-| T33 | Role scoping: `plan_agent` (read-only) | config | 4 | tools.md §7.5 | AutoBuilderToolset |
-| T34 | Role scoping: `code_agent` (full tools) | config | 4 | tools.md §7.5 | AutoBuilderToolset |
-| T35 | Role scoping: `review_agent` (read-only) | config | 4 | tools.md §7.5 | AutoBuilderToolset |
-| T36 | Role scoping: PM (batch + shared) | config | 4 | tools.md §7.5 | AutoBuilderToolset |
-| T37 | Role scoping: Director (governance + shared) | config | 4 | tools.md §7.5 | AutoBuilderToolset |
+| TS01 | `GlobalToolset` (BaseToolset) | module | 4 | tools.md §7.3 | All FunctionTools |
+| TS02 | `resolve_role()` (role from ReadonlyContext) | module | 4 | tools.md §7.3 | ADK ReadonlyContext |
+| TS03 | Cascading permission config | config | 4 | tools.md §7.4 | — |
+| TS04 | Role scoping: `plan_agent` (read-only) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS05 | Role scoping: `code_agent` (full tools) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS06 | Role scoping: `review_agent` (read-only) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS07 | Role scoping: `fix_agent` (full FS, limited exec/git) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS08 | Role scoping: PM (batch + shared) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS09 | Role scoping: Director (governance + shared) | config | 4 | tools.md §7.5 | GlobalToolset |
 
 ---
 
@@ -368,7 +399,7 @@ Source: `architecture/workflows.md`
 | F02 | `WorkflowRegistry.match()` (keyword matching) | mechanism | 7 | workflows.md §4 | — |
 | F03 | `WorkflowRegistry.get()` (explicit lookup) | mechanism | 7 | workflows.md §4 | — |
 | F04 | `WorkflowRegistry.list_available()` | mechanism | 7 | workflows.md §4 | — |
-| F05 | `WorkflowRegistry.create_pipeline()` | mechanism | 7 | workflows.md §4 | AutoBuilderToolset, SkillLibrary |
+| F05 | `WorkflowRegistry.create_pipeline()` | mechanism | 7 | workflows.md §4 | GlobalToolset, SkillLibrary |
 | F06 | `WorkflowEntry` Pydantic model | module | 7 | workflows.md §4 | — |
 | F07 | `WORKFLOW.yaml` manifest schema | config | 7 | workflows.md §5 | — |
 | F08 | Workflow trigger matching (keywords) | mechanism | 7 | workflows.md §4 | — |
@@ -506,6 +537,7 @@ Components removed from the registry as unnecessary or over-engineered:
 | # | Component | Reason |
 |---|-----------|--------|
 | D09 | `skills` table | File-based + Redis cache is sufficient per current architecture |
+| V16 | `enqueue_ceo_item` FunctionTool | Duplicate of T17 — FunctionTool, canonical entry in Section 7.1 |
 | V17 | CEO queue Redis Stream trigger consumer | `enqueue_ceo_item` FunctionTool is the write path; second write path via stream consumer is over-engineering |
 
 ---
@@ -514,22 +546,22 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Metric | Count |
 |--------|-------|
-| Total components | 272 |
-| Dropped | 2 |
-| Active components | 270 |
-| Assigned (with phase) | 270 |
+| Total components | 305 |
+| Dropped | 3 |
+| Active components | 302 |
+| Assigned (with phase) | 302 |
 | **Unassigned (gaps)** | **0** |
 | Phase 0-2 (done) | 19 |
 | Phase 3 | 35 |
-| Phase 4 | 33 |
-| Phase 5 | 50 |
+| Phase 4 | 62 |
+| Phase 5 | 53 |
 | Phase 6 | 23 |
 | Phase 7 | 20 |
-| Phase 8 | 19 |
+| Phase 8 | 20 |
 | Phase 9 | 11 |
 | Phase 10 | 25 |
 | Phase 11 | 17 |
-| Phase 12 | 11 |
+| Phase 12 | 12 |
 | Phase 13 / 13+ / 14 | 6 |
 
 ---
@@ -538,10 +570,13 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2.2 | 2026-02-18 | Fix: drop duplicate V16 entry (`enqueue_ceo_item` counted twice); canonical entry is T17 in Section 7.1; update statistics (Total 306→305, Dropped 2→3, Active 304→302, Phase 4 63→62) |
+| 1.2.1 | 2026-02-18 | Fix: section ref mismatches (T06-T17), ID collisions (Tool Modules → TM##, Toolset → TS##), add missing fix_agent scoping (TS07), correct statistics, fix dashboard phase comment in 03-STRUCTURE.md |
+| 1.2.0 | 2026-02-18 | Phase 4 toolset expansion: 42 tools (was 17), Director queue enums, module rename project.py → management.py + new code.py |
 | 1.1.0 | 2026-02-17 | All 55 gaps resolved: 53 assigned to phases, 2 dropped (D09, V17) |
 | 1.0.0 | 2026-02-17 | Initial BOM — exhaustive extraction from 13 architecture domain files |
 
 ---
 
-*Document Version: 1.1.0*
-*Last Updated: 2026-02-17*
+*Document Version: 1.2.2*
+*Last Updated: 2026-02-18*

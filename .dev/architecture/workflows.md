@@ -164,7 +164,7 @@ class WorkflowRegistry:
 
 **Pipeline instantiation is deferred.** The registry indexes manifests at startup (lightweight YAML parsing) but only instantiates the ADK pipeline when `create_pipeline()` is called. This avoids loading agent definitions and importing modules for workflows that are not used.
 
-**create_pipeline receives shared infrastructure.** The `toolset` (`AutoBuilderToolset`), `skill_library`, and `config` are passed to the workflow's `pipeline.py` module, which uses them to construct its ADK agent tree. The workflow does not need to know how tools or skills are managed — it receives them as dependencies.
+**create_pipeline receives shared infrastructure.** The `toolset` (`GlobalToolset`), `skill_library`, and `config` are passed to the workflow's `pipeline.py` module, which uses them to construct its ADK agent tree. The workflow does not need to know how tools or skills are managed — it receives them as dependencies.
 
 ---
 
@@ -176,7 +176,7 @@ All workflows operate on the same platform foundation:
 
 - **Gateway API** — FastAPI REST + SSE endpoints. Clients interact with workflows through the gateway, not directly.
 - **Worker execution** — ARQ workers execute ADK pipelines. Workflows run in worker processes.
-- **AutoBuilderToolset** — FunctionTools available to all workflows (filesystem, bash, git, web, todo), vended per-role via ADK's `BaseToolset.get_tools()`
+- **GlobalToolset** — FunctionTools available to all workflows (filesystem, bash, git, web, todo), vended per-role via ADK's `BaseToolset.get_tools()`
 - **Skill library** — global + project-local skills, loaded by SkillLoaderAgent
 - **LLM Router** — dynamic model selection based on task type and routing rules
 - **State management** — session/user/app/temp state scopes via ADK's session system, persisted to single database
@@ -367,7 +367,7 @@ auto-code defines its own:
 
 It does not define:
 
-- How tools work (shared FunctionTools from `AutoBuilderToolset`)
+- How tools work (shared FunctionTools from `GlobalToolset`)
 - How skills load (shared SkillLoaderAgent + SkillLibrary)
 - How models are selected (shared LLM Router)
 - How state persists (shared database via DatabaseSessionService)

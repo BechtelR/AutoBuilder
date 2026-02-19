@@ -32,7 +32,7 @@ Six architecture docs in `.dev/` total ~2,975 lines and contain overlapping cont
 │   ├── skills.md                    # Skill system, format, triggers, loading
 │   ├── workflows.md                 # Pluggable workflows, manifests, registry
 │   ├── state.md                     # State scopes, memory architecture, persistence
-│   ├── tools.md                     # Tool registry, FunctionTools, AutoBuilderToolset
+│   ├── tools.md                     # Tool registry, FunctionTools, GlobalToolset
 │   └── observability.md             # Observability, context window, dynamic context
 ```
 
@@ -211,17 +211,17 @@ Work parallelizes at Phase C (merge & improve targets). Launch heavy subagents:
 
 ## Verification Checklist (mirrors 260217_migration.md)
 
-- [ ] All 13 architecture/ files created with correct content
-- [ ] 02-ARCHITECTURE.md rewritten as overview (~200 lines)
-- [ ] Every line from source files exists in a target file (no content lost)
-- [ ] All 5 legacy files deleted
-- [ ] `grep -r "05-AGENTS\|06-SKILLS\|07-WORKFLOWS\|08-STATE_MEMORY\|09-TOOLS" .` returns zero hits outside .git/ and .discussion/ historical docs
-- [ ] All markdown links `[text](path)` resolve to existing files
-- [ ] All architecture/ files have nav header linking back to overview
-- [ ] INDEX.md and CLAUDE.md updated and in sync
-- [ ] 03-STRUCTURE.md scaffold updated with architecture/ directory
-- [ ] .architect.md doc table updated
-- [ ] .claude/commands/*.md references updated
-- [ ] Root AGENTS.md and README.md references updated
-- [ ] No file exceeds 500 lines (guideline, not hard rule for agents.md)
-- [ ] 260217_migration.md checklist all items verified
+- [x] All 13 architecture/ files created with correct content
+- [x] 02-ARCHITECTURE.md rewritten as overview (~200 lines)
+- [x] Every line from source files exists in a target file (no content lost)
+- [x] All 5 legacy files deleted
+- [x] `grep -r "05-AGENTS\|06-SKILLS\|07-WORKFLOWS\|08-STATE_MEMORY\|09-TOOLS" .` returns zero hits outside .git/ and .discussion/ historical docs
+- [x] All markdown links `[text](path)` resolve to existing files
+- [x] All architecture/ files have nav header linking back to overview
+- [x] INDEX.md and CLAUDE.md updated and in sync
+- [x] 03-STRUCTURE.md scaffold updated with architecture/ directory
+- [x] .architect.md doc table updated — .architect.md has no doc table (architect instructions only); no stale refs to old 05-09 files
+- [x] .claude/commands/*.md references updated
+- [x] Root AGENTS.md and README.md references updated
+- [x] No file exceeds 500 lines (guideline, not hard rule for agents.md) — **NOTE**: agents.md=771, tools.md=530; both are complex merged domains
+- [x] 260217_migration.md checklist all items verified

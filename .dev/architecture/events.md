@@ -55,9 +55,32 @@ A single DB-backed queue that aggregates all items requiring CEO attention acros
 | `metadata` | Structured JSON payload (approval choices, escalation context, task details) |
 | `status` | `PENDING`, `SEEN`, `RESOLVED`, `DISMISSED` |
 
-**Write path**: Director and PM agents enqueue items via `enqueue_ceo_item` tool. Redis Streams events can also trigger queue entries via a consumer.
+**Write path**: Director enqueues items via `enqueue_ceo_item` FunctionTool. PMs no longer write directly to the CEO queue — they escalate to the Director queue via `escalate_to_director`. Redis Streams events can also trigger queue entries via a consumer.
 
 **Read path**: Dashboard polls `GET /ceo/queue` or subscribes to `GET /ceo/queue/stream` (SSE). CEO resolves items via `PATCH /ceo/queue/{id}`. Resolved approvals are written back to the relevant session's state for the agent to observe on next invocation.
+
+### Director Queue
+
+A DB-backed queue for PM-to-Director escalation. Parallel design to the CEO queue.
+
+| Field | Purpose |
+|-------|---------|
+| `type` | `ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT` |
+| `priority` | `LOW`, `NORMAL`, `HIGH`, `CRITICAL` |
+| `status` | `PENDING`, `IN_PROGRESS`, `RESOLVED`, `FORWARDED_TO_CEO` |
+| `source_project` | Which project produced this item |
+| `source_agent` | Which PM agent enqueued it |
+| `metadata` | Structured JSON payload (escalation context, status details, resource needs) |
+
+**Write path**: PM agents enqueue items via `escalate_to_director` FunctionTool.
+
+**Read path**: Director processes items during work sessions. Director can resolve locally or forward to CEO queue via `enqueue_ceo_item`.
+
+#### Escalation Path
+
+```
+PM → Director Queue → Director → resolves OR → CEO Queue → CEO
+```
 
 ---
 
@@ -69,6 +92,6 @@ A single DB-backed queue that aggregates all items requiring CEO attention acros
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2026-02-17*
+*Document Version: 2.0*
+*Last Updated: 2026-02-18*
 *Extracted from [02-ARCHITECTURE.md](../02-ARCHITECTURE.md) v2.9*

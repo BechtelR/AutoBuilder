@@ -28,7 +28,7 @@ ADK runs inside workers, behind the anti-corruption layer. This section document
 | `DatabaseSessionService` | State persistence (adapter bridges to shared database). All agent continuity lives here. |
 | `transfer_to_agent` / `sub_agents` | Director → PM delegation via `sub_agents` + `transfer_to_agent`; PM → Worker delegation |
 | `before_agent_callback` / `after_agent_callback` | Supervision hooks; Director monitors PM events |
-| Tool Registry | `AutoBuilderToolset(BaseToolset)` — ADK-native per-role tool vending via `get_tools(readonly_context)`. Tools organized by function type in `app/tools/`. Cascading permission config. See Tool Registry subsection below. |
+| Tool Registry | `GlobalToolset(BaseToolset)` — ADK-native per-role tool vending via `get_tools(readonly_context)`. Tools organized by function type in `app/tools/`. Cascading permission config. See Tool Registry subsection below. |
 
 ## 3. Multi-Model via LiteLLM
 
@@ -78,7 +78,7 @@ flowchart TB
     end
 
     subgraph INFRA["SHARED ENGINE INFRASTRUCTURE"]
-        Tools["AutoBuilderToolset (BaseToolset)\nADK-native get_tools(readonly_context)\nPer-role permission config\nfile_read, file_write, file_edit\nbash_exec, git_*, web_*, todo_*"]
+        Tools["GlobalToolset (BaseToolset)\nADK-native get_tools(readonly_context)\nPer-role permission config\nfile_read, file_write, file_edit\nbash_exec, git_*, web_*, todo_*"]
         Skills["Skill Library\n(Global + Project-local)\nMarkdown + YAML frontmatter\nDeterministic matching"]
         Router["LLM Router\n(task_type to model)\ndirector: opus\npm: sonnet\nplanning: opus\ncoding: sonnet\nreview: sonnet\nclassification: haiku\nFallback chains"]
         Models["Models (Shared Domain)\nenums.py, constants.py\nbase.py (Pydantic base models)"]

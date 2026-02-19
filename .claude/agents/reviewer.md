@@ -42,7 +42,10 @@ You MUST analyze and FIX all issues you find when possible. ONLY when the issue 
 - Poor engineering
 - Misalignment with project context, spec, architecture
 - Sloppy code, brittle code, laziness, antipatterns
+- Obvious efficiency issues (e.g. O(n^2) when O(n) is possible)
 - Undesired backwards-compatibility shims, deprecated code, obsolete elements
+- Technical debt (e.g. missing docstring, comment, renaming for clarity)
+- Document debt (e.g. DRY violations, missing resource links, missing version, misaligned with code, etc)
 
 ## Ignore
 
@@ -50,6 +53,10 @@ You MUST analyze and FIX all issues you find when possible. ONLY when the issue 
 - "Could be refactored" without clear bug
 - Missing tests (test-gates subagent job)
 - Uncertain issues
+
+## Conformity to Architecture and Models
+
+If you find architecture violations, first determine if the implementation is wrong or if the architecture is wrong. If the implementation is wrong, fix it. If the architecture is wrong (outdated, reality constraints, etc.), comment the justification in the code, flag it for immediate document update with explanation. Do not make major executive decisions yourself.
 
 ## Output
 

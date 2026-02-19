@@ -50,7 +50,7 @@ CEO (dev user / human)
         │     sessions: chat sessions (CEO interaction) + work sessions (per-project oversight)
         │     delegation: transfer_to_agent → PM
         ├── PM: Project Alpha (LlmAgent, sonnet) — per-project, IS the outer loop
-        │     ├── tools: select_ready_batch, enqueue_ceo_item (FunctionTools)
+        │     ├── tools: select_ready_batch, escalate_to_director, update_deliverable, query_deliverables, reorder_deliverables, manage_dependencies (FunctionTools)
         │     ├── after_agent_callback: verify_batch_completion
         │     ├── checkpoint_project: `after_agent_callback` on DeliverablePipeline (persists state via CallbackContext)
         │     ├── run_regression_tests: `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state)
@@ -118,6 +118,14 @@ def build_director(project_ids: list[str]) -> LlmAgent:
                     "enforce hard limits, intervene when patterns go wrong. "
                     "Your personality and preferences are in user: state. "
                     "Delegate to PMs via transfer_to_agent.",
+        tools=[
+            FunctionTool(enqueue_ceo_item),
+            FunctionTool(list_projects),
+            FunctionTool(query_project_status),
+            FunctionTool(override_pm),
+            FunctionTool(get_project_context),
+            FunctionTool(query_dependency_graph),
+        ],
         sub_agents=pms,  # PMs are Director's sub_agents; delegation via transfer_to_agent
     )
 
@@ -130,8 +138,12 @@ def build_pm(project_id: str) -> LlmAgent:
                     "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
                     "and escalate only when you cannot resolve an issue.",
         tools=[
-            FunctionTool(select_ready_batch),  # PM reasons about batch composition
-            FunctionTool(enqueue_ceo_item),     # Push to unified CEO queue
+            FunctionTool(select_ready_batch),
+            FunctionTool(escalate_to_director),
+            FunctionTool(update_deliverable),
+            FunctionTool(query_deliverables),
+            FunctionTool(reorder_deliverables),
+            FunctionTool(manage_dependencies),
         ],
         sub_agents=[],  # DeliverablePipeline instances added dynamically per batch
         after_agent_callback=verify_batch_completion,
@@ -184,6 +196,21 @@ A "Main" project acts as the permanent default -- the Director's home context. M
 - **Tool authoring** -- Director can create new tools; CEO approval required by default
 - **Tools and skills** -- governance tools, resource management FunctionTools, governance policies and global convention skills
 
+### Director Tools
+
+| Tool | Purpose |
+|------|---------|
+| `enqueue_ceo_item` | Push items to CEO queue (Director-only) |
+| `list_projects` | Cross-project visibility |
+| `query_project_status` | PM status, batch progress, cost |
+| `override_pm` | Direct PM intervention (pause/resume/reorder/correct) |
+| `get_project_context` | Detect project type, stack, conventions |
+| `query_dependency_graph` | Query/visualize dependency graph |
+
+### Director Override Mechanism
+
+`override_pm` enables the Director to directly intervene in PM operations: pause execution, resume paused projects, reorder deliverable priority, or correct PM strategy. All overrides are logged to the event stream for audit. The Director uses this when PM behavior deviates from expectations or when cross-project concerns require coordinated changes.
+
 ### ADK Integration
 
 ```python
@@ -193,8 +220,15 @@ director_agent = LlmAgent(
     instruction="Cross-project governance agent. {user:director_personality} "
                 "Manage PMs via transfer_to_agent, allocate resources, "
                 "enforce hard limits, intervene when patterns go wrong.",
-    sub_agents=[pm_alpha, pm_beta],  # PMs are Director's sub_agents
-    # PMs transfer back to Director on batch completion or escalation
+    tools=[
+        FunctionTool(enqueue_ceo_item),
+        FunctionTool(list_projects),
+        FunctionTool(query_project_status),
+        FunctionTool(override_pm),
+        FunctionTool(get_project_context),
+        FunctionTool(query_dependency_graph),
+    ],
+    sub_agents=[pm_alpha, pm_beta],
 )
 ```
 
@@ -211,7 +245,7 @@ PMs are per-project autonomous managers. They use LLM reasoning (not programmati
 | **Model** | `anthropic/claude-sonnet-4-5-20250929` (project management reasoning) |
 | **Scope** | Single project |
 | **Lifecycle** | Stateless config, recreated per invocation. Session continuity in DB. Consistent with Director tier. |
-| **Tools** | `select_ready_batch` (FunctionTool -- PM reasons about batch composition), `enqueue_ceo_item` (FunctionTool -- push notifications/escalations to CEO queue) |
+| **Tools** | `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies` (FunctionTools) |
 | **`after_agent_callback`** | `verify_batch_completion` (automatic, after every deliverable) |
 | **Checkpoint** | `checkpoint_project` -- `after_agent_callback` on DeliverablePipeline; fires after each deliverable completes, persists state via `CallbackContext` |
 | **Regression** | `run_regression_tests` -- `RegressionTestAgent` (CustomAgent) wired into pipeline after each batch; reads PM regression policy from session state, runs tests when policy says to, no-ops otherwise; always present (not skippable), policy-aware |
@@ -254,8 +288,12 @@ pm_alpha = LlmAgent(
                 "and escalate only when you cannot resolve an issue. "
                 "Transfer back to Director on batch completion or escalation.",
     tools=[
-        FunctionTool(select_ready_batch),  # PM reasons about batch composition
-        FunctionTool(enqueue_ceo_item),    # Push to unified CEO queue
+        FunctionTool(select_ready_batch),
+        FunctionTool(escalate_to_director),
+        FunctionTool(update_deliverable),
+        FunctionTool(query_deliverables),
+        FunctionTool(reorder_deliverables),
+        FunctionTool(manage_dependencies),
     ],
     sub_agents=[],  # DeliverablePipeline instances added dynamically per batch
     after_agent_callback=verify_batch_completion,
@@ -471,9 +509,10 @@ plan_agent (LLM)          code_agent (LLM)
   |   implementation_plan    |   code_output (files)
   |                          |
   | Tools: READ-ONLY         | Tools: FULL ACCESS
-  |   file_read              |   file_read, file_write,
-  |   file_search            |   file_edit, bash_exec,
-  |   directory_list         |   git_commit, git_diff
+  |   file_read, file_glob,  |   file_read, file_write,
+  |   file_grep,             |   file_edit, file_insert,
+  |   directory_list,        |   file_multi_edit, bash_exec,
+  |   code_symbols           |   git_commit, git_diff
 ```
 
 ### Why This Matters
@@ -493,16 +532,23 @@ All agent tiers (Director, PM, Workers) have access to tools and skills. However
 
 ### Tool Registry
 
-Tools are Python functions in `app/tools/`, organized by function type (filesystem, git, execution, web, task, project). `AutoBuilderToolset(BaseToolset)` handles per-role tool filtering via ADK's native `get_tools(readonly_context)` mechanism. Cascading permission config restricts tools top-down through the supervision hierarchy -- a PM cannot access Director-specific tools, a Worker cannot access PM-specific tools. The Director can author new tools; CEO approval is required by default before new tools become active. See [Tools](./tools.md) for full toolset architecture.
+Tools are Python functions in `app/tools/`, organized by function type (filesystem, code, execution, git, web, task, management). `GlobalToolset(BaseToolset)` handles per-role tool filtering via ADK's native `get_tools(readonly_context)` mechanism. Cascading permission config restricts tools top-down through the supervision hierarchy -- a PM cannot access Director-specific tools, a Worker cannot access PM-specific tools. The Director can author new tools; CEO approval is required by default before new tools become active. See [Tools](./tools.md) for full toolset architecture.
 
 ### Worker-Level Tool Matrix
 
-| Agent | Filesystem | Execution | Git |
-|-------|-----------|-----------|-----|
-| `plan_agent` | Read-only (`file_read`, `file_search`, `directory_list`) | None | Read-only (`git_status`, `git_diff`) |
-| `code_agent` | Full (`file_read`, `file_write`, `file_edit`) | `bash_exec` | Full (`git_commit`, `git_branch`) |
-| `review_agent` | Read-only | None | Read-only |
-| `fix_agent` | Full | `bash_exec` | None (code agent handles commits) |
+| Agent | Filesystem | Code Intelligence | Execution | Git | Web | Tasks |
+|-------|-----------|-------------------|-----------|-----|-----|-------|
+| `plan_agent` | Read-only (`file_read`, `file_glob`, `file_grep`, `directory_list`) | Full (`code_symbols`, `run_diagnostics`) | None | Read-only (`git_status`, `git_diff`, `git_log`, `git_show`) | Full | Session todos |
+| `code_agent` | Full (all 10) | Full | Full (`bash_exec`, `http_request`) | Full (all 8) | Full | Session todos |
+| `review_agent` | Read-only | Full | None | Read-only | Full | Session todos |
+| `fix_agent` | Full | Full | `bash_exec` | Read-only (code agent handles commits) | Full | Session todos |
+
+### Management-Level Tool Matrix
+
+| Agent | Management Tools | Tasks | Escalation |
+|-------|-----------------|-------|------------|
+| PM | `select_ready_batch`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies` | Shared tasks + session todos | `escalate_to_director` → Director queue |
+| Director | `enqueue_ceo_item`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph` | Shared tasks + session todos | `enqueue_ceo_item` → CEO queue |
 
 ADK supports this through `BaseToolset.get_tools()`, which returns different tool sets based on the agent or deliverable type. This keeps tool restriction logic centralized rather than scattered across agent definitions.
 
@@ -720,6 +766,6 @@ review_agent writes: state["review_result"]
 
 ---
 
-**Document Version:** 2.8
-**Last Updated:** 2026-02-17
+**Document Version:** 3.0
+**Last Updated:** 2026-02-18
 **Status:** Framework Validated -- Prototyping Phase

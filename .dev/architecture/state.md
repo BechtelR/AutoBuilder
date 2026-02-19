@@ -397,7 +397,7 @@ The rest of the state and memory architecture (state scopes, session management,
 
 - [Agents](./agents.md) -- agent composition, custom agents, supervision hierarchy
 - [Skills](./skills.md) -- skill-based knowledge injection, SkillLoaderAgent
-- [Tools](./tools.md) -- FunctionTools, AutoBuilderToolset, tool authorization
+- [Tools](./tools.md) -- FunctionTools, GlobalToolset, tool authorization
 - [Architecture Overview](../02-ARCHITECTURE.md) -- system-level architecture
 - [Roadmap](../01-ROADMAP.md) -- delivery plan
 - ADK Sessions & Memory overview: https://google.github.io/adk-docs/sessions/

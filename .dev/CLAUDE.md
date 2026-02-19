@@ -16,8 +16,8 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | — | `architecture/` | Architecture reference | 13 domain-specific files; see `02-ARCHITECTURE.md` §4 reference map |
 | 03 | `03-STRUCTURE.md` | Project scaffold | **Single source of truth** for directory layout |
 | 04 | `04-TECH_STACK.md` | Technology decisions & rationale | Every tech choice with why + rejected alternatives |
-| 10 | `05-DEV_SETUP.md` | Development environment setup | Prerequisites, env vars, local dev workflow |
-| 11 | `06-PROVIDERS.md` | External providers | LLM models, pricing, fallback chains, search providers |
+| 05 | `05-DEV_SETUP.md` | Development environment setup | Prerequisites, env vars, local dev workflow |
+| 06 | `06-PROVIDERS.md` | External providers | LLM models, pricing, fallback chains, search providers |
 | 07 | `07-COMPONENTS.md` | Component Registry (BOM) | **Every buildable component** → phase assignment; gap detection |
 
 ---

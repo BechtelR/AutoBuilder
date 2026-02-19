@@ -118,7 +118,7 @@ Detailed architecture documentation is organized by domain in the `architecture/
 | Agents | [agents.md](./architecture/agents.md) | Agent hierarchy (Director → PM → Workers), types, composition, communication |
 | Execution | [execution.md](./architecture/execution.md) | Autonomous execution loop, multi-session model, session lifecycle |
 | State & Memory | [state.md](./architecture/state.md) | ADK 4-scope state, multi-level memory, cross-session persistence |
-| Tools | [tools.md](./architecture/tools.md) | FunctionTool wrappers, AutoBuilderToolset, tool authorization |
+| Tools | [tools.md](./architecture/tools.md) | FunctionTool wrappers, GlobalToolset, tool authorization |
 
 ### Knowledge & Workflows
 

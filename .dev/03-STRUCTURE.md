@@ -52,14 +52,15 @@ AutoBuilder/
 │   │   ├── custom/                 # CustomAgent subclasses (linter, test runner, skill loader)
 │   │   └── llm/                    # LlmAgent definitions (planner, coder, reviewer)
 │   │
-│   ├── tools/                      # FunctionTool wrappers + AutoBuilderToolset
-│   │   ├── toolset.py              # AutoBuilderToolset(BaseToolset) — per-role tool vending
-│   │   ├── filesystem.py           # file_read, file_write, file_edit, file_search, directory_list
-│   │   ├── execution.py            # bash_exec
-│   │   ├── git.py                  # git_status, git_commit, git_branch, git_diff
+│   ├── tools/                      # FunctionTool wrappers + GlobalToolset
+│   │   ├── _toolset.py             # GlobalToolset(BaseToolset) — per-role tool vending
+│   │   ├── filesystem.py           # 10 tools (read, write, edit, insert, multi_edit, glob, grep, move, delete, directory_list)
+│   │   ├── code.py                 # code_symbols, run_diagnostics
+│   │   ├── execution.py            # bash_exec, http_request
+│   │   ├── git.py                  # 8 tools (status, commit, branch, diff, log, show, worktree, apply)
 │   │   ├── web.py                  # web_search, web_fetch
-│   │   ├── task.py                 # todo_read, todo_write, todo_list
-│   │   └── project.py              # select_ready_batch, enqueue_ceo_item
+│   │   ├── task.py                 # 6 tools (todo_read/write/list, task_create/update/query)
+│   │   └── management.py           # 12 tools (PM: 6 + Director: 6)
 │   │
 │   ├── skills/                     # Global skill files (Markdown + YAML frontmatter)
 │   │   ├── code/                   # Code-generation skills
@@ -85,7 +86,7 @@ AutoBuilder/
 │   │
 │   └── config/                     # Configuration loading and validation
 │
-├── dashboard/                      # React 19 + Vite SPA (Phase 3)
+├── dashboard/                      # React 19 + Vite SPA (Phase 12)
 │   ├── src/
 │   │   ├── app/                    # App shell, layout, routing
 │   │   │   ├── shell/              # App shell component
@@ -143,7 +144,7 @@ AutoBuilder/
 │   │   ├── agents.md               # Agent hierarchy, types, composition
 │   │   ├── execution.md            # Execution loop, multi-session model
 │   │   ├── state.md                # State scopes, memory architecture
-│   │   ├── tools.md                # FunctionTools, AutoBuilderToolset
+│   │   ├── tools.md                # FunctionTools, GlobalToolset
 │   │   ├── skills.md               # Skill system, format, triggers
 │   │   ├── workflows.md            # Pluggable workflows, manifests, registry
 │   │   ├── observability.md        # Observability, context management
@@ -178,7 +179,7 @@ AutoBuilder/
 | `app/lib/` | Shared libraries — logging, exceptions, decorators, base classes |
 | `app/utils/` | Stateless utility functions — string helpers, token counting, hashing |
 | `app/agents/` | ADK agent definitions (deterministic and LLM) |
-| `app/tools/` | FunctionTool wrappers organized by type + `AutoBuilderToolset(BaseToolset)` for per-role vending |
+| `app/tools/` | 42 FunctionTool wrappers (8 modules) + `GlobalToolset(BaseToolset)` for per-role vending |
 | `app/skills/` | Markdown skill files with YAML frontmatter |
 | `app/workflows/` | Pluggable workflow definitions (each a self-contained directory) |
 | `app/router/` | LLM model routing (task type to provider/model) |
@@ -201,5 +202,5 @@ AutoBuilder/
 
 ---
 
-*Document Version: 1.4*
-*Last Updated: 2026-02-16*
+*Document Version: 1.5*
+*Last Updated: 2026-02-18*

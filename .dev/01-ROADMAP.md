@@ -1,5 +1,5 @@
 # AutoBuilder Project Roadmap
-*Version: 2.0.0*
+*Version: 2.1.0*
 
 **Single source of truth for phase sequencing, status, and completion contracts.**
 Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-COMPONENTS.md) (the Component Registry / BOM).
@@ -107,13 +107,18 @@ Anti-corruption layer translating gateway commands to ADK Runner calls and ADK E
 
 
 ### Scope Summary
-FunctionTool wrappers for filesystem (read, write, edit, search, directory list), execution (bash with timeout/output capture), git (status, commit, branch, diff), web (search, fetch), and task management (todo CRUD). AutoBuilderToolset (ADK-native BaseToolset) for per-role tool vending via `get_tools(readonly_context)` with cascading permission config. PM-level tools (`select_ready_batch`, `enqueue_ceo_item`) and deterministic safety mechanisms (`checkpoint_project` as after_agent_callback, `RegressionTestAgent` as CustomAgent).
+42 FunctionTool wrappers across 8 categories: Filesystem (10 tools including glob, grep, multi-edit), Code Intelligence (2 tools — tree-sitter symbols + diagnostics), Execution (2 tools — bash + HTTP), Git (8 tools including log, show, worktree, apply), Web (2 tools), Task Management (6 tools — three-tier system with session todos, shared tasks, and PM-managed deliverables), PM Management (6 tools — batch selection, Director escalation, deliverable lifecycle), and Director Management (6 tools — CEO queue, project oversight, PM override). GlobalToolset (ADK-native BaseToolset) for per-role tool vending with cascading permission config.
 
 ### Completion Contract
-- [ ] All tools callable from within an ADK LlmAgent
+- [ ] All 42 tools callable from within an ADK LlmAgent
 - [ ] Tool schemas auto-generated from type hints + docstrings
-- [ ] AutoBuilderToolset vends correct tool subsets per role configuration
+- [ ] GlobalToolset vends correct tool subsets per role configuration
 - [ ] bash_exec handles timeout, output capture, error reporting
+- [ ] Three-tier task system operational (todos, tasks, deliverables)
+- [ ] PM escalation routes to Director queue (not CEO queue)
+- [ ] code_symbols extracts structure via tree-sitter
+- [ ] run_diagnostics invokes configurable linter/type-checker
+- [ ] Director can override PM via override_pm tool
 
 ---
 
@@ -387,7 +392,7 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 1: ADK Validation | `M` | 4 prototypes pass -> commit to ADK |
 | 2: Gateway + Infra | `L` | FastAPI, Redis, ARQ workers, database, config |
 | 3: ADK Engine | `L` | Anti-corruption layer, LLM Router, LiteLLM, session state |
-| 4: Core Toolset | `M` | FunctionTools (filesystem, bash, git, web, todo) |
+| 4: Core Toolset | `M` | 42 FunctionTools (8 categories), Director queue, three-tier tasks |
 | 5: Agent Definitions | `L` | Director + PM hierarchy, PM loop prototype, worker agents, pipelines |
 | 6: Skills System | `M` | SkillLibrary, two-tier matching, initial skills |
 | 7: Workflow Composition | `M` | WorkflowRegistry, auto-code workflow, WORKFLOW.yaml |
@@ -416,14 +421,15 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 1.5.0 | 2026-02-16 | Resolved Q15/Q16/Q17; Phase 5 updated with stateless agents, CEO queue, tool registry, deterministic safety ops |
 | 1.5.1 | 2026-02-16 | Aligned tool/callback distinction (checkpoint + regression are not FunctionTools); added enqueue_ceo_item to PM tools |
 | 1.5.2 | 2026-02-16 | Reclassified ContextBudgetAgent as `before_model_callback` (not standalone agent) to match architecture doc |
-| 1.6.0 | 2026-02-16 | Revised Decision #46: replaced file-based directory-scoped tool registry with ADK-native AutoBuilderToolset(BaseToolset) pattern |
+| 1.6.0 | 2026-02-16 | Revised Decision #46: replaced file-based directory-scoped tool registry with ADK-native GlobalToolset(BaseToolset) pattern |
 | 1.6.1 | 2026-02-16 | Replaced vague "deterministic callback" terminology with exact ADK mechanisms: checkpoint_project = after_agent_callback, RegressionTestAgent = CustomAgent |
 | 1.6.2 | 2026-02-16 | Flagged unverified ADK mechanism claims as TBD: checkpoint_project and run_regression_tests behavior is decided, exact ADK wiring deferred to Phase 5 prototype |
 | 1.7.0 | 2026-02-16 | Resolved all TBD flags: checkpoint_project = `after_agent_callback` on DeliverablePipeline (persists state via CallbackContext); run_regression_tests = `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state) |
-| 1.7.1 | 2026-02-17 | Moved AutoBuilderToolset from Phase 5 to Phase 4; removed redundant Deterministic Safety section; fixed Phase 4 completion contract to be verifiable in Phase 4 |
+| 1.7.1 | 2026-02-17 | Moved GlobalToolset from Phase 5 to Phase 4; removed redundant Deterministic Safety section; fixed Phase 4 completion contract to be verifiable in Phase 4 |
 | 2.0.0 | 2026-02-17 | Roadmap v2: slim format, component checklists moved to 07-COMPONENTS.md (BOM) |
+| 2.1.0 | 2026-02-18 | Phase 4 scope expanded: 42 tools (was 17), 8 categories, Director queue, three-tier task system |
 
 ---
 
-*Document Version: 2.0.0*
-*Last Updated: 2026-02-17*
+*Document Version: 2.1.0*
+*Last Updated: 2026-02-18*
