@@ -157,7 +157,7 @@ Source: `architecture/events.md`
 | V13 | CEO queue type enum (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) | config | 5 | events.md §4 | — |
 | V14 | CEO queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 5 | events.md §4 | — |
 | V15 | CEO queue status enum (`PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`) | config | 5 | events.md §4 | — |
-| V17 | CEO queue Redis Stream trigger consumer | mechanism | DROP | events.md §4 | `enqueue_ceo_item` FunctionTool is the write path; second write path via stream consumer is over-engineering |
+| V17 | CEO queue Redis Stream trigger consumer | mechanism | DROP | events.md §4 | `escalate_to_ceo` FunctionTool is the write path; second write path via stream consumer is over-engineering |
 | V18 | CEO resolved approval → session state writeback | mechanism | 5 | events.md §4 | CEO queue, ADK session |
 | V19 | Batch completion event publishing | mechanism | 8 | events.md §4 | Redis Streams |
 | V20 | Director queue type enum (`ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT`) | config | 4 | events.md §Director Queue | — |
@@ -278,7 +278,7 @@ Source: `architecture/tools.md`
 | T14 | `todo_write` FunctionTool | tool | 4 | tools.md §3.6 | Session state |
 | T15 | `todo_list` FunctionTool | tool | 4 | tools.md §3.6 | Session state |
 | T16 | `select_ready_batch` FunctionTool | tool | 4 | tools.md §3.7 | Deliverable state |
-| T17 | `enqueue_ceo_item` FunctionTool | tool | 4 | tools.md §3.8 | CEO queue |
+| T17 | `escalate_to_ceo` FunctionTool | tool | 4 | tools.md §3.8 | CEO queue |
 | T18 | `file_insert` FunctionTool | tool | 4 | tools.md §3.1 | — |
 | T19 | `file_multi_edit` FunctionTool | tool | 4 | tools.md §3.1 | — |
 | T20 | `file_move` FunctionTool | tool | 4 | tools.md §3.1 | — |
@@ -537,8 +537,8 @@ Components removed from the registry as unnecessary or over-engineered:
 | # | Component | Reason |
 |---|-----------|--------|
 | D09 | `skills` table | File-based + Redis cache is sufficient per current architecture |
-| V16 | `enqueue_ceo_item` FunctionTool | Duplicate of T17 — FunctionTool, canonical entry in Section 7.1 |
-| V17 | CEO queue Redis Stream trigger consumer | `enqueue_ceo_item` FunctionTool is the write path; second write path via stream consumer is over-engineering |
+| V16 | `escalate_to_ceo` FunctionTool | Duplicate of T17 — FunctionTool, canonical entry in Section 7.1 |
+| V17 | CEO queue Redis Stream trigger consumer | `escalate_to_ceo` FunctionTool is the write path; second write path via stream consumer is over-engineering |
 
 ---
 
@@ -570,9 +570,9 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 1.2.2 | 2026-02-18 | Fix: drop duplicate V16 entry (`enqueue_ceo_item` counted twice); canonical entry is T17 in Section 7.1; update statistics (Total 306→305, Dropped 2→3, Active 304→302, Phase 4 63→62) |
+| 1.2.2 | 2026-02-18 | Fix: drop duplicate V16 entry (`escalate_to_ceo` counted twice); canonical entry is T17 in Section 7.1; update statistics (Total 306→305, Dropped 2→3, Active 304→302, Phase 4 63→62) |
 | 1.2.1 | 2026-02-18 | Fix: section ref mismatches (T06-T17), ID collisions (Tool Modules → TM##, Toolset → TS##), add missing fix_agent scoping (TS07), correct statistics, fix dashboard phase comment in 03-STRUCTURE.md |
-| 1.2.0 | 2026-02-18 | Phase 4 toolset expansion: 42 tools (was 17), Director queue enums, module rename project.py → management.py + new code.py |
+| 1.2.0 | 2026-02-18 | Phase 4 toolset expansion: 42 tools, Director queue enums, management.py module + new code.py |
 | 1.1.0 | 2026-02-17 | All 55 gaps resolved: 53 assigned to phases, 2 dropped (D09, V17) |
 | 1.0.0 | 2026-02-17 | Initial BOM — exhaustive extraction from 13 architecture domain files |
 

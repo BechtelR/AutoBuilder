@@ -419,7 +419,7 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 1.3.0 | 2026-02-14 | Hierarchical supervision (Director -> PM -> Workers) integrated into Phase 5, 8 |
 | 1.4.0 | 2026-02-16 | PM IS the outer loop; tool/agent terminology aligned; Agent Skills standard adopted |
 | 1.5.0 | 2026-02-16 | Resolved Q15/Q16/Q17; Phase 5 updated with stateless agents, CEO queue, tool registry, deterministic safety ops |
-| 1.5.1 | 2026-02-16 | Aligned tool/callback distinction (checkpoint + regression are not FunctionTools); added enqueue_ceo_item to PM tools |
+| 1.5.1 | 2026-02-16 | Aligned tool/callback distinction (checkpoint + regression are not FunctionTools); added escalate_to_ceo to PM tools |
 | 1.5.2 | 2026-02-16 | Reclassified ContextBudgetAgent as `before_model_callback` (not standalone agent) to match architecture doc |
 | 1.6.0 | 2026-02-16 | Revised Decision #46: replaced file-based directory-scoped tool registry with ADK-native GlobalToolset(BaseToolset) pattern |
 | 1.6.1 | 2026-02-16 | Replaced vague "deterministic callback" terminology with exact ADK mechanisms: checkpoint_project = after_agent_callback, RegressionTestAgent = CustomAgent |
@@ -427,7 +427,7 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 1.7.0 | 2026-02-16 | Resolved all TBD flags: checkpoint_project = `after_agent_callback` on DeliverablePipeline (persists state via CallbackContext); run_regression_tests = `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state) |
 | 1.7.1 | 2026-02-17 | Moved GlobalToolset from Phase 5 to Phase 4; removed redundant Deterministic Safety section; fixed Phase 4 completion contract to be verifiable in Phase 4 |
 | 2.0.0 | 2026-02-17 | Roadmap v2: slim format, component checklists moved to 07-COMPONENTS.md (BOM) |
-| 2.1.0 | 2026-02-18 | Phase 4 scope expanded: 42 tools (was 17), 8 categories, Director queue, three-tier task system |
+| 2.1.0 | 2026-02-18 | Phase 4 scope expanded: 42 tools, 8 categories, Director queue, three-tier task system |
 
 ---
 

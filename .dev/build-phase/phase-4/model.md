@@ -25,7 +25,7 @@ flowchart TB
             GI["git.py (8)\ngit_status, git_commit, git_branch,\ngit_diff, git_log, git_show,\ngit_worktree, git_apply"]
             WB["web.py (2)\nweb_search, web_fetch"]
             TK["task.py (6)\ntodo_read, todo_write, todo_list,\ntask_create, task_update, task_query"]
-            MG["management.py (12)\nPM: select_ready_batch,\nescalate_to_director, update_deliverable,\nquery_deliverables, reorder_deliverables,\nmanage_dependencies\nDirector: enqueue_ceo_item,\nlist_projects, query_project_status,\noverride_pm, get_project_context,\nquery_dependency_graph"]
+            MG["management.py (12)\nPM: select_ready_batch,\nescalate_to_director, update_deliverable,\nquery_deliverables, reorder_deliverables,\nmanage_dependencies\nDirector: escalate_to_ceo,\nlist_projects, query_project_status,\noverride_pm, get_project_context,\nquery_dependency_graph"]
         end
 
         ABT -->|wraps as FunctionTool| FS & CD & EX & GI & WB & TK & MG
@@ -77,7 +77,7 @@ flowchart TB
 | P4.D3 | `git.py`: `git_status`, `git_commit`, `git_branch`, `git_diff`, `git_log`, `git_show`, `git_worktree`, `git_apply`, git repo validation helper |
 | P4.D4 | `web.py`: `web_fetch`, `web_search`, Tavily/Brave provider dispatch; `Settings` extension (`search_provider`) |
 | P4.D5 | `task.py`: `todo_read`, `todo_write`, `todo_list`, `task_create`, `task_update`, `task_query` |
-| P4.D6 | `management.py`: PM tools (`select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`), Director tools (`enqueue_ceo_item`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`), validation constants |
+| P4.D6 | `management.py`: PM tools (`select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`), Director tools (`escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`), validation constants |
 | P4.D6b | `code.py`: `code_symbols`, `run_diagnostics` |
 | P4.D7 | `_toolset.py`: `GlobalToolset`, `resolve_role`, `ROLE_PERMISSIONS`, `AGENT_ROLE_MAP` |
 | P4.D8 | `tests/tools/`: test modules for all above + schema generation tests + conftest fixtures |
@@ -267,8 +267,7 @@ def select_ready_batch(project_id: str) -> str:
     """Placeholder — returns 'no deliverables' until Phase 8.""" ...
 
 def escalate_to_director(priority: str, context: str, request_type: str) -> str:
-    """Escalate an issue from PM to the Director queue for resolution.
-    PM uses this instead of enqueue_ceo_item.""" ...
+    """Escalate an issue from PM to the Director queue for resolution.""" ...
 
 def update_deliverable(deliverable_id: str, status: str, notes: str | None = None) -> str:
     """Update a deliverable's lifecycle status. Placeholder until Phase 5.""" ...
@@ -283,7 +282,7 @@ def manage_dependencies(action: str, source_id: str, target_id: str | None = Non
     """Add, remove, or query deliverable dependency relationships. Placeholder until Phase 8.""" ...
 
 # Director tools (6)
-def enqueue_ceo_item(
+def escalate_to_ceo(
     item_type: str, priority: str, message: str, metadata: str,
 ) -> str:
     """Director-only. Validates item_type/priority, logs, returns placeholder ID.
@@ -354,7 +353,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
                  "query_deliverables", "reorder_deliverables", "manage_dependencies",
                  "task_create", "task_update", "task_query",
                  "todo_read", "todo_write", "todo_list"},
-    "director": {"enqueue_ceo_item", "list_projects", "query_project_status",
+    "director": {"escalate_to_ceo", "list_projects", "query_project_status",
                  "override_pm", "get_project_context", "query_dependency_graph",
                  "task_create", "task_update", "task_query",
                  "todo_read", "todo_write", "todo_list"},
@@ -480,7 +479,7 @@ flowchart LR
     PM["PM Agent"] -->|escalate_to_director| DQ["Director Queue"]
     DQ --> DIR["Director Agent"]
     DIR -->|resolves| DONE["Issue Resolved"]
-    DIR -->|enqueue_ceo_item| CQ["CEO Queue"]
+    DIR -->|escalate_to_ceo| CQ["CEO Queue"]
     CQ --> CEO["CEO (Human)"]
 ```
 
@@ -553,7 +552,7 @@ flowchart TD
 
 | Extension Point | Future Phase | Preparation |
 |----------------|-------------|-------------|
-| `enqueue_ceo_item` backend | Phase 5 | Correct signature + validation in place; replace log with `INSERT INTO ceo_queue` |
+| `escalate_to_ceo` backend | Phase 5 | Correct signature + validation in place; replace log with `INSERT INTO ceo_queue` |
 | `escalate_to_director` backend | Phase 5 | Correct signature + validation in place; replace log with `INSERT INTO director_queue` |
 | `select_ready_batch` backend | Phase 8 | Correct signature in place; replace placeholder with topological sort over deliverables |
 | `update_deliverable` backend | Phase 5 | Correct signature in place; replace placeholder with DB update |

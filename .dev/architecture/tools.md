@@ -71,8 +71,8 @@ All FunctionTools execute inside worker processes. They have direct access to th
 | `file_edit(path, old, new, replace_all?)` | Keep | Targeted string replacement |
 | `file_insert(path, line, content)` | **New** | Insert content at line number |
 | `file_multi_edit(path, edits)` | **New** | Atomic multi-site replacements |
-| `file_glob(pattern, path?)` | **New** (replaces file_search) | Find files by name pattern |
-| `file_grep(pattern, path?, glob?, context?)` | **New** (replaces file_search) | Search file contents by regex |
+| `file_glob(pattern, path?)` | **New** | Find files by name pattern |
+| `file_grep(pattern, path?, glob?, context?)` | **New** | Search file contents by regex |
 | `file_move(src, dst)` | **New** | Move/rename file |
 | `file_delete(path)` | **New** | Delete file |
 | `directory_list(path, depth?)` | Enhanced | Add depth control |
@@ -234,7 +234,7 @@ def task_query(filter: str | None = None, assignee: str | None = None) -> str:
 | Tool | Status | Purpose |
 |------|--------|---------|
 | `select_ready_batch(project_id)` | Keep | Dependency-aware batch selection |
-| `escalate_to_director(priority, context, request_type)` | **New** (replaces PM's `enqueue_ceo_item`) | PM → Director queue |
+| `escalate_to_director(priority, context, request_type)` | **New** | PM → Director queue |
 | `update_deliverable(deliverable_id, status, notes?)` | **New** | Deliverable lifecycle management |
 | `query_deliverables(project_id, status?)` | **New** | Query deliverable state |
 | `reorder_deliverables(project_id, order)` | **New** | Change execution priority |
@@ -267,7 +267,7 @@ def manage_dependencies(action: str, source_id: str, target_id: str | None = Non
 
 | Tool | Status | Purpose |
 |------|--------|---------|
-| `enqueue_ceo_item(type, priority, message, metadata)` | Keep (Director-only now) | Director → CEO queue |
+| `escalate_to_ceo(type, priority, message, metadata)` | Keep (Director-only now) | Director → CEO queue |
 | `list_projects(status?)` | **New** | Cross-project visibility |
 | `query_project_status(project_id)` | **New** | PM status, batch progress, cost |
 | `override_pm(project_id, action, reason)` | **New** | Direct PM intervention (pause/resume/reorder/correct) |
@@ -275,7 +275,7 @@ def manage_dependencies(action: str, source_id: str, target_id: str | None = Non
 | `query_dependency_graph(project_id, deliverable_id?)` | **New** | Query/visualize dependency graph |
 
 ```python
-def enqueue_ceo_item(item_type: str, priority: str, message: str, metadata: str) -> str:
+def escalate_to_ceo(item_type: str, priority: str, message: str, metadata: str) -> str:
     """Push a notification, approval request, escalation, or task to the unified
     CEO queue. Director-only — PM uses escalate_to_director instead."""
 
@@ -494,7 +494,7 @@ Within each tier, individual agents have scoping based on their role. The table 
 - **`review_agent`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
 - **`fix_agent`** (worker): Full filesystem (all 10), full code intelligence (2), `bash_exec` (no `http_request`), read-only git (`git_status`, `git_diff`, `git_log`, `git_show` -- no `git_commit`, `git_branch`, `git_worktree`, `git_apply`; `code_agent` handles commits), `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
 - **PM**: `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`. Note: `checkpoint_project` (`after_agent_callback` on DeliverablePipeline) and `run_regression_tests` (`RegressionTestAgent`, CustomAgent in pipeline) are not tools -- they are not LLM-discretionary.
-- **Director**: `enqueue_ceo_item`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`
+- **Director**: `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`
 
 `GlobalToolset.get_tools()` enforces this scoping at agent construction time, not through directory placement.
 

@@ -76,9 +76,9 @@ Q8 resolved: Vercel `agent-browser` CLI (npm package). Agents invoke it via `bas
 PM management tools (6) and Director management tools (6) require DB infrastructure that arrives in Phase 5 (CEO queue table, Director queue table, project configs) and Phase 8 (deliverable dependency resolution). In Phase 4:
 
 - All 12 management tools have correct signatures, type hints, docstrings, and parameter validation.
-- **PM tools** (6): `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`. PM uses `escalate_to_director` to send issues to the Director queue — PM does NOT use `enqueue_ceo_item` (that is Director-only).
-- **Director tools** (6): `enqueue_ceo_item`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`. Only the Director can push to the CEO queue.
-- `enqueue_ceo_item` validates `item_type` against known values (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) and `priority` against known values (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`). Logs the enqueued item via `get_logger("tools.management")` and returns a confirmation string with a placeholder ID. Phase 5 replaces the log with a DB insert.
+- **PM tools** (6): `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`. PM uses `escalate_to_director` to send issues to the Director queue.
+- **Director tools** (6): `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`. Only the Director can push to the CEO queue.
+- `escalate_to_ceo` validates `item_type` against known values (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) and `priority` against known values (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`). Logs the enqueued item via `get_logger("tools.management")` and returns a confirmation string with a placeholder ID. Phase 5 replaces the log with a DB insert.
 - `escalate_to_director` validates `request_type` against known values (`ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT`) and `priority` against known values (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`). Returns a confirmation with a placeholder ID. Phase 5 replaces with Director queue DB insert.
 - `select_ready_batch` accepts a `project_id` and returns `"No deliverables configured for project {project_id}"`. Phase 8 replaces this with actual dependency resolution.
 - All other management tools return appropriate placeholder messages indicating which phase provides the real backend.
@@ -131,7 +131,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "todo_read", "todo_write", "todo_list",
     },
     "director": {
-        "enqueue_ceo_item", "list_projects", "query_project_status",
+        "escalate_to_ceo", "list_projects", "query_project_status",
         "override_pm", "get_project_context", "query_dependency_graph",
         "task_create", "task_update", "task_query",
         "todo_read", "todo_write", "todo_list",
@@ -319,10 +319,10 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 ### P4.D6: Management Tools
 **Files:** `app/tools/management.py`
 **Depends on:** —
-**Description:** PM-level (6) and Director-level (6) management tools for batch operations, escalation, deliverable lifecycle, project oversight, and CEO communication. Per DD-4, all tools have correct signatures and validation but use placeholder backends. PM uses `escalate_to_director` (NOT `enqueue_ceo_item`) for escalations. `enqueue_ceo_item` is Director-only. Real backends arrive in Phase 5 (CEO queue table, Director queue table, project configs) and Phase 8 (deliverable dependency resolution).
+**Description:** PM-level (6) and Director-level (6) management tools for batch operations, escalation, deliverable lifecycle, project oversight, and CEO communication. Per DD-4, all tools have correct signatures and validation but use placeholder backends. PM escalates via `escalate_to_director`; Director escalates via `escalate_to_ceo`. Real backends arrive in Phase 5 (CEO queue table, Director queue table, project configs) and Phase 8 (deliverable dependency resolution).
 **BOM Components:**
 - [ ] `T16` — `select_ready_batch` FunctionTool
-- [ ] `T17` — `enqueue_ceo_item` FunctionTool
+- [ ] `T17` — `escalate_to_ceo` FunctionTool
 - [ ] `T31` — `escalate_to_director` FunctionTool
 - [ ] `T32b` — `update_deliverable` FunctionTool
 - [ ] `T33b` — `query_deliverables` FunctionTool
@@ -343,17 +343,17 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [ ] `reorder_deliverables(project_id: str, order: list[str]) -> str` validates parameters; returns placeholder confirmation
 - [ ] `manage_dependencies(action: str, source_id: str, target_id: str | None = None) -> str` validates `action` is one of `"ADD"`, `"REMOVE"`, `"QUERY"`; returns placeholder response
 - [ ] **Director tools (6):**
-- [ ] `enqueue_ceo_item(item_type: str, priority: str, message: str, metadata: str) -> str` validates `item_type` is one of `"NOTIFICATION"`, `"APPROVAL"`, `"ESCALATION"`, `"TASK"`; validates `priority` is one of `"LOW"`, `"NORMAL"`, `"HIGH"`, `"CRITICAL"`; returns validation error message for invalid values; logs via `get_logger("tools.management")` and returns confirmation with a generated UUID placeholder ID
+- [ ] `escalate_to_ceo(item_type: str, priority: str, message: str, metadata: str) -> str` validates `item_type` is one of `"NOTIFICATION"`, `"APPROVAL"`, `"ESCALATION"`, `"TASK"`; validates `priority` is one of `"LOW"`, `"NORMAL"`, `"HIGH"`, `"CRITICAL"`; returns validation error message for invalid values; logs via `get_logger("tools.management")` and returns confirmation with a generated UUID placeholder ID
 - [ ] `list_projects(status: str | None = None) -> str` returns placeholder "No project infrastructure (Phase 5)"
 - [ ] `query_project_status(project_id: str) -> str` returns placeholder response with project ID
 - [ ] `override_pm(project_id: str, action: str, reason: str) -> str` validates `action` is one of `"PAUSE"`, `"RESUME"`, `"REORDER"`, `"CORRECT"`; returns placeholder confirmation
 - [ ] `get_project_context(path: str | None = None) -> str` detects project type from filesystem (reads `package.json`, `pyproject.toml`, etc.); functional even in Phase 4
 - [ ] `query_dependency_graph(project_id: str, deliverable_id: str | None = None) -> str` returns placeholder "No dependency infrastructure (Phase 8)"
 - [ ] Validation uses string comparison against known values (not enum imports — CEO/Director queue enums arrive in Phase 5)
-- [ ] Module importable as `from app.tools.management import select_ready_batch, escalate_to_director, update_deliverable, query_deliverables, reorder_deliverables, manage_dependencies, enqueue_ceo_item, list_projects, query_project_status, override_pm, get_project_context, query_dependency_graph`
+- [ ] Module importable as `from app.tools.management import select_ready_batch, escalate_to_director, update_deliverable, query_deliverables, reorder_deliverables, manage_dependencies, escalate_to_ceo, list_projects, query_project_status, override_pm, get_project_context, query_dependency_graph`
 **Validation:**
 - `uv run pyright app/tools/management.py`
-- `python -c "from app.tools.management import select_ready_batch, enqueue_ceo_item, escalate_to_director"`
+- `python -c "from app.tools.management import select_ready_batch, escalate_to_ceo, escalate_to_director"`
 - `uv run pytest tests/tools/test_management.py -v`
 
 ---
@@ -424,7 +424,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [ ] **Git tests** (use `tmp_path` fixture with `git init`): `git_status` on clean repo returns clean message; `git_commit` after file creation returns success; `git_commit` with selective `files` parameter stages only specified files; `git_commit` on clean repo returns nothing-to-commit; `git_branch` create + switch works; `git_diff` shows changes; `git_log` returns commit history; `git_show` displays commit details; `git_worktree` add/list/remove works; `git_apply` applies patch
 - [ ] **Web tests**: `web_fetch` returns extracted text from HTML (mock httpx response); `web_fetch` truncates output at 10000 chars; `web_fetch` returns raw content for non-HTML; `web_search` with valid API key returns formatted results (mock Tavily API); `web_search` with Brave provider returns formatted results (mock Brave API); `web_search` without API key returns error message
 - [ ] **Task tests**: `todo_write` add creates task; `todo_list` returns all tasks; `todo_read` returns specific task; `todo_write` complete marks task done; `todo_list` with filter returns filtered results; `task_create` returns placeholder confirmation; `task_update` returns placeholder confirmation; `task_query` returns placeholder message
-- [ ] **Management tests**: `select_ready_batch` returns placeholder message; `enqueue_ceo_item` with valid params returns confirmation; `enqueue_ceo_item` with invalid `item_type` returns validation error; `escalate_to_director` with valid params returns confirmation; `escalate_to_director` with invalid `request_type` returns validation error; `get_project_context` detects project type from filesystem; all other management tools return appropriate placeholder responses
+- [ ] **Management tests**: `select_ready_batch` returns placeholder message; `escalate_to_ceo` with valid params returns confirmation; `escalate_to_ceo` with invalid `item_type` returns validation error; `escalate_to_director` with valid params returns confirmation; `escalate_to_director` with invalid `request_type` returns validation error; `get_project_context` detects project type from filesystem; all other management tools return appropriate placeholder responses
 - [ ] **Code intelligence tests**: `code_symbols` extracts symbols from Python file; `code_symbols` auto-detects language from extension; `run_diagnostics` runs lint tool and returns output
 - [ ] **Toolset tests**: `GlobalToolset` constructor creates 42 `FunctionTool` instances; `get_tools(None)` returns all tools; planner role gets read-only + code intelligence + web + todos; coder role gets 27 tools (full set minus management); reviewer role matches planner; fix_agent role gets full FS + limited exec/git; PM role includes 12 tools (PM management + shared tasks + todos); Director role includes 12 tools (Director management + shared tasks + todos); `excluded_tools={"bash_exec"}` removes bash from coder role; `resolve_role` maps `"plan_agent"` -> `"planner"`, `"code_agent"` -> `"coder"`, `"fix_agent"` -> `"fix_agent"`, unknown -> `"default"`
 - [ ] **Schema generation tests**: Each `FunctionTool(func)` produces a schema where `name` matches `func.__name__`, description is a non-empty string derived from `func.__doc__`, and parameter names match the function signature (excluding `tool_context`)
@@ -467,7 +467,7 @@ Batch 3: P4.D8
 | 4 | bash_exec handles timeout, output capture, error reporting | P4.D2, P4.D8 | Execution tests: timeout kills process, output captured, exit code reported |
 | 5 | Code intelligence tools extract symbols and run diagnostics | P4.D6b, P4.D8 | Code intelligence tests verify tree-sitter extraction and diagnostics execution |
 | 6 | Three-tier task system (todos/tasks/deliverables) has correct interfaces | P4.D5, P4.D6, P4.D8 | Task + management tests verify all 6 task-tier tools |
-| 7 | PM escalation path uses Director queue (not CEO queue) | P4.D6, P4.D7, P4.D8 | PM role includes `escalate_to_director`, not `enqueue_ceo_item`; Director role includes `enqueue_ceo_item` |
+| 7 | PM escalation path uses Director queue | P4.D6, P4.D7, P4.D8 | PM role includes `escalate_to_director`; Director role includes `escalate_to_ceo` |
 | 8 | Director management tools have correct signatures for Phase 5 integration | P4.D6, P4.D8 | Management tests verify all 6 Director tools accept correct params |
 | 9 | fix_agent role has distinct permissions from coder (no git commit, no http_request) | P4.D7, P4.D8 | Toolset tests verify fix_agent has limited exec/git vs coder's full set |
 
@@ -504,7 +504,7 @@ Batch 3: P4.D8
 | T30b | `task_update` FunctionTool | P4.D5 |
 | T30c | `task_query` FunctionTool | P4.D5 |
 | T16 | `select_ready_batch` FunctionTool | P4.D6 |
-| T17 | `enqueue_ceo_item` FunctionTool | P4.D6 |
+| T17 | `escalate_to_ceo` FunctionTool | P4.D6 |
 | T31 | `escalate_to_director` FunctionTool | P4.D6 |
 | T32b | `update_deliverable` FunctionTool | P4.D6 |
 | T33b | `query_deliverables` FunctionTool | P4.D6 |

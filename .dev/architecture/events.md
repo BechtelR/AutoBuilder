@@ -55,7 +55,7 @@ A single DB-backed queue that aggregates all items requiring CEO attention acros
 | `metadata` | Structured JSON payload (approval choices, escalation context, task details) |
 | `status` | `PENDING`, `SEEN`, `RESOLVED`, `DISMISSED` |
 
-**Write path**: Director enqueues items via `enqueue_ceo_item` FunctionTool. PMs no longer write directly to the CEO queue — they escalate to the Director queue via `escalate_to_director`. Redis Streams events can also trigger queue entries via a consumer.
+**Write path**: Director enqueues items via `escalate_to_ceo` FunctionTool. PMs no longer write directly to the CEO queue — they escalate to the Director queue via `escalate_to_director`. Redis Streams events can also trigger queue entries via a consumer.
 
 **Read path**: Dashboard polls `GET /ceo/queue` or subscribes to `GET /ceo/queue/stream` (SSE). CEO resolves items via `PATCH /ceo/queue/{id}`. Resolved approvals are written back to the relevant session's state for the agent to observe on next invocation.
 
@@ -74,7 +74,7 @@ A DB-backed queue for PM-to-Director escalation. Parallel design to the CEO queu
 
 **Write path**: PM agents enqueue items via `escalate_to_director` FunctionTool.
 
-**Read path**: Director processes items during work sessions. Director can resolve locally or forward to CEO queue via `enqueue_ceo_item`.
+**Read path**: Director processes items during work sessions. Director can resolve locally or forward to CEO queue via `escalate_to_ceo`.
 
 #### Escalation Path
 

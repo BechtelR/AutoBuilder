@@ -119,7 +119,7 @@ def build_director(project_ids: list[str]) -> LlmAgent:
                     "Your personality and preferences are in user: state. "
                     "Delegate to PMs via transfer_to_agent.",
         tools=[
-            FunctionTool(enqueue_ceo_item),
+            FunctionTool(escalate_to_ceo),
             FunctionTool(list_projects),
             FunctionTool(query_project_status),
             FunctionTool(override_pm),
@@ -200,7 +200,7 @@ A "Main" project acts as the permanent default -- the Director's home context. M
 
 | Tool | Purpose |
 |------|---------|
-| `enqueue_ceo_item` | Push items to CEO queue (Director-only) |
+| `escalate_to_ceo` | Push items to CEO queue (Director-only) |
 | `list_projects` | Cross-project visibility |
 | `query_project_status` | PM status, batch progress, cost |
 | `override_pm` | Direct PM intervention (pause/resume/reorder/correct) |
@@ -221,7 +221,7 @@ director_agent = LlmAgent(
                 "Manage PMs via transfer_to_agent, allocate resources, "
                 "enforce hard limits, intervene when patterns go wrong.",
     tools=[
-        FunctionTool(enqueue_ceo_item),
+        FunctionTool(escalate_to_ceo),
         FunctionTool(list_projects),
         FunctionTool(query_project_status),
         FunctionTool(override_pm),
@@ -548,7 +548,7 @@ Tools are Python functions in `app/tools/`, organized by function type (filesyst
 | Agent | Management Tools | Tasks | Escalation |
 |-------|-----------------|-------|------------|
 | PM | `select_ready_batch`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies` | Shared tasks + session todos | `escalate_to_director` → Director queue |
-| Director | `enqueue_ceo_item`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph` | Shared tasks + session todos | `enqueue_ceo_item` → CEO queue |
+| Director | `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph` | Shared tasks + session todos | `escalate_to_ceo` → CEO queue |
 
 ADK supports this through `BaseToolset.get_tools()`, which returns different tool sets based on the agent or deliverable type. This keeps tool restriction logic centralized rather than scattered across agent definitions.
 
