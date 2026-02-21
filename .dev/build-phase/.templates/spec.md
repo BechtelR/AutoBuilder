@@ -3,15 +3,7 @@
 
 ## Overview
 
-{Phase goal expanded with design decisions made during research. 2-4 paragraphs covering what this phase delivers, why it matters, and key constraints. Must align with `.dev/00-VISION.md` — features should trace to vision goals, not just roadmap checkboxes.}
-
-## Features
-
-{Simple line-items summarizing what this phase delivers — a table of contents for the spec. Each feature maps to one or more deliverables below.}
-
-- {Feature 1: brief summary}
-- {Feature 2: brief summary}
-- ...
+{Phase goal expanded with design decisions made during research. 2-4 paragraphs covering what this phase delivers, why it matters, and key constraints. Must align with the FRD capabilities (CAP-{n}) — deliverables satisfy FRD requirements, not just roadmap checkboxes.}
 
 ## Prerequisites
 
@@ -58,11 +50,17 @@ Batch 2 (sequential): P{N}.D{z}
 
 ## Completion Contract Traceability
 
-### Contract Coverage
+### FRD Coverage
 
-| # | Roadmap Completion Contract Item | Covered By | Validation |
-|---|---|---|---|
-| 1 | {Exact text from roadmap} | P{N}.D{x}, P{N}.D{y} | `{verification command}` |
+A **Capability (CAP-{n})** is a named consumer-facing behavior group — the container. **Functional Requirements (FR-{N}.{nn})** are the specific testable conditions within it — the proof. All FRs under a capability must pass for the capability to be satisfied.
+
+| Capability | FRD Requirement | Deliverable(s) |
+|---|---|---|
+| CAP-{n}: {capability name} | FR-{N}.{nn} | P{N}.D{x} |
+| *(same cap)* | FR-{N}.{nn} | P{N}.D{x}, P{N}.D{y} |
+| CAP-{n}: {capability name} | FR-{N}.{nn} | P{N}.D{z} |
+
+*Every FRD functional requirement must trace to at least one deliverable. Zero uncovered. If no FRD exists for this phase, omit this section.*
 
 ### BOM Coverage
 
@@ -71,6 +69,12 @@ Batch 2 (sequential): P{N}.D{z}
 | {ID} | {Component name} | P{N}.D{x} |
 
 *Every BOM component assigned to Phase {N} in `07-COMPONENTS.md` must appear above. Zero unmapped.*
+
+### Contract Coverage
+
+| # | Roadmap Completion Contract Item | Covered By | Validation |
+|---|---|---|---|
+| 1 | {Exact text from roadmap} | P{N}.D{x}, P{N}.D{y} | `{verification command}` |
 
 ## Research Notes
 

@@ -8,7 +8,7 @@ Build Phase {$ARGUMENTS}. Implement the spec with quality gates, double review, 
 
 This is a SESSION command — no file output. It drives implementation from spec.md + model.md through to verified, reviewed, roadmap-complete code.
 
-CRITICAL: NOT done until Completion Protocol steps A-E are complete and every contract item shows PASS. Do not stop early. On blockers, ask the user.
+CRITICAL: NOT done until Completion Protocol steps A-E are complete and every item across all three verification layers shows PASS. Do not stop early. On blockers, ask the user.
 </objective>
 
 <context>
@@ -20,9 +20,10 @@ Parse phase number from arguments (if missing, ask). Flags:
 
 Bootstrap (parallel reads):
 - @.dev/build-phase/phase-{N}/spec.md — full spec (deliverables, BOM components, decisions, requirements, build order)
+- @.dev/build-phase/phase-{N}/frd.md — functional requirements (FR-{N}.{nn} IDs for verification — OPTIONAL, skip if absent)
 - @.dev/build-phase/phase-{N}/model.md — architecture model (OPTIONAL — skip if not present)
 - @.dev/03-STRUCTURE.md — file placement truth
-- @.dev/02-ARCHITECTURE.md — five-layer architecture
+- @.dev/02-ARCHITECTURE.md — system architecture (conformance target)
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
 Selective reads (only what the phase touches, via INDEX.md):
@@ -34,6 +35,7 @@ Skip `CLAUDE.md` and `.claude/rules/` (already in context).
 
 If spec.md doesn't exist: stop and tell user to run `/spec-phase {N}` first.
 If model.md doesn't exist: note it and proceed — model is optional for simple specs.
+If frd.md doesn't exist: note it and proceed — FRD requirement verification will be skipped.
 </context>
 
 <delegation>
@@ -48,7 +50,7 @@ MUST DELEGATE work to parallel subagents to preserve context window:
 </delegation>
 
 <process>
-Steps 1-5 sequential. Announce each step. Use `TaskCreate` to create one task per step + one per batch in Step 2, chained with `blockedBy`. Mark each `in_progress` when starting, `completed` when done. This is the primary enforcement mechanism — do NOT skip tasks.
+Steps 1-5 sequential. Announce each step.
 
 STEP 1 — PLAN
 
@@ -69,11 +71,21 @@ D. **Surface the plan:**
 |-------|-------------|-----------|----------------|
 | 1     | P{N}.D{x}, D{y} | `path/...` | `command` |
 
-**Completion Contract** (from spec.md Traceability — ALL items, NONE omitted):
+**Verification Layers** (surface all three — preview of Step 5):
+
+FRs (from frd.md, if exists — ALL FRs, NONE omitted):
+- [ ] FR-{N}.{nn}: {description} → verify via deliverable validation commands
+
+Deliverables (from spec.md — ALL deliverables, NONE omitted):
+- [ ] P{N}.D{n}: {title} — BOM: {component IDs} → validate: `{command}`
+
+Contract Items (from spec.md Traceability — ALL items, NONE omitted):
 - [ ] {Contract item} → verify: `{command}`
 
 **Without `--go` (default):** Stop and ask the user to approve the plan before proceeding.
 **With `--go`:** Do NOT enter plan mode. Print the plan summary, then proceed directly to Step 2. Do NOT stop for approval.
+
+E. **Create task list** — after plan is approved (or immediately with `--go`), use `TaskCreate` to create one task per step (Steps 2-5) + one per batch within Step 2, chained with `blockedBy`. Mark each `in_progress` when starting, `completed` when done. This is the primary enforcement mechanism — do NOT skip tasks.
 
 STEP 2 — IMPLEMENT BY BATCH
 
@@ -128,6 +140,7 @@ Split files evenly across reviewers. Each checks:
 - CLAUDE.md and `.claude/rules/` adherence
 - Type safety (no `Any`, Pydantic at boundaries)
 - Security (no hardcoded secrets, input validation)
+- FRD requirement conformance (every FR-{N}.{nn} from frd.md satisfied — skip if no frd.md)
 - Code quality (no dead code, no debug logging, no over-engineering)
 
 **Execution:**
@@ -145,55 +158,68 @@ STEP 5 — COMPLETION PROTOCOL
 
 CRITICAL — Every checkbox requires EVIDENCE (command output or observable result). Never mark without proof.
 
-**A. Verify Completion Contract**
-Per item in Completion Contract: run verification command → read output → only mark `[x]` on proven success. Failures → fix and re-verify.
+Three independent verification layers — all required, all can fail independently:
 
-**B. Mark Spec Complete**
+| Layer | Question | Artifact | Verified In |
+|-------|----------|----------|-------------|
+| **FRs** | Did it work correctly? | `frd.md` FR-{N}.{nn} checkboxes | Step A |
+| **Deliverables** | Was it built right? | `spec.md` BOM + requirement checkboxes | Step B |
+| **Contract items** | Was the phase scope completed? | `08-ROADMAP.md` contract checkboxes | Step C |
+
+Passing FRs does not guarantee deliverable conformance. Checking off deliverables does not guarantee contract completion.
+
+**A. Verify FRs**
+If frd.md exists: for each FR-{N}.{nn}, find the deliverable(s) that cover it (via spec.md FRD Coverage table), run those deliverables' validation commands → read output → mark `[x]` in `frd.md` only on proven success. Failures → fix and re-verify. Skip if no frd.md.
+
+**B. Verify Deliverables**
 Open `.dev/build-phase/phase-{N}/spec.md`. Per deliverable:
-1. Check off BOM Components (`[x]`) — each component that was implemented
-2. Check off Requirements (`[x]`) — only passing requirements verified by validation command
+1. `[x]` each BOM Component — only if implemented and confirmed
+2. `[x]` each Requirement — only if proven by validation command output
 3. Unverifiable items → leave unchecked, report to user
 
-**C. Mark Roadmap Complete**
-Open `.dev/01-ROADMAP.md`:
-1. `[x]` each deliverable checkbox — only if ALL corresponding spec requirements passed in B
-2. `[x]` each contract checkbox — only if verification passed in A
-3. Status: `IN PROGRESS` → `DONE`
-4. Update top-level status to next phase
+**C. Verify Contract Items**
+Open `.dev/08-ROADMAP.md`:
+1. `[x]` each contract checkbox — run verification command from spec.md Contract Coverage table, mark only on proven success
+2. Status: `IN PROGRESS` → `DONE`
+3. Update top-level status to next phase
 
 **D. Final Quality Gate**
 Run directly (not via subagent):
 ```
-uv run ruff check . && uv run ruff format --check . && uv run pyright
+uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
 ```
 Fix and re-run until clean.
 
 **E. Completion Summary**
-Print evidence table:
+Print evidence table covering all three layers:
 
-| # | Contract Item | Status | Evidence |
-|---|---------------|--------|----------|
-| 1 | {item} | PASS/FAIL | {proof} |
+| # | Item | Layer | Status | Evidence |
+|---|------|-------|--------|----------|
+| 1 | FR-{N}.{nn}: {description} | FRs | PASS/FAIL | {command + output} |
+| 2 | P{N}.D{n}: {title} requirements | Deliverables | PASS/FAIL | {command + output} |
+| 3 | {contract item} | Contract | PASS/FAIL | {command + output} |
 
 NOT done until A-E complete and every row shows PASS.
 </process>
 
 <verification>
-Before reporting done, verify:
-1. All spec deliverables implemented (check off in spec.md)
-2. Quality gate passes (ruff, pyright, pytest)
-3. Review report exists at `.dev/build-phase/phase-{N}/review.md` (unless `--review=none`)
-4. All findings resolved (unless `--review=none`)
-5. Completion Protocol steps A-E all executed with evidence
-6. Roadmap updated (status, checkboxes)
-7. Evidence table printed with all rows PASS
+Before reporting done, verify all three layers:
+1. **FRs**: every FR-{N}.{nn} checked off in frd.md with evidence (if frd.md exists)
+2. **Deliverables**: every BOM component and requirement checked off in spec.md with evidence
+3. **Contract items**: every contract checkbox marked in 08-ROADMAP.md with evidence
+4. Quality gate passes (ruff, pyright, pytest)
+5. Review report exists at `.dev/build-phase/phase-{N}/review.md` (unless `--review=none`)
+6. All review findings resolved (unless `--review=none`)
+7. Roadmap status updated to DONE
+8. Evidence table printed with all rows PASS across all three layers
 </verification>
 
 <success_criteria>
-- All spec deliverables implemented and requirements checked off
+- All FR checkboxes marked in frd.md with evidence (if frd.md exists)
+- All spec deliverable BOM components and requirements checked off with evidence
+- All roadmap contract items checked off with evidence; status updated to DONE
 - Quality gate clean (ruff + pyright + pytest)
 - Review completed per `--review` flag (default: double), report at `.dev/build-phase/phase-{N}/review.md`
-- Completion Protocol A-E executed with evidence
-- Roadmap status updated to DONE
+- Completion Protocol A-E executed
 - Evidence table shows all PASS
 </success_criteria>

@@ -4,14 +4,16 @@
 ## Component Diagram
 
 ```mermaid
-{Mermaid flowchart showing components, their relationships, and which architecture layer each belongs to (Interface / Gateway / Worker / Engine / Infrastructure). Group components into subgraphs by layer. Show data flow direction with arrows. For UI components: names + relationships only — detailed UI design lives in separate files for dashboard phases.}
+{Mermaid flowchart showing components, their relationships, and which architecture layer each belongs to (layers defined in 02-ARCHITECTURE.md). Group components into subgraphs by layer. Show data flow direction with arrows. For UI components: names + relationships only — detailed UI design lives in separate files for dashboard phases.}
 ```
 
-## Deliverable-to-Component Traceability
+## L2 Architecture Conformance
 
-| Deliverable | Components |
-|---|---|
-| P{N}.D{n} | {components this deliverable maps to} |
+| Component | L2 Architecture File | Section |
+|---|---|---|
+| {component name} | `architecture/{file}.md` | {section name} |
+
+*Every model component must trace to the L2 architecture section that defines its design contract.*
 
 ## Major Interfaces
 

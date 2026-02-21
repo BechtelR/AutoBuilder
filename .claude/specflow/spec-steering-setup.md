@@ -47,7 +47,7 @@ You are setting up steering documents that will guide all future spec developmen
      ```
    - **For each document**:
      - **product.md**: Product vision, users, strategic advantages, features, objectives
-     - **roadmap.md**: High-level roadmap structure, phase overview, terminology, risks. **DO NOT include current development status** (completion percentages, active tasks, etc.) - refer to `.dev/01-ROADMAP.md` as the master document for current status
+     - **roadmap.md**: High-level roadmap structure, phase overview, terminology, risks. **DO NOT include current development status** (completion percentages, active tasks, etc.) - refer to `.dev/08-ROADMAP.md` as the master document for current status
      - **tech.md**: Technology stack, tools, constraints, decisions
      - **structure.md**: High-level blueprint, file organization, naming conventions, patterns
      - **standards.md**: Engineering standards, coding rules, patterns (keep focused and concise)

@@ -6,7 +6,7 @@ argument-hint: <phase-number> [--research-only | --resume]
 <objective>
 Produce a buildable specification for Phase {$ARGUMENTS}. Output: `spec.md` in `.dev/build-phase/phase-{N}/`.
 
-CRITICAL: NOT done until spec.md is written AND every roadmap completion contract item traces to a deliverable. Do not stop early. On blockers, ask the user.
+CRITICAL: NOT done until spec.md is written AND every FRD requirement traces to a deliverable (if FRD exists) AND every BOM component maps to a deliverable AND every roadmap contract item traces to a deliverable. Do not stop early. On blockers, ask the user.
 </objective>
 
 <context>
@@ -16,10 +16,13 @@ Parse phase number from arguments (if missing, ask). Flags:
 
 Bootstrap (parallel, token discipline — do NOT bulk-read):
 - @.dev/07-COMPONENTS.md — filter by phase number, this is the **authoritative component list** for the phase
-- @.dev/01-ROADMAP.md — target phase scope summary, completion contract, prerequisites ONLY
-- @.dev/00-VISION.md — vision goals (features must align)
+- @.dev/08-ROADMAP.md — target phase scope summary, completion contract, prerequisites ONLY
 - @.dev/03-STRUCTURE.md — file placement truth
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
+
+FRD read:
+- `.dev/build-phase/phase-{N}/frd.md` — phase functional requirements (Spec traces to these)
+- If FRD doesn't exist: warn user to run `/shape-phase {N}` first. Proceed only if user confirms — traceability will be incomplete.
 
 Selective deep-reads (only architecture files referenced in BOM "Source" column for this phase's components):
 - Infrastructure/gateway → `02-ARCHITECTURE.md` | Agents → `architecture/agents.md`
@@ -30,6 +33,12 @@ Selective deep-reads (only architecture files referenced in BOM "Source" column 
 Skip `CLAUDE.md` and `.claude/rules/` (already in context).
 If spec exists and no flag: ask user — overwrite or resume?
 </context>
+
+<delegation>
+Use subagents to preserve context window:
+- `Explore` — codebase research, understand existing patterns in target modules
+- `subtask` — parallel research into specific technical areas
+</delegation>
 
 <process>
 Steps 1-9 sequential. Announce each step.
@@ -69,14 +78,15 @@ Per deliverable: ID (`P{N}.D{n}`), title (imperative), BOM components (list IDs,
 
 Rules: single-session completable, max 3-4 files, DAG deps, every contract item mapped, every BOM component covered, add implied deliverables.
 
-STEP 6 — VISION ALIGNMENT
-Verify features align with `00-VISION.md` goals. Each feature should trace to at least one vision differentiator or problem being solved. Flag features that don't connect to the vision — these may be scope creep.
+STEP 6 — FRD TRACEABILITY
+If FRD exists: verify every FRD requirement (FR-{N}.{nn}) traces to at least one deliverable. Flag requirements with no deliverable coverage — these are gaps. Flag deliverables with no FRD requirement — these may be scope creep.
+If no FRD: skip this step, note the gap.
 
-STEP 7 — COMPLETION CONTRACT TRACEABILITY
-Two matrices:
-A. **Contract traceability**: every roadmap contract item → deliverable(s) → validation command. Any uncovered → add deliverable.
+STEP 7 — TRACEABILITY MATRICES
+Write three matrices for the spec (Step 6 found gaps; this step produces the artifact):
+A. **FRD coverage** (if FRD exists): formalize the Step 6 mapping — every FRD requirement (FR-{N}.{nn}) → deliverable(s). Zero uncovered.
 B. **BOM coverage**: every BOM component ID for this phase → deliverable ID. Any uncovered → add to existing deliverable or create new one. Zero BOM components may be left unmapped.
-Include both roadmap-level requirements AND phase-specific requirements.
+C. **Contract traceability**: every roadmap contract item → deliverable(s) → validation command. Any uncovered → add deliverable.
 
 STEP 8 — BUILD ORDER
 Topological sort into parallel batches respecting deps.
@@ -92,31 +102,30 @@ Follow template at `.dev/build-phase/.templates/spec.md` — fill all `{placehol
 
 Requirements:
 - Standalone (fresh session needs only this + referenced docs)
-- Features section lists all phase deliveries as simple line-items
 - Requirements per deliverable state what must be true when complete
+- FRD Coverage maps every FR-{N}.{nn} to deliverable(s) (if FRD exists, zero uncovered)
 - Completion Contract Traceability covers ALL roadmap contract items
+- BOM Coverage maps every phase component to a deliverable (zero unmapped)
 - All file paths valid per `03-STRUCTURE.md`
 </output>
 
 <verification>
 Re-read spec.md and check:
-1. Has: Overview (with vision alignment), Features, Prerequisites, Design Decisions, Deliverables (ID/BOM Components/Files/Depends/Description/Requirements/Validation), Build Order, Traceability (contract + BOM coverage), Research Notes
-2. Roadmap contract item count matches traceability matrix count
+1. Has: Overview, Prerequisites, Design Decisions, Deliverables (ID/BOM Components/Files/Depends/Description/Requirements/Validation), Build Order, Traceability (FRD + BOM + Contract coverage), Research Notes
+2. Every FRD requirement (FR-{N}.{nn}) maps to a deliverable (if FRD exists)
 3. Every BOM component for this phase maps to a deliverable (zero unmapped)
-4. All requirements concrete (no "works correctly")
-5. All file paths valid per `03-STRUCTURE.md`
-6. Features trace to `00-VISION.md` goals
-7. Both roadmap-level and phase-specific requirements included
+4. Roadmap contract item count matches traceability matrix count
+5. All requirements concrete (no "works correctly")
+6. All file paths valid per `03-STRUCTURE.md`
+7. Valid DAG build order with no circular dependencies
 
 Fix failures before returning.
 </verification>
 
 <success_criteria>
 - spec.md written to disk
+- Every FRD requirement → deliverable (if FRD exists, zero unmapped)
 - Every BOM component for this phase → deliverable (zero unmapped)
 - Every roadmap contract item → deliverable (traceability)
-- Features section present with line-items mapping to deliverables
-- Requirements per deliverable (not "acceptance criteria")
 - Concrete requirements, valid file paths, valid DAG build order
-- Features align with `00-VISION.md` vision goals
 </success_criteria>

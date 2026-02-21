@@ -130,11 +130,16 @@ AutoBuilder/
 ├── .dev/                           # Architecture docs and planning (not shipped)
 │   ├── .architect.md               # Architect agent instructions
 │   ├── .standards.md               # Engineering standards
+│   ├── .workflow.md                # Development workflow (4 levels, artifact flow, sync rules)
 │   ├── 00-VISION.md                # Mission, differentiators, prior art
-│   ├── 01-ROADMAP.md               # Project roadmap and phased delivery
+│   ├── 01-PRD.md                   # Product requirements document
 │   ├── 02-ARCHITECTURE.md          # Technical architecture
 │   ├── 03-STRUCTURE.md             # This file — project scaffold
 │   ├── 04-TECH_STACK.md            # Technology choices and rationale
+│   ├── 05-DEV_SETUP.md             # Development environment setup
+│   ├── 06-PROVIDERS.md             # External providers
+│   ├── 07-COMPONENTS.md            # Component registry (BOM)
+│   ├── 08-ROADMAP.md               # Project roadmap and phased delivery
 │   ├── architecture/               # Domain-specific architecture reference (13 files)
 │   │   ├── gateway.md              # Gateway layer, ACL, routes, type safety
 │   │   ├── workers.md              # ARQ workers, lifecycle, concurrency
@@ -149,9 +154,10 @@ AutoBuilder/
 │   │   ├── workflows.md            # Pluggable workflows, manifests, registry
 │   │   ├── observability.md        # Observability, context management
 │   │   └── clients.md              # CLI + Dashboard architecture
-│   ├── 05-DEV_SETUP.md              # Development environment setup
-│   ├── 06-PROVIDERS.md              # External providers
-│   ├── .discussion/                 # Planning discussion documents
+│   ├── build-phase/                # Per-phase build artifacts
+│   │   ├── .templates/             # FRD, spec, model templates
+│   │   └── phase-{N}/             # frd.md, spec.md, model.md, review.md
+│   ├── .discussion/                # Planning discussion documents
 │   └── .notes/                     # Working notes
 │
 ├── AGENTS.md                       # AI agent guidance (concise)

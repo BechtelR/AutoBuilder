@@ -10,16 +10,16 @@ This is a DESIGN artifact — no implementation code. Defines components, interf
 
 Conciseness principle: model what the builder must comply with. Skip signatures that are obvious from the interface name and types. Skip diagrams for trivial flows. Design for decisions, not dictation.
 
-CRITICAL: NOT done until model.md is written AND every spec deliverable maps to at least one component. On blockers, ask the user.
+CRITICAL: NOT done until model.md is written AND every component traces to an L2 architecture section. On blockers, ask the user.
 </objective>
 
 <context>
 Parse phase number from arguments (if missing, ask).
 
 Bootstrap (parallel reads):
-- @.dev/build-phase/phase-{N}/spec.md — full spec (deliverables, decisions, files)
+- @.dev/build-phase/phase-{N}/frd.md — phase functional requirements (capabilities + FR IDs)
 - @.dev/07-COMPONENTS.md — filter by phase number for **authoritative component list** with types and dependencies
-- @.dev/02-ARCHITECTURE.md — five-layer architecture (conformance target)
+- @.dev/02-ARCHITECTURE.md — system architecture (conformance target, defines layers)
 - @.dev/03-STRUCTURE.md — file placement truth
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
@@ -28,28 +28,27 @@ Selective deep-reads (only architecture files referenced in BOM "Source" column 
 - State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
 - Tech decisions → `04-TECH_STACK.md` | Design history → `.discussion/design-changelog.md`
 
-If spec.md doesn't exist: stop and tell user to run `/spec-phase {N}` first.
+If frd.md doesn't exist: stop and tell user to run `/shape-phase {N}` first.
 If model.md exists: ask user — overwrite or skip?
 </context>
+
+<delegation>
+Use subagents to preserve context window:
+- `Explore` — codebase research, understand existing patterns in target modules
+- `subtask` — parallel research into specific technical areas
+</delegation>
 
 <process>
 Steps 1-8 sequential. Announce each step.
 
-STEP 1 — READ SPEC
-Extract from spec.md: deliverables (IDs, files, descriptions, requirements), design decisions, build order, prerequisites. Build a mental map of what this phase delivers.
+STEP 1 — READ FRD
+Extract from frd.md: capabilities (CAP-{n} IDs and descriptions), consumer roles, functional requirements (FR-{N}.{nn}), non-functional requirements, rabbit holes. Build a mental map of what this phase must do and for whom.
 
 STEP 2 — ARCHITECTURE CONFORMANCE
-Verify ALL components slot into the five-layer architecture from `02-ARCHITECTURE.md`:
-1. **Interface layer** — CLI (typer), dashboard (React SPA)
-2. **Gateway layer** — FastAPI routes/models, ARQ queue, database access
-3. **Worker layer** — ARQ workers, anti-corruption layer
-4. **Engine layer** — ADK orchestration, agents, tools, state
-5. **Infrastructure layer** — Redis, database, filesystem
-
-For each component in scope: identify its layer. Flag any that don't fit cleanly — these are architecture violations requiring resolution before proceeding. Also verify conformance with `00-VISION.md` principles (API-first, ADK behind ACL, out-of-process execution, etc.).
+Read the architecture layers defined in `02-ARCHITECTURE.md`. For each component in scope: identify which layer it belongs to. Flag any that don't fit cleanly — these are architecture violations requiring resolution before proceeding.
 
 STEP 3 — IDENTIFY COMPONENTS
-Map spec deliverables to concrete components: modules, classes, functions. Show how they connect. Group by architecture layer. For UI components: list names and relationships only — detailed UI design belongs in separate files.
+Identify the concrete components — modules, classes, functions — needed to support this phase's domain (informed by the FRD capabilities read in Step 1). Show how they connect. Group by architecture layer. For each component, identify which L2 architecture section defines its design contract. For UI components: list names and relationships only — detailed UI design belongs in separate files.
 
 STEP 4 — DEFINE INTERFACES
 For each component boundary: define Protocol classes or ABCs with method signatures only. No implementation bodies. Include type hints for all parameters and return types. These are the contracts the build phase must satisfy.
@@ -76,8 +75,8 @@ One file: `.dev/build-phase/phase-{N}/model.md`
 Follow template at `.dev/build-phase/.templates/model.md` — fill all `{placeholders}`, keep all sections.
 
 Requirements:
-- Every spec deliverable maps to at least one component
-- Every component has an identified architecture layer
+- Every component has an identified architecture layer and traces to an L2 architecture section
+- L2 Architecture Conformance table fully populated
 - Interfaces use Protocol/ABC with full type signatures
 - Mermaid diagrams for component, data flow, and logic flow
 - No implementation code — signatures and types only
@@ -87,22 +86,22 @@ Requirements:
 <verification>
 Re-read model.md and check:
 1. Component diagram present with Mermaid, components grouped by architecture layer
-2. Every spec deliverable (P{N}.D{n}) traceable to at least one component
+2. L2 Architecture Conformance table present and fully populated (every component → architecture file + section)
 3. All interfaces have Protocol/ABC definitions with typed signatures
 4. Key types include Pydantic models and enums with field-level detail
 5. Data flow shows type transformations across boundaries
 6. Logic flow uses state diagrams or flowcharts (Mermaid)
 7. Integration points table covers existing components AND future extensions
 8. Zero implementation code (no function bodies beyond `...`)
-9. All components conform to the five-layer architecture from `02-ARCHITECTURE.md`
+9. All components conform to the architecture layers defined in `02-ARCHITECTURE.md`
 
 Fix failures before returning.
 </verification>
 
 <success_criteria>
 - model.md written to disk at `.dev/build-phase/phase-{N}/model.md`
-- Every spec deliverable traceable to component(s)
-- All components placed in correct architecture layer
+- All components placed in correct architecture layer and traced to L2 architecture section
+- L2 Architecture Conformance table fully populated
 - Interfaces defined as Protocol/ABC with typed signatures
 - Mermaid diagrams for component layout, data flow, and logic flow
 - No implementation code

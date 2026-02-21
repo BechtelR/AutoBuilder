@@ -149,7 +149,7 @@ See [AGENTS.md](./AGENTS.md) for development guidelines and coding standards.
 - **[.dev/02-ARCHITECTURE.md](./.dev/02-ARCHITECTURE.md)**: Technical architecture and design
 - **[.dev/03-STRUCTURE.md](./.dev/03-STRUCTURE.md)**: Project scaffold (single source of truth)
 - **[.dev/04-TECH_STACK.md](./.dev/04-TECH_STACK.md)**: Tech stack decisions and rationale
-- **[.dev/01-ROADMAP.md](./.dev/01-ROADMAP.md)**: Project roadmap
+- **[.dev/08-ROADMAP.md](./.dev/08-ROADMAP.md)**: Project roadmap
 
 ---
 

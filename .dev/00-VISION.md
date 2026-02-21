@@ -1,92 +1,96 @@
-# AutoBuilder Vision & Strategy
+# AutoBuilder — Vision & Strategy
+*Version: 3.0 | Updated: 2026-02-20*
 
-## Pitch
+## Mission
 
-AutoBuilder is an autonomous agentic workflow system built on Google ADK that orchestrates multi-agent teams alongside deterministic tooling in structured, resumable pipelines. It supports pluggable workflow composition (auto-code, auto-design, auto-research, etc.), dynamic LLM routing across providers via LiteLLM, six-level progressive memory architecture, skill-based knowledge injection, and git worktree isolation for parallel execution. The system runs continuously from specification to verified output with optional human-in-the-loop intervention points.
+Autonomous workflow execution that knowledge workers can trust — so one person, or a small team, can accomplish what previously required many.
 
-The system exposes an API-first gateway (FastAPI) that owns the external contract. ADK runs behind an anti-corruption layer -- clients never see ADK internals. Workflow execution is out-of-process via ARQ workers backed by Redis. Interfaces (CLI and web dashboard) are pure API consumers over REST + SSE.
+## Problem
 
-Unlike chat-based assistants that require constant human steering, AutoBuilder is a standalone orchestrator that runs autonomously from spec to verified deliverable. It treats deterministic tools (validators, test runners, formatters, etc.) as first-class workflow participants alongside LLM agents, guaranteeing that deterministic steps execute at prescribed pipeline stages regardless of LLM judgment.
+Complex, multi-step knowledge work — software development, research synthesis, design iteration, investment analysis — shares a common pattern: it requires specialists working in sequence, each dependent on the previous, each requiring review. Coordinate wrong and quality collapses. Hand off poorly and context is lost. Move too slowly and the window closes.
 
----
+AI tools have made individual steps faster. They haven't solved the coordination problem.
 
-## Core Differentiators
+Today's AI tooling forces humans to remain the orchestrator. You drive the session. You prompt the next step. You catch the mistakes. You decide when it's done. The AI is fast; you're still the bottleneck. Every time you step away — truly delegate — quality degrades silently. There are no gates. No one is checking the work. By the time you return, the output has drifted and you don't know by how much.
 
-1. **Autonomous completion** -- "run until done" loop, not session-based human interaction
-2. **Hierarchical agent supervision** -- CEO (user) → Director → PM → Workers; each tier autonomous with recursive problem-solving, mapped to ADK's native agent tree
-3. **Deterministic + probabilistic composition** -- LLM agents and deterministic tools are equal workflow participants
-4. **Spec-to-deliverable pipeline** -- specification to deliverable decomposition to parallel implementation to verified output
-5. **Multi-model orchestration** -- route tasks to optimal models by capability
-6. **Structured quality gates** -- validation, verification, and review cycles are guaranteed workflow steps, not LLM suggestions
-7. **API-first architecture** -- gateway owns the contract; ADK is an internal implementation detail behind an anti-corruption layer
-8. **Out-of-process execution** -- gateway enqueues work, ARQ workers execute pipelines, Redis Streams distribute events
+High-end autonomous alternatives exist but are enterprise-priced, black-box, and opaque when they fail. You can't see inside the execution, can't trust the quality, can't afford them at the project level.
 
----
+**The fundamental problem**: autonomy and quality don't yet coexist. You get one or the other.
 
-## What AutoBuilder Is Not
+## Who It's For
 
-- **Not a plugin for an existing editor/CLI** -- AutoBuilder is a standalone orchestrator that owns the full execution loop
-- **Not a chat-based assistant** -- it is an autonomous executor, not a conversation partner requiring constant human prompting
-- **Not a single-agent harness** -- it coordinates multi-agent teams with specialized roles across parallel and sequential workflows
-- **Not an ADK wrapper** -- ADK is an internal engine behind the gateway's anti-corruption layer; clients never interact with ADK directly
+**The technical founder** with a full product roadmap and twenty hours a week. They know exactly what to build. They need to hand off a phase and receive verified output — not a draft to babysit, not a session to manage. Leverage, not assistance.
 
----
+**The small engineering team** punching above its weight. Three people, startup pace. They want to delegate entire workstreams — research, implementation, review — not individual functions. The team defines what done looks like; the system figures out how to get there.
 
-## Problems Being Solved
+**The knowledge operator** running repeatable, high-value processes — due diligence, research reports, design reviews — that currently require senior people time on coordination as much as execution. They want to encode their best process once and run it reliably at scale.
 
-| # | Problem | Description |
-|---|---------|-------------|
-| 1 | **Excessive human-in-the-loop** | Existing tools require constant human steering |
-| 2 | **No intelligent orchestration** | Lack of hierarchical supervision and sequential vs parallel process coordination across agent teams |
-| 3 | **Expensive autonomous alternatives** | Tools like Blitzy cost $10k+ per project |
-| 4 | **Fragmented ecosystem** | Agent harnesses that do specific things instead of orchestrating multi-agent teams |
-| 5 | **Insufficient quality control** | Too little verification and structured review in autonomous workflows |
-| 6 | **Blocking on feedback** | Systems that halt entirely for human input when unrelated work could continue |
-| 7 | **No shared memory architecture** | No multi-level context (business standards, project conventions, session state) |
-| 8 | **Token waste** | Excessive human-friendly language when machine-formatted structures would suffice |
-| 9 | **Over-reliance on LLM judgment** | Non-deterministic processing where scripts and tools should guarantee outcomes |
-| 10 | **No progressive knowledge loading** | Agents either get everything or nothing, no task-appropriate context |
+What these users share: they think in outcomes, not prompts. They want to define *what done looks like* and trust the system to get there.
 
----
+## Product Vision
 
-## Prior Art Analysis
+At its fullest realization, AutoBuilder is the execution layer between a defined workflow and verified output.
 
-### Frameworks Evaluated
+You compose a workflow — combining a process flow, specialized agents, domain tools, skills, memory layers, and validation gates for a specific domain of work. AutoBuilder executes it: decomposing the work into a dependency-ordered plan, routing tasks to the right agents, enforcing quality gates at every stage, iterating on failures until they pass, and handing back a completion report with evidence. It runs overnight. It runs over weekends. It doesn't need you in the loop unless something is genuinely unresolvable.
 
-| Framework | Key Strength | Key Weakness | Lesson for AutoBuilder |
-|-----------|-------------|--------------|----------------------|
-| **Autocoder** | Autonomous execution, spec to 150-400+ features, regression testing | Single agent, no parallelism, Claude-only | Spec-to-feature pipeline pattern; auto-continuation loop |
-| **Automaker** | Git worktree isolation, dependency resolution, concurrent execution | Bloated (19 views, 32 themes, 150+ routes), no auto-continuation | Topological sorting; worktree isolation for parallel work |
-| **SpecDevLoop** | Fresh context per iteration via ledger handoff | Subprocess overhead, Claude-only, single workflow | Ledger/handoff pattern (achievable without subprocess overhead) |
-| **oh-my-opencode** | 11 specialized agents, multi-model fallback chains, plan/execute separation | 117k LOC, plugin coupling, no autonomous loop, no spec pipeline | Agent role restrictions; provider fallback chains; plan/execute boundary |
+The agent hierarchy mirrors how teams actually work: a Director who holds the project context, a PM who manages the current phase, Workers who execute the deliverables. Each tier operates autonomously, escalates when blocked, and surfaces decisions upward only when it must. You play the CEO — you set the objective, approve major decisions, review final output.
 
-### Key Patterns Adopted from Prior Art
+Quality is structural, not aspirational. Validators, formatters, and test runners execute as guaranteed pipeline steps — not because the LLM thinks they should run, but because the workflow mandates it. A phase isn't done until three independent verification layers pass: does it work correctly, was it built right, and was the full scope completed.
 
-- **Provider fallback chains** (oh-my-opencode) -- 3-step resolution: user override, fallback chain, default
-- **Plan/Execute separation** (oh-my-opencode) -- planning agents never write code; execution agents consume structured plans
-- **Agent tool restrictions** (oh-my-opencode) -- read-only agents for exploration prevent scope creep
-- **Git worktree isolation** (Automaker) -- true filesystem isolation for parallel code generation
-- **Topological dependency sorting** (Automaker) -- features execute in dependency order
-- **Spec-to-feature generation** (Autocoder) -- specification decomposed into 150-400+ implementable features
-- **Auto-continuation loop** (Autocoder) -- run until all features complete, no human prompting needed
+Software development is the first workflow. It will not be the last.
 
-### Patterns Explicitly Avoided
+## Innovations
 
-- **Monolithic files** -- max ~500 per module
-- **Hook/plugin systems as primary extension** -- prefer explicit workflow phases
-- **Magic keyword triggers** -- structured config, not prompt keyword detection
-- **Platform-specific binaries** -- pure Python, no native dependencies
-- **Plugin coupling to host tools** -- standalone system, no external CLI dependency
-- **GraphQL / gRPC at gateway layer** -- REST + SSE is sufficient; complexity not justified
-- **Separate databases per interface** -- single database behind the gateway
+**Workflow-as-plugin composition**: Any structured knowledge work process can be encoded as a workflow — a plugin that combines process flow, specialized agents, domain tools, memory configuration, and validation logic. Auto-code is the flagship workflow. The platform is the product. This separates AutoBuilder from every purpose-built tool: the domain is pluggable, the infrastructure is the value.
 
----
+**Deterministic + probabilistic composition**: LLM agents and deterministic tools are equal participants in a pipeline. A formatter doesn't need LLM permission to run. A test suite doesn't ask whether it's a good time. This is structurally novel — every comparable system privileges LLM judgment over deterministic verification, producing inconsistent quality at scale.
 
-## Terminology
+**Three-layer verification**: Most autonomous systems verify nothing or verify shallowly. AutoBuilder enforces three independent layers — functional correctness (does it work?), architectural conformance (was it built right?), and contract completion (was the full scope delivered?). Each layer can fail independently. The completion report shows exactly what passed and what didn't.
 
-Throughout this documentation, **deliverable** refers to any discrete, independently completable unit of work within a specification -- whether that's a software feature, a research report section, a design asset, or an investment strategy component. A specification is decomposed into deliverables, which are then executed in dependency-aware parallel batches.
+**Hierarchical supervision that compounds**: The Director → PM → Worker structure gives each tier bounded autonomy and structured escalation. The system handles more edge cases as it accumulates execution history. Trust is earned incrementally, not assumed.
 
----
+**Spec-to-deliverable traceability**: Every requirement traces to a deliverable; every deliverable traces to a completion proof. Nothing is marked done without evidence. Trust is built through traceability, not assertion.
 
-*Document Version: 2.1*
-*Last Updated: 2026-02-14*
+## Strategic Advantages
+
+**Workflow composability as a moat**: As the workflow library grows — auto-code, auto-research, auto-design, auto-analysis — each workflow makes the platform more valuable. The infrastructure compounds; individual tools don't.
+
+**API-first anti-corruption layer**: The underlying AI framework is fully hidden behind the gateway. Clients build against a stable API. Framework migrations don't break integrations. As the AI landscape fragments across providers and frameworks, AutoBuilder absorbs the change internally.
+
+**Trust through structure**: Every output is verifiable. Every decision is traceable. This is a prerequisite for enterprise adoption and a hard capability to retrofit onto systems not designed with it from the start.
+
+**Provider agnosticism**: LLM routing across providers means no lock-in. As model capabilities shift, the system routes optimally without code changes. Cost and capability balance automatically.
+
+**Memory architecture that deepens**: Execution context — domain standards, project conventions, session decisions — is layered appropriately and accumulates across runs. Agents get exactly the context they need. The system gets better the more it runs.
+
+## Competitive Landscape
+
+**Claude Code / Cursor / Copilot**: Excellent interactive tools. They augment the human in the loop — they don't replace the loop. Not competitors; they represent the status quo AutoBuilder moves beyond.
+
+**Devin / SWE-agent**: Autonomous but opaque. No structured quality gates. No workflow composability. No traceability. When they fail, you don't know why. Strong proof the market exists; weak on reliability and domain generality.
+
+**Blitzy**: Enterprise-priced ($10k+ per project), closed system, software-only, no visibility into execution. Proves demand at the high end; inaccessible to the developers and small teams who need it most.
+
+**n8n / Zapier / Make**: Workflow automation at the integration layer — connecting services, not executing knowledge work. Complementary, not competitive.
+
+**LangGraph / CrewAI / AutoGen**: Agent orchestration frameworks, not products. Require substantial engineering to build anything end-to-end. AutoBuilder is built on this layer, not competing with it.
+
+The gap AutoBuilder fills: autonomous workflow execution with structured quality guarantees, workflow composability across domains, and a price point accessible to individual practitioners and small teams.
+
+## Non-Goals
+
+- **Not domain-specific**: AutoBuilder is workflow infrastructure. Domain specificity lives in workflow plugins. It is not a purpose-built coding assistant, research tool, or design platform.
+- **Not a chat assistant**: AutoBuilder executes; it does not converse. It is not an interactive pair programmer. It is an autonomous executor.
+- **Not a plugin or extension**: It is a standalone system with its own execution loop. It does not live inside an editor, IDE, or CLI tool.
+- **Not a project management tool**: It tracks workflow state to drive execution, not to report status to stakeholders.
+- **Not a model**: It orchestrates models. The intelligence of any single model matters less than the structure of the workflow.
+- **Not multi-tenant cloud (yet)**: Local-first deployment is the current target. Multi-tenant SaaS is a future concern, not a present constraint.
+
+## Success Criteria
+
+- A practitioner hands AutoBuilder a defined workflow and receives verified, complete output without a single prompt during execution.
+- The system correctly identifies and escalates genuinely unresolvable blockers — not false positives, not silent failures.
+- Quality gate pass rate exceeds 90% on well-specified workflows without human intervention.
+- Total execution cost per completed workflow is less than 10% of equivalent human team cost at comparable quality.
+- Third-party workflow plugins can be built and registered without modifying core infrastructure.
+- A new team member reads this document and understands why AutoBuilder exists, who wins because of it, and what winning looks like — without reading a single technical document.

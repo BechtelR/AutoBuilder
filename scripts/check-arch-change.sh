@@ -23,7 +23,7 @@ fi
 if [[ "$file_path" == *".dev/07-COMPONENTS.md"* ]]; then
   cat <<EOF
 {
-  "systemMessage": "COMPONENT REGISTRY UPDATED. Now verify downstream documents: (1) .dev/03-STRUCTURE.md — do new components require new directories or modules in the project scaffold? (2) .dev/01-ROADMAP.md — do phase scope summaries and completion contracts still match the BOM? Check for phase component count changes and new completion criteria."
+  "systemMessage": "COMPONENT REGISTRY UPDATED. Now verify downstream documents: (1) .dev/03-STRUCTURE.md — do new components require new directories or modules in the project scaffold? (2) .dev/08-ROADMAP.md — do phase scope summaries and completion contracts still match the BOM? Check for phase component count changes and new completion criteria."
 }
 EOF
   exit 0
