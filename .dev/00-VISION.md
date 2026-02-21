@@ -51,7 +51,7 @@ Software development is the first workflow. It will not be the last.
 
 **Hierarchical supervision that compounds**: The Director → PM → Worker structure gives each tier bounded autonomy and structured escalation. Project conventions, domain standards, and execution decisions accumulate across runs — agents receive increasingly precise context without manual reconfiguration. The tenth execution of a workflow is faster and more accurate than the first.
 
-**Spec-to-deliverable traceability**: Every requirement traces to a deliverable; every deliverable traces to a completion proof. Nothing is marked done without evidence. Trust is built through traceability, not assertion.
+**Brief-to-deliverable traceability**: Every requirement traces to a deliverable; every deliverable traces to a completion proof. Nothing is marked done without evidence. Trust is built through traceability, not assertion.
 
 ## Strategic Advantages
 
@@ -63,7 +63,7 @@ Software development is the first workflow. It will not be the last.
 
 **Provider agnosticism**: LLM routing across providers means no lock-in. As model capabilities shift, the system routes optimally without code changes. Cost and capability balance automatically.
 
-**Memory architecture that deepens**: Domain standards, project conventions, and session decisions are layered across persistent memory tiers — global, project, and session. Agents receive exactly the context they need, no more. The system doesn't forget what worked.
+**Memory architecture that deepens**: Domain standards, workflow-accumulated expertise, project conventions, and session decisions are layered across persistent memory tiers — global, workflow, project, and session. Agents receive exactly the context they need, no more. The system doesn't forget what worked.
 
 ## Competitive Landscape
 

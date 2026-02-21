@@ -219,7 +219,8 @@ Mapping the original "multi-level memory" requirement (Problem #7 from plan-shap
 | **Pipeline context** | Session state (no prefix) | Deliverable spec, plan, execution output, validation results, verification results | Written by agents via `state_delta`, read via `{key}` templates |
 | **Project conventions** | Database entity (project table) + Skills | Standards, architecture decisions, workflow patterns, tech stack settings | Loaded at session start via tool/init callback; Skills via SkillLoaderAgent |
 | **Director personality + user preferences** | `user:` state | Director personality profile, model preferences, notification settings, review strictness | Auto-merged into session at load; personality seeded from config on first login |
-| **Cross-session learnings** | `MemoryService` | Patterns discovered, mistakes made, architectural decisions from past runs | `PreloadMemoryTool` or `LoadMemory` tool |
+| **Project learnings** | `MemoryService` (project-scoped) | Conventions, architectural decisions, and resolved escalations from this project's prior phases and stages. Written on phase or stage approval. | `PreloadMemoryTool` or `LoadMemory` tool |
+| **Workflow expertise** | `MemoryService` (workflow-type-scoped) | Domain expertise accumulated across all projects of this workflow type: recurring failure patterns, quality signals, edge cases. Written at project completion after Director approval. Immediately available to subsequent projects of the same type. | `PreloadMemoryTool` or `LoadMemory` tool |
 | **Business knowledge** | Skills files (global + project-local) | Domain rules, compliance requirements, workflow conventions | SkillLoaderAgent (deterministic matching) |
 
 This is six levels of progressively broader context, all using ADK-native mechanisms. No custom memory framework needed -- just proper use of state scopes + MemoryService + Skills.
@@ -326,9 +327,14 @@ yield Event(
 
 ### 9.2 Memory Ingestion Is Explicit
 
-Call `memory_service.add_session_to_memory(session)` at appropriate points -- after deliverable completion, after batch completion, at session end. Not every invocation needs to be ingested.
+Call `memory_service.add_session_to_memory(session)` at workflow-defined checkpoints. Write triggers are explicit, not ambient:
 
-The ingestion strategy (after each deliverable, each batch, or session end) is an open design question. See consolidated planning doc, Open Questions #10.
+| Scope | Trigger | Approver |
+|-------|---------|---------|
+| **Project** | Phase or Stage approval | Director (phase) / CEO (stage) |
+| **Workflow** | Project completion | Director approval required |
+| **Global** | Director decision | User approval required |
+| **Session** | Phase completion — extracted and ingested into Project/Workflow scope | Automatic |
 
 ### 9.3 Rewind Limitations
 
@@ -407,5 +413,5 @@ The rest of the state and memory architecture (state scopes, session management,
 
 ---
 
-*Document Version: 3.0*
-*Last Updated: 2026-02-17*
+*Document Version: 3.1*
+*Last Updated: 2026-02-21*
