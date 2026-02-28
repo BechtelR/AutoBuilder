@@ -51,4 +51,4 @@ htmlcov/
 .claude/.memory/
 .claude/.prompts/
 .dev/.notes/
-.dev/.todo/
+# .dev/.todo/

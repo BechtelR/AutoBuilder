@@ -102,7 +102,7 @@ End-to-end review of the AutoBuilder architecture and implementation state follo
 1. **Work-queue model** (`/workflows`, `/specs`) — fire-and-forget, async execution
 2. **Conversational model** (`/chat`) — session-oriented, streaming Director responses via SSE
 
-These are not equivalent and must not be conflated. New DB models (`Conversation`, `Message`) and gateway routes (`/chat`) are required. See `.todo/260227_update-gateway-design.md`.
+These are not equivalent and must not be conflated. New DB models (`Chat`, `ChatMessage`) and gateway routes (`/chat`) are required. See `.todo/260228_pre-phase-5.md`.
 
 ---
 
@@ -118,7 +118,7 @@ These are not equivalent and must not be conflated. New DB models (`Conversation
 
 | Action | Owner | Phase |
 |--------|-------|-------|
-| Implement `/chat` gateway routes, `Conversation`/`Message` DB models, Pydantic contracts | — | Phase 5 pre-work |
+| Implement `/chat` gateway routes, `Chat`/`ChatMessage` DB models, Pydantic contracts | — | Phase 5 pre-work |
 | Update `architecture/agents.md` verification section: deterministic gates vs. probabilistic LLM checks | — | Phase 5 pre-work |
 | Add structured token logging (model + token count) to LlmRouter and worker task context | — | Phase 5 |
 | Add E2E workflow integration test (smoke test) between Phase 5 and 6 | — | Phase 5 exit |
