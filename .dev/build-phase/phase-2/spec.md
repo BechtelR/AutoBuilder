@@ -55,6 +55,8 @@ Three core tables — minimal columns sufficient to demonstrate the gateway→wo
 
 **`workflows`**: `id` (UUID PK), `specification_id` (FK → specifications, nullable), `workflow_type` (str), `status` (WorkflowStatus enum), `params` (JSONB, nullable), `started_at` (nullable), `completed_at` (nullable), `created_at`, `updated_at`
 
+> **Delta note (2026-02-27):** Phase 3 added `error_message: Mapped[str | None]` to the `Workflow` ORM model via migration `002_add_workflow_error_message.py`. This column is not part of Phase 2's original scope but is present in the current codebase.
+
 **`deliverables`**: `id` (UUID PK), `workflow_id` (FK → workflows), `name` (str), `description` (text, nullable), `status` (DeliverableStatus enum), `depends_on` (JSONB array of UUID strings, default `[]`), `result` (JSONB, nullable), `created_at`, `updated_at`
 
 All tables use UUID primary keys (`uuid4` server default), timezone-aware UTC timestamps, and proper foreign key constraints.
@@ -64,6 +66,8 @@ JSON structured logging via stdlib `logging` with a custom `JsonFormatter`. Fiel
 
 ### DD-5: Redis Client Management
 A single `redis.asyncio.Redis` instance created at gateway startup (in lifespan), injected via FastAPI dependency injection. The same `AUTOBUILDER_REDIS_URL` serves both the gateway's Redis client and ARQ workers. Connection verified with `PING` during lifespan startup.
+
+> **Delta note (2026-02-27):** Phase 3 superseded this design. The gateway now uses `ArqRedis` (via `await create_pool(redis_settings)`) as a single client for both ARQ job enqueuing and general Redis operations. `get_redis()` still exists but the underlying value is `ArqRedis`. A new `get_arq_pool() -> ArqRedis` dependency was added as the canonical post-Phase-3 accessor. `redis.asyncio.Redis` is no longer directly instantiated in the gateway lifespan.
 
 ### DD-6: ARQ Worker Test Task
 Phase 2 includes a minimal `test_task` ARQ job to validate the gateway→Redis→worker round-trip. The gateway enqueues the job (via `arq.connections.ArqRedis`), the worker processes it, and the result is verifiable. This proves the infrastructure works end-to-end before Phase 3 adds real ADK pipelines.
@@ -227,6 +231,8 @@ Phase 2 adds to `app/models/enums.py` using the established `enum.StrEnum` patte
 **Validation:**
 - `docker build -t autobuilder . && docker run --rm --name ab-test -d autobuilder && sleep 2 && docker logs ab-test && docker stop ab-test`
 
+> **Delta note (2026-02-27):** Code review added a non-root user (`appuser`, UID 1000) as a security requirement. The actual `Dockerfile` creates this user (lines 22-23) and switches to it before the entrypoint (line 38). The requirements above do not reflect this but the implementation is correct.
+
 ---
 
 ### P2.D9: Test Suite
@@ -367,14 +373,14 @@ Use `Mapped[T]` annotations for full pyright strict compatibility. Use `mapped_c
 ### Production Dockerfile Pattern (Multi-Stage with uv)
 ```dockerfile
 # Stage 1: Build — install deps into venv
-FROM python:3.11-slim AS builder
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+FROM python:3.12-slim AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 # Stage 2: Runtime — copy venv + source only
-FROM python:3.11-slim
+FROM python:3.12-slim
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY app/ app/
@@ -412,7 +418,10 @@ from arq.connections import RedisSettings, ArqRedis, create_pool
 # FastAPI
 from fastapi import FastAPI, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
+# NOTE (2026-02-27): BaseHTTPMiddleware was NOT used in the implementation.
+# Code review replaced it with pure ASGI middleware classes (SSE-safe).
+# Correct pattern:
+from starlette.types import ASGIApp, Scope, Receive, Send  # for pure ASGI middleware
 
 # Testing
 from httpx import AsyncClient, ASGITransport

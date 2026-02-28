@@ -99,6 +99,7 @@ def async_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessio
 
 from collections.abc import AsyncIterator
 from redis.asyncio import Redis
+from arq.connections import ArqRedis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 async def get_db_session() -> AsyncIterator[AsyncSession]:
@@ -106,7 +107,16 @@ async def get_db_session() -> AsyncIterator[AsyncSession]:
     ...
 
 def get_redis() -> Redis:  # type: ignore[type-arg]
-    """Return the Redis client from app.state."""
+    """Return the Redis client from app.state.
+    NOTE (2026-02-27): After Phase 3, the underlying value is ArqRedis (superset of Redis).
+    Use get_arq_pool() for ARQ-specific operations (job enqueuing).
+    """
+    ...
+
+# Phase 3 addition — canonical accessor for ARQ operations
+def get_arq_pool() -> ArqRedis:
+    """Return the ArqRedis pool from app.state. Added in Phase 3 when redis.asyncio.Redis
+    was replaced with ArqRedis as the single gateway Redis client."""
     ...
 ```
 
@@ -114,9 +124,10 @@ def get_redis() -> Redis:  # type: ignore[type-arg]
 
 ```python
 # app/gateway/middleware/errors.py
+# NOTE (2026-02-27): Code review replaced BaseHTTPMiddleware with a pure ASGI class
+# (SSE-safe — BaseHTTPMiddleware buffers full response bodies, breaking SSE streams).
 
-from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Scope, Receive, Send
 
 # Exception type → HTTP status code mapping (internal, not a Protocol)
 # NotFoundError      → 404
@@ -126,9 +137,11 @@ from starlette.responses import JSONResponse
 # WorkerError        → 500
 # Unhandled          → 500 (generic INTERNAL_ERROR, no stack trace)
 
-async def error_handling_middleware(request: Request, call_next: object) -> JSONResponse:
-    """Catch AutoBuilderError subclasses and return structured ErrorResponse JSON."""
-    ...
+class ErrorHandlingMiddleware:
+    """Pure ASGI middleware: catch AutoBuilderError subclasses, return structured ErrorResponse."""
+
+    def __init__(self, app: ASGIApp) -> None: ...
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None: ...
 ```
 
 ### Worker Entry Points
@@ -272,13 +285,17 @@ class ErrorResponse(BaseModel):
 
 ```python
 # app/gateway/models/health.py
+from typing import Literal
 from app.models.base import BaseModel
+
+ServiceStatus = Literal["ok", "unavailable"]
+HealthStatus = Literal["ok", "degraded"]
 
 class HealthResponse(BaseModel):
     """Health check response with per-service status."""
-    status: str                   # "ok" or "degraded"
-    version: str                  # App version string
-    services: dict[str, str]      # {"postgres": "ok", "redis": "ok"} or "unavailable"
+    status: HealthStatus              # "ok" or "degraded"
+    version: str                      # App version string
+    services: dict[str, ServiceStatus]  # {"postgres": "ok", "redis": "ok"} or "unavailable"
 ```
 
 ### ORM Models (`app/db/models.py`)
@@ -308,25 +325,38 @@ class Specification(TimestampMixin, Base):
     name: Mapped[str]                        # Spec name
     content: Mapped[str]                     # Full spec text
     status: Mapped[SpecificationStatus]      # PENDING → PROCESSING → COMPLETED | FAILED
+    # Bidirectional relationship (added in code review): lazy="raise" to prevent N+1
+    workflows: Mapped[list["Workflow"]] = relationship(back_populates="specification", lazy="raise")
 
 class Workflow(TimestampMixin, Base):
     __tablename__ = "workflows"
-    specification_id: Mapped[uuid.UUID | None]  # FK → specifications.id (nullable)
+    specification_id: Mapped[uuid.UUID | None]  # FK → specifications.id (nullable), index=True
     workflow_type: Mapped[str]                   # e.g., "auto-code"
     status: Mapped[WorkflowStatus]               # PENDING → RUNNING → COMPLETED | FAILED | CANCELLED
     params: Mapped[dict[str, object] | None]     # JSONB, workflow configuration
     started_at: Mapped[datetime | None]          # Set when execution begins
     completed_at: Mapped[datetime | None]        # Set on completion/failure
+    error_message: Mapped[str | None]            # Phase 3 addition (migration 002)
+    # Bidirectional relationships (added in code review): lazy="raise" to prevent N+1
+    specification: Mapped["Specification | None"] = relationship(back_populates="workflows", lazy="raise")
+    deliverables: Mapped[list["Deliverable"]] = relationship(back_populates="workflow", lazy="raise")
 
 class Deliverable(TimestampMixin, Base):
     __tablename__ = "deliverables"
-    workflow_id: Mapped[uuid.UUID]               # FK → workflows.id (required)
+    workflow_id: Mapped[uuid.UUID]               # FK → workflows.id (required), index=True
     name: Mapped[str]                            # Deliverable name
     description: Mapped[str | None]              # Optional description
     status: Mapped[DeliverableStatus]            # PENDING → IN_PROGRESS → COMPLETED | FAILED | BLOCKED
     depends_on: Mapped[list[str]]                # JSONB array of UUID strings, default []
     result: Mapped[dict[str, object] | None]     # JSONB, execution result
+    # Bidirectional relationship (added in code review): lazy="raise" to prevent N+1
+    workflow: Mapped["Workflow"] = relationship(back_populates="deliverables", lazy="raise")
 ```
+
+> **Delta note (2026-02-27):** Three additions were made post-spec:
+> 1. **Bidirectional relationships** with `lazy="raise"` added in code review (prevents N+1 queries; `lazy="raise"` ensures relationships are only loaded explicitly, not accidentally via attribute access).
+> 2. **FK indexes** (`index=True`) added in code review to `specification_id` and `workflow_id` columns for query performance.
+> 3. **`error_message` column** on `Workflow` added by Phase 3 migration `002_add_workflow_error_message.py` — stores the last error message for failed workflows.
 
 ### Exception → HTTP Mapping (constant, not a type)
 
@@ -375,7 +405,7 @@ sequenceDiagram
     participant Exceptions as Exception Hierarchy
 
     Client->>ErrorMW: HTTP Request
-    ErrorMW->>Route: call_next(request)
+    ErrorMW->>Route: self.app(scope, receive, send)
     alt Route raises AutoBuilderError subclass
         Route-->>ErrorMW: NotFoundError / ConflictError / etc.
         ErrorMW->>ErrorMW: Map exception → HTTP status + ErrorCode
@@ -485,7 +515,7 @@ stateDiagram-v2
 | `app.config.Settings` | `get_settings() → Settings` | Read `db_url`, `redis_url`, `log_level` for engine creation, Redis connection, log configuration |
 | `app.models.enums` | `WorkflowStatus`, `DeliverableStatus`, `AgentRole` StrEnums | Referenced by ORM model column types; extended with `SpecificationStatus`, `ErrorCode` |
 | `app.models.base.BaseModel` | Pydantic base with `from_attributes=True`, `strict=True` | All gateway Pydantic models inherit from this |
-| `app.models.constants.APP_NAME` | `str` constant | Used in health response version/identification |
+| `app.models.constants.APP_VERSION` | `str` constant | Used in health response and FastAPI app title |
 | `alembic.ini` + `env.py` | Alembic async migration env | Updated to import `Base.metadata` for autogenerate |
 | `docker-compose.yml` | PostgreSQL + Redis containers | Phase 2 code connects to these services; no changes to compose file |
 

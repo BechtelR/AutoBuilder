@@ -204,7 +204,7 @@ async def git_branch(path: str, name: str, action: GitBranchAction) -> str: ...
 async def git_diff(path: str, ref: str | None = None) -> str: ...
 async def git_log(path: str, count: int | None = None, ref: str | None = None) -> str: ...
 async def git_show(path: str, ref: str) -> str: ...
-async def git_worktree(path: str, action: str, branch: str | None = None) -> str: ...
+async def git_worktree(path: str, action: GitWorktreeAction, branch: str | None = None) -> str: ...  # action: str -> GitWorktreeAction (review delta)
 async def git_apply(path: str, patch: str) -> str: ...
 ```
 
@@ -214,8 +214,9 @@ async def git_apply(path: str, patch: str) -> str: ...
 async def web_fetch(url: str) -> str:
     """Fetch URL content via httpx. Extracts text from HTML.""" ...
 
-async def web_search(query: str, num_results: int = 5) -> str:
-    """Search the web via configured provider (Tavily primary, Brave fallback).""" ...
+async def web_search(query: str, num_results: int = 5, provider: str | None = None) -> str:
+    """Search the web via configured provider (Tavily primary, Brave fallback).
+    provider overrides AUTOBUILDER_SEARCH_PROVIDER when specified.""" ...  # provider param added by review
 ```
 
 ### Tool Function Signatures — Task Management (6 tools)
@@ -223,7 +224,7 @@ async def web_search(query: str, num_results: int = 5) -> str:
 ```python
 from google.adk.tools import ToolContext
 
-def todo_read(task_id: str, tool_context: ToolContext) -> str: ...
+def todo_read(tool_context: ToolContext) -> str: ...
 
 def todo_write(
     action: TodoAction,
@@ -233,8 +234,8 @@ def todo_write(
 ) -> str: ...
 
 def todo_list(
-    status_filter: TodoStatus | None = None,
     tool_context: ToolContext,
+    filter: str | None = None,
 ) -> str: ...
 
 def task_create(
@@ -253,7 +254,7 @@ def task_update(
     """Update a shared task's status or add notes.""" ...
 
 def task_query(
-    status: TaskStatus | None = None,
+    filter: TaskStatus | None = None,
     assignee: str | None = None,
 ) -> str:
     """Query shared tasks with optional status filter and assignee.""" ...
@@ -266,8 +267,8 @@ def task_query(
 def select_ready_batch(project_id: str) -> str:
     """Placeholder — returns 'no deliverables' until Phase 8.""" ...
 
-def escalate_to_director(priority: str, context: str, request_type: str) -> str:
-    """Escalate an issue from PM to the Director queue for resolution.""" ...
+def escalate_to_director(priority: EscalationPriority, context: str, request_type: EscalationRequestType) -> str:
+    """Escalate an issue from PM to the Director queue for resolution.""" ...  # str -> typed enums (review delta)
 
 def update_deliverable(deliverable_id: str, status: str, notes: str | None = None) -> str:
     """Update a deliverable's lifecycle status. Placeholder until Phase 5.""" ...
@@ -278,15 +279,15 @@ def query_deliverables(project_id: str, status: str | None = None) -> str:
 def reorder_deliverables(project_id: str, order: list[str]) -> str:
     """Change execution priority by reordering deliverables. Placeholder until Phase 5.""" ...
 
-def manage_dependencies(action: str, source_id: str, target_id: str | None = None) -> str:
-    """Add, remove, or query deliverable dependency relationships. Placeholder until Phase 8.""" ...
+def manage_dependencies(action: DependencyAction, source_id: str, target_id: str | None = None) -> str:
+    """Add, remove, or query deliverable dependency relationships. Placeholder until Phase 8.""" ...  # str -> DependencyAction (review delta)
 
 # Director tools (6)
 def escalate_to_ceo(
-    item_type: str, priority: str, message: str, metadata: str,
+    item_type: CeoItemType, priority: EscalationPriority, message: str, metadata: str,
 ) -> str:
     """Director-only. Validates item_type/priority, logs, returns placeholder ID.
-    Real DB backend in Phase 5.""" ...
+    Real DB backend in Phase 5.""" ...  # str -> typed enums (review delta)
 
 def list_projects(status: str | None = None) -> str:
     """List all projects. Placeholder until Phase 5.""" ...
@@ -294,8 +295,8 @@ def list_projects(status: str | None = None) -> str:
 def query_project_status(project_id: str) -> str:
     """Query detailed project status. Placeholder until Phase 5.""" ...
 
-def override_pm(project_id: str, action: str, reason: str) -> str:
-    """Direct PM intervention: pause, resume, reorder, or correct. Placeholder until Phase 5.""" ...
+def override_pm(project_id: str, action: PmOverrideAction, reason: str) -> str:
+    """Direct PM intervention: pause, resume, reorder, or correct. Placeholder until Phase 5.""" ...  # str -> PmOverrideAction (review delta)
 
 def get_project_context(path: str | None = None) -> str:
     """Detect project type, technology stack, and conventions from the codebase.
@@ -360,40 +361,79 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 }
 ```
 
-### CEO Queue Validation Constants (management.py — strings until Phase 5 enums)
+### Queue Validation Enums (management.py — Phase 4 review promoted to StrEnum)
 
-```python
-VALID_CEO_ITEM_TYPES: set[str] = {"NOTIFICATION", "APPROVAL", "ESCALATION", "TASK"}
-VALID_PRIORITIES: set[str] = {"LOW", "NORMAL", "HIGH", "CRITICAL"}
-```
+> **Delta note (2026-02-27):** Reviewer 1 promoted all string-validation sets to typed `StrEnum` types during Phase 4 review (`[SPEC-UPDATE]`). The `VALID_*: set[str]` pattern shown in the original model is replaced by these enums in `app/models/enums.py`.
 
-### Director Queue Validation Constants (management.py — strings until Phase 5 enums)
-
-```python
-VALID_DIRECTOR_REQUEST_TYPES: set[str] = {"ESCALATION", "STATUS_REPORT", "RESOURCE_REQUEST", "PATTERN_ALERT"}
-VALID_PM_OVERRIDE_ACTIONS: set[str] = {"PAUSE", "RESUME", "REORDER", "CORRECT"}
-VALID_DEPENDENCY_ACTIONS: set[str] = {"ADD", "REMOVE", "QUERY"}
-```
+These enums replace the former `VALID_CEO_ITEM_TYPES`, `VALID_PRIORITIES`, `VALID_DIRECTOR_REQUEST_TYPES`, `VALID_PM_OVERRIDE_ACTIONS`, and `VALID_DEPENDENCY_ACTIONS` validation sets. See Tool Parameter Enums section for definitions.
 
 ### Tool Parameter Enums (app/models/enums.py)
 
 ```python
 import enum
 
-class GitBranchAction(str, enum.Enum):
+class GitBranchAction(enum.StrEnum):
     CREATE = "CREATE"
     SWITCH = "SWITCH"
     DELETE = "DELETE"
 
-class TodoAction(str, enum.Enum):
+class TodoAction(enum.StrEnum):
     ADD = "ADD"
     UPDATE = "UPDATE"
     COMPLETE = "COMPLETE"
     REMOVE = "REMOVE"
 
-class TodoStatus(str, enum.Enum):
+class TodoStatus(enum.StrEnum):
     PENDING = "PENDING"
     DONE = "DONE"
+
+class TaskStatus(enum.StrEnum):
+    OPEN = "OPEN"
+    IN_PROGRESS = "IN_PROGRESS"
+    DONE = "DONE"
+    BLOCKED = "BLOCKED"
+
+# --- Phase 4 review additions (Reviewer 1 [SPEC-UPDATE]) ---
+
+class GitWorktreeAction(enum.StrEnum):
+    ADD = "ADD"
+    LIST = "LIST"
+    REMOVE = "REMOVE"
+
+class EscalationPriority(enum.StrEnum):    # BOM V21: Director queue priority enum
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+class EscalationRequestType(enum.StrEnum):  # BOM V20: Director queue type enum
+    ESCALATION = "ESCALATION"
+    STATUS_REPORT = "STATUS_REPORT"
+    RESOURCE_REQUEST = "RESOURCE_REQUEST"
+    PATTERN_ALERT = "PATTERN_ALERT"
+
+class CeoItemType(enum.StrEnum):
+    NOTIFICATION = "NOTIFICATION"
+    APPROVAL = "APPROVAL"
+    ESCALATION = "ESCALATION"
+    TASK = "TASK"
+
+class DependencyAction(enum.StrEnum):
+    ADD = "ADD"
+    REMOVE = "REMOVE"
+    QUERY = "QUERY"
+
+class PmOverrideAction(enum.StrEnum):
+    PAUSE = "PAUSE"
+    RESUME = "RESUME"
+    REORDER = "REORDER"
+    CORRECT = "CORRECT"
+
+# --- V22: Director queue status enum — NOT YET IMPLEMENTED (code remediation pending) ---
+# BOM V22 defines: DirectorQueueStatus (or equivalent) with values:
+#   PENDING, IN_PROGRESS, RESOLVED, FORWARDED_TO_CEO
+# This enum was assigned to Phase 4 / P4.D6 but was not added during Phase 4 review.
+# Must be added to app/models/enums.py in a targeted fix session.
 ```
 
 ### Role Type (internal to _toolset.py)

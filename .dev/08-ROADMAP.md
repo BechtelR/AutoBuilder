@@ -23,11 +23,14 @@ AutoBuilder is delivered in phased increments. Each phase produces testable, ind
 Project configuration (pyproject.toml, Alembic, Docker Compose), directory scaffold matching `03-STRUCTURE.md`, Pydantic Settings configuration module, shared domain models (enums, constants, base models), and dev tooling verification (uv, ruff, pyright, pytest).
 
 ### Completion Contract
-- [x] `docker compose up -d` starts PostgreSQL and Redis
-- [x] `uv sync && uv run ruff check . && uv run pyright && uv run pytest` all pass
-- [x] Directory structure matches `.dev/03-STRUCTURE.md`
-- [x] Configuration loads from environment variables with sensible defaults
-- [x] Shared enums and base models importable from `app.models`
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| ✓ | `docker compose up -d` starts PostgreSQL and Redis | NFR-6 |
+| ✓ | `uv sync && uv run ruff check . && uv run pyright && uv run pytest` all pass | NFR-5 |
+| ✓ | Directory structure matches `.dev/03-STRUCTURE.md` | NFR-5 |
+| ✓ | Configuration loads from environment variables with sensible defaults | NFR-6 |
+| ✓ | Shared enums and base models importable from `app.models` | NFR-5 |
 
 ---
 
@@ -42,10 +45,13 @@ Project configuration (pyproject.toml, Alembic, Docker Compose), directory scaff
 Five focused prototypes validating that Google ADK can serve as AutoBuilder's orchestration engine. P1-P4 validate core patterns (basic agent loop, mixed agent coordination, parallel execution, dynamic outer loop) with Claude via LiteLLM. P5 validates alternate providers (OpenAI, Gemini) as production fallbacks.
 
 ### Completion Contract
-- [x] P1-P4 prototypes pass their criteria
-- [x] P5 alternate providers validated as fallback-ready
-- [x] Go/no-go decision updated with P5 results
-- [x] Any ADK quirks or workarounds documented
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| ✓ | P1-P4 prototypes pass their criteria | NFR-3, NFR-5 |
+| ✓ | P5 alternate providers validated as fallback-ready | NFR-3 |
+| ✓ | Go/no-go decision updated with P5 results | NFR-5 |
+| ✓ | Any ADK quirks or workarounds documented | NFR-3 |
 
 ### Decision Gate
 
@@ -71,12 +77,15 @@ Five focused prototypes validating that Google ADK can serve as AutoBuilder's or
 FastAPI app factory with lifespan, health endpoint, CORS, error handling middleware, and dependency injection. AsyncEngine + AsyncSession factory, SQLAlchemy mapped models, Alembic migrations. Redis client, ARQ worker settings and entry point, cron skeleton. Structured logging, custom exception hierarchy, request logging middleware. Production Dockerfile.
 
 ### Completion Contract
-- [x] `uv run uvicorn app.gateway.main:app` starts and serves `/health`
-- [x] `uv run arq app.workers.settings.WorkerSettings` starts worker
-- [x] `uv run alembic upgrade head` creates tables
-- [x] Redis `PING` succeeds
-- [x] Gateway can enqueue a test job, worker can dequeue and process it
-- [x] All quality gates pass (ruff, pyright, pytest)
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| ✓ | `uv run uvicorn app.gateway.main:app` starts and serves `/health` | NFR-4, NFR-5 |
+| ✓ | `uv run arq app.workers.settings.WorkerSettings` starts worker | PR-9 |
+| ✓ | `uv run alembic upgrade head` creates tables | NFR-5 |
+| ✓ | Redis `PING` succeeds | NFR-6 |
+| ✓ | Gateway can enqueue a test job, worker can dequeue and process it | PR-9 |
+| ✓ | All quality gates pass (ruff, pyright, pytest) | NFR-5 |
 
 ---
 
@@ -91,11 +100,14 @@ FastAPI app factory with lifespan, health endpoint, CORS, error handling middlew
 Anti-corruption layer translating gateway commands to ADK Runner calls and ADK Events to Redis Stream messages. ADK App container with context compression and resumability config. Static LLM routing (model_role x complexity to model) with fallback chains via LiteLLM. DatabaseSessionService for ADK session persistence with 4-scope state system. Worker pipeline bridge connecting ARQ jobs to ADK pipeline execution with event publishing.
 
 ### Completion Contract
-- [x] Can enqueue a workflow job from gateway, have worker execute an ADK pipeline
-- [x] LLM Router selects correct model per task type
-- [x] Claude responds reliably via LiteLLM through ADK
-- [x] Session state persists across worker invocations
-- [x] ADK events translate to gateway events in Redis Streams
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| ✓ | Can enqueue a workflow job from gateway, have worker execute an ADK pipeline | PR-9, PR-10 |
+| ✓ | LLM Router selects correct model per task type | PR-5 |
+| ✓ | Claude responds reliably via LiteLLM through ADK | NFR-3 |
+| ✓ | Session state persists across worker invocations | PR-3, NFR-3 |
+| ✓ | ADK events translate to gateway events in Redis Streams | PR-34 |
 
 ---
 
@@ -110,15 +122,18 @@ Anti-corruption layer translating gateway commands to ADK Runner calls and ADK E
 42 FunctionTool wrappers across 8 categories: Filesystem (10 tools including glob, grep, multi-edit), Code Intelligence (2 tools — tree-sitter symbols + diagnostics), Execution (2 tools — bash + HTTP), Git (8 tools including log, show, worktree, apply), Web (2 tools), Task Management (6 tools — three-tier system with session todos, shared tasks, and PM-managed deliverables), PM Management (6 tools — batch selection, Director escalation, deliverable lifecycle), and Director Management (6 tools — CEO queue, project oversight, PM override). GlobalToolset (ADK-native BaseToolset) for per-role tool vending with cascading permission config.
 
 ### Completion Contract
-- [x] All 42 tools callable from within an ADK LlmAgent
-- [x] Tool schemas auto-generated from type hints + docstrings
-- [x] GlobalToolset vends correct tool subsets per role configuration
-- [x] bash_exec handles timeout, output capture, error reporting
-- [x] Three-tier task system operational (todos, tasks, deliverables)
-- [x] PM escalation routes to Director queue (not CEO queue)
-- [x] code_symbols extracts structure via tree-sitter
-- [x] run_diagnostics invokes configurable linter/type-checker
-- [x] Director can override PM via override_pm tool
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| ✓ | All 42 tools callable from within an ADK LlmAgent | PR-5 |
+| ✓ | Tool schemas auto-generated from type hints + docstrings | NFR-5 |
+| ✓ | GlobalToolset vends correct tool subsets per role configuration | PR-15 |
+| ✓ | bash_exec handles timeout, output capture, error reporting | PR-9 |
+| ✓ | Three-tier task system operational (todos, tasks, deliverables) | PR-9 |
+| ✓ | PM escalation routes to Director queue (not CEO queue) | PR-18 |
+| ✓ | code_symbols extracts structure via tree-sitter | PR-5 |
+| ✓ | run_diagnostics invokes configurable linter/type-checker | PR-11 |
+| ✓ | Director can override PM via override_pm tool | PR-15, PR-16 |
 
 ---
 
@@ -133,14 +148,17 @@ Anti-corruption layer translating gateway commands to ADK Runner calls and ADK E
 Supervision hierarchy: Director (LlmAgent, opus) as stateless root_agent and PM (LlmAgent, sonnet) as per-project autonomous manager driving the batch loop through tools and callbacks. Unified CEO queue (DB-backed) for approvals, escalations, and status reports with SSE push. PM loop prototype validating reliable inter-batch reasoning. Worker-tier LLM agents (plan, code, review, fix) and custom agents (SkillLoader, Linter, TestRunner, Formatter, DependencyResolver, RegressionTest). Context budget monitor as before_model_callback. Pipeline composition: DeliverablePipeline (SequentialAgent) with ReviewCycle (LoopAgent).
 
 ### Completion Contract
-- [ ] Director agent operates as root_agent (stateless config, recreated per invocation)
-- [ ] PM agent manages a project autonomously via tools + deterministic safety mechanisms (`checkpoint_project`, `verify_batch_completion`, `run_regression_tests`), escalating only when necessary
-- [ ] PM loop prototype validates reliable inter-batch reasoning with tools + callbacks
-- [ ] Can run a single deliverable through the full DeliverablePipeline
-- [ ] Plan agent produces structured plan; code agent implements it
-- [ ] Lint/test agents produce structured results in state
-- [ ] Review cycle loops on failure, terminates on approval or max iterations
-- [ ] Context budget `before_model_callback` reports token usage percentage
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | Director agent operates as root_agent (stateless config, recreated per invocation) | PR-13 |
+| | PM agent manages a project autonomously via tools + deterministic safety mechanisms (`checkpoint_project`, `verify_batch_completion`, `run_regression_tests`), escalating only when necessary | PR-14 |
+| | PM loop prototype validates reliable inter-batch reasoning with tools + callbacks | PR-10 |
+| | Can run a single deliverable through the full DeliverablePipeline | PR-10 |
+| | Plan agent produces structured plan; code agent implements it | PR-5 |
+| | Lint/test agents produce structured results in state | PR-11 |
+| | Review cycle loops on failure, terminates on approval or max iterations | PR-22 |
+| | Context budget `before_model_callback` reports token usage percentage | PR-15 |
 
 ---
 
@@ -155,11 +173,14 @@ Supervision hierarchy: Director (LlmAgent, opus) as stateless root_agent and PM 
 Skill library adopting the Agent Skills open standard file format (`SKILL.md`) with deterministic loading runtime. Two-tier architecture: global skills (`app/skills/`) and project-local skills (`.app/skills/` in user repo) with override semantics. Trigger matchers (deliverable_type, file_pattern, tag_match, explicit, always) with OR-logic. InstructionProvider integration injecting filtered skills per agent. Initial skill set covering API endpoints, data models, migrations, security review, unit tests, and task decomposition. Redis-cached skill index.
 
 ### Completion Contract
-- [ ] `SkillLoaderAgent` loads relevant skills for a given deliverable context
-- [ ] Skills appear in unified event stream
-- [ ] `loaded_skill_names` in state shows exactly which skills loaded
-- [ ] Project-local skills override globals with same name
-- [ ] ~320 lines total implementation
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | `SkillLoaderAgent` loads relevant skills for a given deliverable context | PR-31, PR-32 |
+| | Skills appear in unified event stream | PR-34 |
+| | `loaded_skill_names` in state shows exactly which skills loaded | PR-32 |
+| | Project-local skills override globals with same name | PR-33 |
+| | ~320 lines total implementation | — |
 
 ---
 
@@ -174,10 +195,13 @@ Skill library adopting the Agent Skills open standard file format (`SKILL.md`) w
 WorkflowRegistry with automatic directory scanning for `WORKFLOW.yaml` manifests, deterministic keyword matching, and deferred ADK pipeline instantiation. WORKFLOW.yaml manifest format defining triggers, required/optional tools, default models, and pipeline configuration. Auto-code workflow as first implementation with its own manifest, pipeline composition, agents, and skills.
 
 ### Completion Contract
-- [ ] WorkflowRegistry discovers auto-code on startup
-- [ ] `POST /workflows/run {"workflow": "auto-code"}` resolves and instantiates pipeline
-- [ ] Adding a new workflow = adding a directory + manifest (zero registration code)
-- [ ] auto-code pipeline stages match architecture doc
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | WorkflowRegistry discovers auto-code on startup | PR-4 |
+| | `POST /workflows/run {"workflow": "auto-code"}` resolves and instantiates pipeline | PR-4 |
+| | Adding a new workflow = adding a directory + manifest (zero registration code) | PR-4, NFR-5 |
+| | auto-code pipeline stages match architecture doc | PR-6 |
 
 ---
 
@@ -192,13 +216,16 @@ WorkflowRegistry with automatic directory scanning for `WORKFLOW.yaml` manifests
 Specification processing: submission endpoint, spec-to-deliverable decomposition, deliverable model with status tracking and dependency declaration. PM outer loop driving batch execution via `select_ready_batch()` tool with deterministic safety mechanisms (RegressionTestAgent, checkpoint_project callback). Autonomous continuation with inter-batch PM reasoning (retry/skip/reorder/escalate), Director-level cross-project management, optional human-in-the-loop pause, and partial failure handling. Git worktree isolation for parallel deliverable execution.
 
 ### Completion Contract
-- [ ] Can submit a spec, have it decomposed into deliverables
-- [ ] Director delegates project to PM; PM drives batch loop autonomously via tools + deterministic safety mechanisms
-- [ ] PM constructs dependency-aware parallel batches via `select_ready_batch()` tool
-- [ ] Loop continues autonomously until all deliverables complete
-- [ ] Failed deliverables don't block independent work
-- [ ] Git worktrees provide filesystem isolation for parallel execution
-- [ ] Can intervene (pause/modify) at batch boundary via API
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | Can submit a spec, have it decomposed into deliverables | PR-1, PR-8 |
+| | Director delegates project to PM; PM drives batch loop autonomously via tools + deterministic safety mechanisms | PR-10, PR-14 |
+| | PM constructs dependency-aware parallel batches via `select_ready_batch()` tool | PR-10 |
+| | Loop continues autonomously until all deliverables complete | PR-10 |
+| | Failed deliverables don't block independent work | PR-12, PR-25 |
+| | Git worktrees provide filesystem isolation for parallel execution | PR-9 |
+| | Can intervene (pause/modify) at batch boundary via API | PR-3, PR-9 |
 
 ---
 
@@ -213,10 +240,13 @@ Specification processing: submission endpoint, spec-to-deliverable decomposition
 PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and semantic search. Memory tools: PreloadMemoryTool (auto-loads relevant memories each turn) and LoadMemory (agent-decided on-demand retrieval). Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end).
 
 ### Completion Contract
-- [ ] Completed sessions are ingested into searchable memory
-- [ ] Agents can search for patterns from prior runs
-- [ ] Memory persists across sessions in PostgreSQL
-- [ ] Uses existing PostgreSQL database -- tsvector for keyword search, pgvector for semantic search
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | Completed sessions are ingested into searchable memory | PR-26, PR-29 |
+| | Agents can search for patterns from prior runs | PR-28, PR-29 |
+| | Memory persists across sessions in PostgreSQL | PR-26 |
+| | Uses existing PostgreSQL database -- tsvector for keyword search, pgvector for semantic search | PR-26 |
 
 ---
 
@@ -231,12 +261,15 @@ PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and
 Event system on Redis Streams: publisher from workers, SSE endpoint with reconnection/replay, webhook dispatcher, audit logger, event listener CRUD, and consumer group management. CLI via typer as a pure API client (run, status, intervene, list, logs). Observability via OpenTelemetry tracing (ADK-native), structured logging hierarchy, and ADK Dev UI for local development.
 
 ### Completion Contract
-- [ ] Client receives real-time events via SSE as pipeline executes
-- [ ] SSE reconnection replays missed events (no data loss)
-- [ ] Webhook listeners fire on matching events
-- [ ] CLI can launch a workflow, stream events, and query status
-- [ ] OpenTelemetry traces visible for pipeline execution
-- [ ] **Full MVP validated end-to-end**: spec -> decompose -> parallel execute -> verify -> complete
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | Client receives real-time events via SSE as pipeline executes | PR-34 |
+| | SSE reconnection replays missed events (no data loss) | PR-34 |
+| | Webhook listeners fire on matching events | PR-21 |
+| | CLI can launch a workflow, stream events, and query status | PR-36 |
+| | OpenTelemetry traces visible for pipeline execution | PR-35 |
+| | **Full MVP validated end-to-end**: spec -> decompose -> parallel execute -> verify -> complete | PR-1, PR-10, PR-22 |
 
 ---
 
@@ -251,11 +284,14 @@ Event system on Redis Streams: publisher from workers, SSE endpoint with reconne
 LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with prompt tracking, latency analysis, and quality scoring. Token/cost tracking per-deliverable and per-agent with context budget awareness and reactive compression. Crash recovery via PM checkpoint resume, ADK session resume with ResumabilityConfig, and tool idempotency validation. Enhanced routing: richer CLI status, agent role-based tool restrictions, adaptive LLM Router (cost/latency-aware). Advanced capabilities: compound workflow composition and semantic memory upgrade (pgvector embeddings).
 
 ### Completion Contract
-- [ ] Langfuse dashboard shows per-prompt metrics
-- [ ] Token costs visible per deliverable, per agent, per model
-- [ ] Pipeline resumes correctly after simulated crash
-- [ ] Adaptive router selects models based on cost/latency data
-- [ ] Context budget triggers compression before window exhaustion
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | Langfuse dashboard shows per-prompt metrics | PR-35 |
+| | Token costs visible per deliverable, per agent, per model | PR-35 |
+| | Pipeline resumes correctly after simulated crash | NFR-3 |
+| | Adaptive router selects models based on cost/latency data | PR-15, NFR-2 |
+| | Context budget triggers compression before window exhaustion | PR-15, NFR-2 |
 
 ---
 
@@ -270,11 +306,14 @@ LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with promp
 React 19 + Vite SPA with hey-api codegen (OpenAPI to typed TypeScript client + TanStack Query hooks), Tailwind v4 with CSS-first `@theme`, Zustand for client-only state, feature-sliced architecture, and atomic design system. Core features: real-time pipeline visualization via SSE, batch progress display with dependency graph, state inspector, and cost dashboards with per-run/per-agent/per-model breakdown.
 
 ### Completion Contract
-- [ ] Dashboard displays live pipeline execution via SSE
-- [ ] Pipeline state browsable through state inspector
-- [ ] Cost data visualized with per-run and per-agent breakdown
-- [ ] Type changes in Pydantic models propagate to TypeScript at build time
-- [ ] Static build deployable to any CDN/file server
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | Dashboard displays live pipeline execution via SSE | PR-37 |
+| | Pipeline state browsable through state inspector | PR-37 |
+| | Cost data visualized with per-run and per-agent breakdown | PR-37, PR-35 |
+| | Type changes in Pydantic models propagate to TypeScript at build time | NFR-5 |
+| | Static build deployable to any CDN/file server | PR-37 |
 
 ---
 
@@ -432,5 +471,5 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 
 ---
 
-*Document Version: 2.2.0*
-*Last Updated: 2026-02-18*
+*Document Version: 2.3.0*
+*Last Updated: 2026-02-28*

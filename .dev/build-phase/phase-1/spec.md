@@ -121,12 +121,16 @@ from google.adk.agents import BaseAgent, LlmAgent, SequentialAgent
 
 class LinterAgent(BaseAgent):
     """Deterministic agent — Pydantic v2 model, no extra fields needed."""
-    async def _run_async_impl(self, ctx):
+    async def _run_async_impl(self, ctx):  # type: ignore[override]
         plan = ctx.session.state.get("plan_output", "")
         has_steps = len(plan.strip()) > 0
-        ctx.session.state["lint_results"] = f"Plan length: {len(plan)} chars"
-        ctx.session.state["lint_passed"] = has_steps
-        yield Event(author=self.name, actions=EventActions(state_delta={}))
+        # NOTE: Direct ctx.session.state writes do NOT persist (ADK quirk).
+        # All state writes use state_delta on a yielded Event.
+        delta: dict[str, object] = {
+            "lint_results": f"Plan length: {len(plan)} chars",
+            "lint_passed": has_steps,
+        }
+        yield Event(author=self.name, actions=EventActions(state_delta=delta))
 
 pipeline = SequentialAgent(
     name="pipeline",
@@ -230,9 +234,16 @@ class OuterLoopAgent(BaseAgent):
                 if ctx.session.state.get(f"feature_{f.name}_output"):
                     completed.add(f.name)
 
-        ctx.session.state["all_completed"] = len(completed) == len(self.features)
-        ctx.session.state["completed_features"] = sorted(completed)
-        ctx.session.state["total_batches"] = batch_num
+        # NOTE: Direct ctx.session.state writes do NOT persist (ADK quirk).
+        # Final completion state written via state_delta on a yielded Event.
+        yield Event(
+            author=self.name,
+            actions=EventActions(state_delta={
+                "all_completed": len(completed) == len(self.features),
+                "completed_features": sorted(completed),
+                "total_batches": batch_num,
+            }),
+        )
 ```
 
 **Acceptance criteria:**
@@ -388,14 +399,18 @@ class MyAgent(BaseAgent):
 
 ### State Access in CustomAgent
 ```python
-async def _run_async_impl(self, ctx):
-    # Read
+async def _run_async_impl(self, ctx):  # type: ignore[override]
+    # Read — direct access works correctly
     value = ctx.session.state.get("key")
-    # Write (direct)
-    ctx.session.state["key"] = "value"
-    # Write (event-sourced — visible in event stream)
+
+    # Write (DEPRECATED — direct writes do NOT persist; see Decision D9 revision)
+    # ctx.session.state["key"] = "value"  # ← DO NOT USE
+
+    # Write (CORRECT — event-sourced via state_delta)
     yield Event(author=self.name, actions=EventActions(state_delta={"key": "value"}))
 ```
+
+> **ADK Quirk (confirmed in implementation)**: Direct `ctx.session.state["key"] = value` assignments inside `_run_async_impl` do NOT persist across agent boundaries. All state writes MUST use `state_delta` on a yielded `Event`. This applies to both `InMemorySessionService` and `DatabaseSessionService`. See Decision D9 (revised, design-changelog.md) and ERRATA.md #1.
 
 ### Token Usage
 ```python

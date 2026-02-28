@@ -96,7 +96,7 @@ class CustomAgentBase(BaseAgent):
     - Yields Event objects into the unified stream
     """
 
-    async def _run_async_impl(
+    async def _run_async_impl(  # type: ignore[override]
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
         ...
@@ -121,7 +121,7 @@ class OuterLoopAgent(BaseAgent):
 
     features: list[Feature] = Field(default_factory=list)
 
-    async def _run_async_impl(
+    async def _run_async_impl(  # type: ignore[override]
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
         ...
@@ -204,9 +204,9 @@ class AgentRole(str, enum.Enum):
 | P1.D4 | `agent_2_output` | `str` | `mountain_agent` via `output_key` |
 | P1.D4 | `agent_3_output` | `str` | `forest_agent` via `output_key` |
 | P1.D5 | `feature_{name}_output` | `str` | Per-feature `LlmAgent` via `output_key` |
-| P1.D5 | `all_completed` | `bool` | `OuterLoopAgent` direct write |
-| P1.D5 | `completed_features` | `list[str]` | `OuterLoopAgent` direct write |
-| P1.D5 | `total_batches` | `int` | `OuterLoopAgent` direct write |
+| P1.D5 | `all_completed` | `bool` | `OuterLoopAgent` via `state_delta` |
+| P1.D5 | `completed_features` | `list[str]` | `OuterLoopAgent` via `state_delta` |
+| P1.D5 | `total_batches` | `int` | `OuterLoopAgent` via `state_delta` |
 
 ## Data Flow
 
@@ -231,8 +231,8 @@ sequenceDiagram
         Agent->>State: output_key write
     else CustomAgent (BaseAgent)
         Agent->>State: read state keys
-        Agent->>State: write via state_delta or direct
-        Agent->>Agent: yield Event(author, actions)
+        Agent->>Agent: yield Event(author, actions=EventActions(state_delta={...}))
+        Note over Agent,State: All writes via state_delta (direct writes do NOT persist)
     end
 
     Agent-->>Runner: yield Event stream
@@ -398,7 +398,7 @@ flowchart LR
 
 ## Notes
 
-- **Design Decision D9**: Phase 1 prototypes use direct `ctx.session.state[key] = value` writes for simplicity. Production agents (Phase 3+) MUST use `Event(actions=EventActions(state_delta={...}))` for event-sourced auditability. This is a known deviation documented in the spec.
+- **Design Decision D9 (revised)**: All Phase 1 prototype state writes use `Event(actions=EventActions(state_delta={...}))` — direct `ctx.session.state[key] = value` writes do NOT persist (ADK quirk confirmed during implementation). The original decision described direct writes as a simplification; the implementation corrected this. Production agents (Phase 3+) follow the same `state_delta` pattern. See design-changelog.md Decision D9 and ERRATA.md #1.
 
 - **BaseAgent is a Pydantic v2 model**: Custom attributes on `BaseAgent` subclasses must be declared as Pydantic model fields (`features: list[Feature] = Field(default_factory=list)`), not as `__init__` parameters. This is an ADK constraint discovered during prototype design and applies to all future `CustomAgent` implementations.
 

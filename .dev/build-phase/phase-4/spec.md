@@ -195,6 +195,8 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `directory_list(path: str, depth: int | None = None) -> str` lists directory contents as a formatted tree with optional depth control (default 2 levels)
 - [x] All functions validate paths — reject absolute paths outside configured project root, reject `..` traversal
 - [x] All functions return `str` (error messages for failures, not exceptions)
+
+> **Delta note (2026-02-27):** Path containment validation uses `Path(path).relative_to(project_root)` (not `str.startswith(project_root)`). Reviewer 1 changed the implementation during Phase 4 review — `Path.relative_to()` is robust to symlinks and path normalization edge cases that `startswith` misses. The logical requirement (reject paths outside project root) is unchanged; the implementation method is stronger.
 - [x] Module importable as `from app.tools.filesystem import file_read, file_write, file_edit, file_insert, file_multi_edit, file_glob, file_grep, file_move, file_delete, directory_list`
 **Validation:**
 - `uv run pyright app/tools/filesystem.py`
@@ -213,7 +215,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `TM03` — `app/tools/execution.py` module
 - [x] `E11` — Idempotent tool execution guards
 **Requirements:**
-- [x] `bash_exec(command: str, cwd: str | None = None, timeout: int = 120, idempotency_key: str | None = None, tool_context: ToolContext | None = None) -> str` runs a shell command via `asyncio.create_subprocess_shell`
+- [x] `bash_exec(command: str, cwd: str | None = None, timeout: int = 30, idempotency_key: str | None = None, tool_context: ToolContext | None = None) -> str` runs a shell command via `asyncio.create_subprocess_shell`
 - [x] Returns combined stdout + stderr output, truncated to 10000 characters with truncation notice
 - [x] On timeout: kills the process and returns error message with the timeout value
 - [x] On non-zero exit code: returns output prefixed with `"Exit code: {code}\n"`
@@ -221,6 +223,8 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] When `cwd` is provided: validates directory exists before execution
 - [x] `http_request(method: str, url: str, headers: dict[str, str] | None = None, body: str | None = None) -> str` makes a structured HTTP call via `httpx.AsyncClient`; returns status code + response body; truncates to 10000 characters
 - [x] Module importable as `from app.tools.execution import bash_exec, http_request`
+
+> **Delta note (2026-02-27):** `http_request` has SSRF protection added by Reviewer 3: `urlparse(url).scheme` is checked before sending the request — only `http` and `https` schemes are permitted. Other schemes (e.g. `file://`, `ftp://`) return a clear error string to the LLM without making a network call. Not in original spec requirements. Note: `web_fetch` (P4.D4) received the same SSRF protection in the same review pass.
 **Validation:**
 - `uv run pyright app/tools/execution.py`
 - `python -c "from app.tools.execution import bash_exec, http_request"`
@@ -251,6 +255,8 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `git_log(path: str, count: int | None = None, ref: str | None = None) -> str` shows commit history with optional count limit and ref filter
 - [x] `git_show(path: str, ref: str) -> str` inspects a specific commit (message, diff, metadata)
 - [x] `git_worktree(path: str, action: str, branch: str | None = None) -> str` manages git worktrees for parallel execution across branches (add, remove, list)
+
+> **Delta note (2026-02-27):** `git_worktree` action parameter is `GitWorktreeAction` (a new `StrEnum` with values `ADD`, `LIST`, `REMOVE`) not bare `str`. Added by Reviewer 1 as a `[SPEC-UPDATE]` item in review.md. The `GitWorktreeAction` enum is defined in `app/models/enums.py`. Actual signature: `git_worktree(path: str, action: GitWorktreeAction, branch: str | None = None) -> str`.
 - [x] `git_apply(path: str, patch: str) -> str` applies a unified diff patch to the working tree
 - [x] All functions validate `path` is a git repository (contains `.git`)
 - [x] All git commands use `cwd=path` for subprocess execution
@@ -272,8 +278,12 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `TM04` — `app/tools/web.py` module
 **Requirements:**
 - [x] `web_fetch(url: str) -> str` fetches URL content via `httpx.AsyncClient` with 30s timeout; extracts text from HTML via `beautifulsoup4` `.get_text()`; returns raw content for non-HTML responses; truncates to 10000 characters
+
+> **Delta note (2026-02-27):** `web_fetch` has SSRF protection added by Reviewer 3: `urlparse(url).scheme` is checked before sending the request — only `http` and `https` schemes are permitted. Other schemes return a clear error string. Same protection as `http_request` (P4.D2). Not in original spec requirements.
 - [x] `web_search(query: str, num_results: int = 5) -> str` calls the configured search provider API; returns formatted results (title, URL, snippet per result)
 - [x] `web_search` returns clear error message if the provider's API key is not configured
+
+> **Delta note (2026-02-27):** `web_search` accepts an optional `provider: str | None = None` parameter (flagged as `[SPEC-UPDATE]` in review.md). When `provider` is `None`, uses the configured `Settings.search_provider`. When provided, overrides the configured default for that call. Actual signature: `web_search(query: str, num_results: int = 5, provider: str | None = None) -> str`.
 - [x] `Settings` has `search_provider: str` defaulting to `"tavily"` (env var: `AUTOBUILDER_SEARCH_PROVIDER`)
 - [x] API keys read from env directly: `TAVILY_API_KEY`, `BRAVE_API_KEY` (not `AUTOBUILDER_` prefixed — aligns with `.env`)
 - [x] Tavily provider: POST to `https://api.tavily.com/search` with `api_key`, `query`, `max_results`; parse response `results` array
@@ -299,15 +309,15 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `T30c` — `task_query` FunctionTool
 - [x] `TM05` — `app/tools/task.py` module
 **Requirements:**
-- [x] `todo_read(task_id: str, tool_context: ToolContext) -> str` reads a specific task by ID from session state; returns task content and status; returns error message if not found
+- [x] `todo_read(tool_context: ToolContext) -> str` reads all tasks from session state; returns formatted list of all todos with status; returns "No todos found" if empty
 - [x] `TodoAction` enum (StrEnum) in `app/models/enums.py`: `ADD = "ADD"`, `UPDATE = "UPDATE"`, `COMPLETE = "COMPLETE"`, `REMOVE = "REMOVE"` — values match names
 - [x] `TodoStatus` enum (StrEnum) in `app/models/enums.py`: `PENDING = "PENDING"`, `DONE = "DONE"` — values match names
-- [x] `TaskStatus` enum (StrEnum) in `app/models/enums.py`: `PENDING = "PENDING"`, `IN_PROGRESS = "IN_PROGRESS"`, `COMPLETED = "COMPLETED"`, `BLOCKED = "BLOCKED"` — values match names
-- [x] `todo_write(action: TodoAction, task_id: str, content: str, tool_context: ToolContext) -> str` writes updated task list to state via `tool_context.actions.state_delta["tasks"]`; generates UUID-based `task_id` for `ADD` action (ignores provided `task_id`); returns confirmation
-- [x] `todo_list(status_filter: TodoStatus | None = None, tool_context: ToolContext) -> str` lists all tasks with optional status filter; returns formatted list
+- [x] `TaskStatus` enum (StrEnum) in `app/models/enums.py`: `OPEN = "OPEN"`, `IN_PROGRESS = "IN_PROGRESS"`, `DONE = "DONE"`, `BLOCKED = "BLOCKED"` — values match names
+- [x] `todo_write(action: TodoAction, task_id: str, content: str, tool_context: ToolContext) -> str` writes updated task list to state via `tool_context.actions.state_delta["todos"]`; generates UUID-based `task_id` for `ADD` action (ignores provided `task_id`); returns confirmation
+- [x] `todo_list(tool_context: ToolContext, filter: str | None = None) -> str` lists all tasks with optional status filter; returns formatted list
 - [x] `task_create(title: str, description: str, assignee: str | None = None, tags: list[str] | None = None) -> str` creates a cross-session task; placeholder backend returns confirmation with generated UUID
 - [x] `task_update(task_id: str, status: TaskStatus | None = None, notes: str | None = None) -> str` updates a shared task; placeholder backend returns confirmation
-- [x] `task_query(status: TaskStatus | None = None, assignee: str | None = None) -> str` queries shared tasks; placeholder backend returns "No shared tasks configured (Phase 5)"
+- [x] `task_query(filter: TaskStatus | None = None, assignee: str | None = None) -> str` queries shared tasks; placeholder backend returns "Task query (placeholder -- persistence in Phase 5)"
 - [x] `tool_context` parameter excluded from LLM-visible tool schema (ADK auto-injection)
 - [x] Module importable as `from app.tools.task import todo_read, todo_write, todo_list, task_create, task_update, task_query`
 **Validation:**
@@ -337,7 +347,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `TM06` — `app/tools/management.py` module
 **Requirements:**
 - [x] **PM tools (6):**
-- [x] `select_ready_batch(project_id: str) -> str` accepts a project ID; returns `"No deliverables configured for project {project_id}. Batch selection requires deliverable infrastructure (Phase 8)."`
+- [x] `select_ready_batch(project_id: str) -> str` accepts a project ID; returns `"Ready batch for project {project_id} (placeholder — dependency resolution in Phase 5)"`
 - [x] `escalate_to_director(priority: str, context: str, request_type: str) -> str` validates `request_type` is one of `"ESCALATION"`, `"STATUS_REPORT"`, `"RESOURCE_REQUEST"`, `"PATTERN_ALERT"`; validates `priority` is one of `"LOW"`, `"NORMAL"`, `"HIGH"`, `"CRITICAL"`; returns validation error for invalid values; logs via `get_logger("tools.management")` and returns confirmation with a generated UUID placeholder ID
 - [x] `update_deliverable(deliverable_id: str, status: str, notes: str | None = None) -> str` validates parameters; returns placeholder confirmation
 - [x] `query_deliverables(project_id: str, status: str | None = None) -> str` returns placeholder "No deliverable infrastructure (Phase 5)"
@@ -350,8 +360,26 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `override_pm(project_id: str, action: str, reason: str) -> str` validates `action` is one of `"PAUSE"`, `"RESUME"`, `"REORDER"`, `"CORRECT"`; returns placeholder confirmation
 - [x] `get_project_context(path: str | None = None) -> str` detects project type from filesystem (reads `package.json`, `pyproject.toml`, etc.); functional even in Phase 4
 - [x] `query_dependency_graph(project_id: str, deliverable_id: str | None = None) -> str` returns placeholder "No dependency infrastructure (Phase 8)"
-- [x] Validation uses string comparison against known values (not enum imports — CEO/Director queue enums arrive in Phase 5)
+- [x] ~~Validation uses string comparison against known values (not enum imports — CEO/Director queue enums arrive in Phase 5)~~ **Outdated** — see delta note below.
 - [x] Module importable as `from app.tools.management import select_ready_batch, escalate_to_director, update_deliverable, query_deliverables, reorder_deliverables, manage_dependencies, escalate_to_ceo, list_projects, query_project_status, override_pm, get_project_context, query_dependency_graph`
+
+> **Delta note (2026-02-27):** Reviewer 1 promoted all string-validation sets to typed `StrEnum` types in Phase 4 (flagged as `[SPEC-UPDATE]` in review.md). The 6 new enums in `app/models/enums.py` are:
+> - `EscalationPriority` — `LOW`, `NORMAL`, `HIGH`, `CRITICAL` (→ BOM V21)
+> - `EscalationRequestType` — `ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT` (→ BOM V20)
+> - `CeoItemType` — `NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`
+> - `DependencyAction` — `ADD`, `REMOVE`, `QUERY`
+> - `PmOverrideAction` — `PAUSE`, `RESUME`, `REORDER`, `CORRECT`
+> - `GitWorktreeAction` — `ADD`, `REMOVE`, `LIST` (also affects P4.D3 `git_worktree`)
+>
+> **BOM gap**: BOM V22 ("Director queue status enum: `PENDING`, `IN_PROGRESS`, `RESOLVED`, `FORWARDED_TO_CEO`") is assigned to Phase 4 / P4.D6 but has no implementation. None of the 6 review-added enums cover Director queue item status. This enum is required and needs to be added to `app/models/enums.py`.
+>
+> Actual management tool signatures use typed enums:
+> - `escalate_to_director(priority: EscalationPriority, context: str, request_type: EscalationRequestType) -> str`
+> - `manage_dependencies(action: DependencyAction, source_id: str, target_id: str | None = None) -> str`
+> - `escalate_to_ceo(item_type: CeoItemType, priority: EscalationPriority, message: str, metadata: str) -> str`
+> - `override_pm(project_id: str, action: PmOverrideAction, reason: str) -> str`
+>
+> The note "CEO/Director queue enums arrive in Phase 5" is obsolete — Phase 4 itself provides these enums (except V22 which is still pending). Phase 5 will add the DB backend for these queues, not the enum definitions.
 **Validation:**
 - `uv run pyright app/tools/management.py`
 - `python -c "from app.tools.management import select_ready_batch, escalate_to_ceo, escalate_to_director"`
@@ -539,7 +567,9 @@ Batch 3: P4.D8
 | V22 | Director queue status enum | P4.D6 |
 | E11 | Idempotent tool execution guards | P4.D2 |
 
-*All 62 BOM components assigned to Phase 4 in `07-COMPONENTS.md` are mapped above. Zero unmapped.*
+> **Delta note (2026-02-27):** V20 and V21 are implemented as `EscalationRequestType` and `EscalationPriority` enums in `app/models/enums.py`. **V22 (Director queue status enum: `PENDING`, `IN_PROGRESS`, `RESOLVED`, `FORWARDED_TO_CEO`) has no corresponding implementation** — no enum with these values exists in `enums.py`. The 6 review-added enums do not include a Director queue status enum. This is a BOM component gap requiring code remediation. See Phase 4 delta-report for details.
+
+*All 62 BOM components assigned to Phase 4 in `07-COMPONENTS.md` are mapped above. V22 is mapped but unimplemented — code remediation pending.*
 
 ## Research Notes
 

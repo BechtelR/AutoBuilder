@@ -116,7 +116,7 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 
 | ID | Requirement |
 |----|-------------|
-| PR-8 | The Director decomposes each submitted Brief into a dependency-ordered execution plan, determining the appropriate workflow stage to begin from. |
+| PR-8 | The Director decomposes each submitted Brief into a dependency-ordered execution plan, determining the appropriate workflow stage to begin from. Before the first deliverable is dispatched, the system validates all resources required by the workflow stage — credentials, API access, tool authorizations, and input materials. Any missing or invalid resource surfaces to the CEO queue immediately; execution does not begin until resolved. Resource failures never occur mid-run. |
 | PR-9 | All agent work is managed through **observable async work queues**. Every queued item — pending, in-progress, or blocked — is visible to the user at all times. Items can be promoted, demoted, paused, resumed, or cancelled without restarting the project. |
 | PR-10 | The PM's execution loop operates on the work queue: select a Batch of dependency-ready deliverables → dispatch in parallel or sequentially → collect results → repeat until the phase is complete → run regression tests → fix until pass → checkpoint. |
 | PR-11 | The workflow manifest defines when validators run — per-deliverable for lightweight checks, per-batch or per-phase for comprehensive validation. At minimum, all workflow validators run at phase completion. Scheduled validators are mandatory pipeline steps; they cannot be skipped or overridden by agent judgment. |
@@ -249,7 +249,7 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 
 ## 8. Out of Scope
 
-Interactive pair programming, IDE plugins, LLM training/fine-tuning, proprietary workflow formats, and real-time human-AI co-editing are **never** in scope.
+Interactive pair programming, IDE plugins, LLM training/fine-tuning, proprietary workflow formats, and real-time human-AI co-editing are **never** in scope. AutoBuilder is a standalone system — it does not extend or embed in an editor, IDE, or other tool.
 
 Multi-tenant SaaS, workflow marketplace, cross-project dependency orchestration, artifact deployment, mobile UX, and WCAG AA compliance are **deferred**. Note: basic semantic HTML and keyboard navigation are expected engineering standards from Phase 1, not features to be added later. The plugin install infrastructure (PR-4, NFR-5) is foundational to a future marketplace.
 
@@ -259,27 +259,29 @@ Multi-tenant SaaS, workflow marketplace, cross-project dependency orchestration,
 
 | Metric | Target |
 |--------|--------|
-| Autonomous completion | ≥80% of standard phases (2–20 deliverables, no external API dependencies) complete without CEO queue intervention |
+| Autonomous completion | ≥80% of standard workflow phases complete without CEO queue intervention |
 | Escalation precision | ≥90% of CEO queue items are genuine blockers — not conditions the system could have resolved with another retry or alternative |
 | Cross-phase retention | Phase 3 completion report reflects conventions established in Phase 1 without user re-entry, verified by report inspection |
 | Workflow memory improvement | Escalations per deliverable decrease ≥20% between run 1 and run 5 of the same workflow type |
 | Verification coverage | 100% of completion reports contain machine-generated evidence for all three layers — any missing layer is a failure |
 | Plugin extensibility | A valid third-party WORKFLOW.yaml installs and executes a full project with zero core code changes |
 | Time to first output | First deliverable output within 30 minutes of completing initial stack setup |
+| Stage duration | A standard workflow stage completes within one working day of wall-clock time |
+| Cost efficiency | Execution cost per completed workflow stage ≤5% of market-rate equivalent human output at comparable quality (validated on auto-code workflow by Phase 10) |
 
 ---
 
 ## 10. Traceability
 
-| Vision Goal | Requirements |
-|-------------|-------------|
-| V-1 Autonomous execution | PR-1, 2, 7, 10, 20, 24, 36, NFR-2, 3 |
-| V-2 Hierarchical supervision | PR-7, 8, 13, 14, 15, 16, 18, 21, 37 |
-| V-3 Guaranteed quality enforcement | PR-9, 10, NFR-4 |
-| V-4 Three-layer verification | PR-9, 22 |
-| V-5 Brief-to-deliverable traceability | PR-1, 22, 23, 24, 35 |
-| V-6 Workflow composability | PR-4, 5, 6, 31, 33, NFR-5 |
-| V-7 Cost efficiency | PR-24, 35, NFR-1 |
-| V-8 Transparency | PR-3, 34, 35, 36, 37 |
-| V-9 Structured escalation | PR-10, 15, 16, 17, 18, 19, 20, 32 |
-| V-10 Memory accumulation | PR-26–30, 32 |
+| Vision Goal | Vision Section | Requirements |
+|-------------|---------------|-------------|
+| Autonomous execution | Product Vision | PR-1, 2, 7, 10, 20, 24, 36, NFR-2, 3 |
+| Hierarchical supervision | Innovations | PR-7, 8, 13, 14, 15, 16, 18, 21, 37 |
+| Guaranteed quality enforcement | Innovations | PR-9, 10, 11, NFR-4 |
+| Three-layer verification | Innovations | PR-9, 22, 23 |
+| Brief-to-deliverable traceability | Innovations | PR-1, 22, 23, 24, 35 |
+| Workflow composability | Innovations | PR-4, 5, 6, 31, 33, NFR-5 |
+| Cost efficiency | Success Criteria | PR-24, 35, §9 Cost efficiency metric |
+| Transparency and trust | Strategic Advantages | PR-3, 34, 35, 36, 37 |
+| Structured escalation | Product Vision | PR-10, 15, 16, 17, 18, 19, 20, 32 |
+| Memory accumulation | Strategic Advantages | PR-26–30, 32 |

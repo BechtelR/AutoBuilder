@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 1.2.2*
+*Version: 1.2.3*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -33,33 +33,33 @@ Source: `architecture/gateway.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| G01 | `GET /health` | route | ✓ | gateway.md §2 | — |
-| G02 | `POST /specs` | route | 8 | gateway.md §2 | Spec decomposition |
-| G03 | `POST /workflows/{id}/run` | route | 8 | gateway.md §2 | ARQ worker, WorkflowRegistry |
-| G04 | `GET /workflows/{id}/status` | route | 8 | gateway.md §2 | `workflows` table |
-| G05 | `GET /workflows` | route | 10 | gateway.md §2 | WorkflowRegistry |
-| G06 | `POST /workflows/{id}/intervene` | route | 8 | gateway.md §2 | ADK session, PM agent |
-| G07 | `GET /deliverables` | route | 8 | gateway.md §2 | `deliverables` table |
-| G08 | `GET /deliverables/{id}` | route | 8 | gateway.md §2 | `deliverables` table |
-| G09 | `GET /events/stream` | endpoint | 10 | gateway.md §2 | Redis Streams, SSE |
-| G10 | `POST /chat/{session_id}/messages` | route | 5 | gateway.md §2 | Director agent, `runner.run_async` |
-| G11 | `GET /chat/{session_id}/messages` | route | 5 | gateway.md §2 | ADK session / DB |
-| G12 | `GET /ceo/queue` | route | 5 | gateway.md §2 | `ceo_queue` table |
-| G13 | `PATCH /ceo/queue/{id}` | route | 5 | gateway.md §2 | `ceo_queue` table, session state writeback |
-| G14 | `GET /ceo/queue/stream` | endpoint | 10 | gateway.md §2 | `ceo_queue` table, Redis Streams |
+| G01 | `GET /health` | route | ✓ | gateway.md §Route Structure | — |
+| G02 | `POST /specs` | route | 8 | gateway.md §Route Structure | Spec decomposition |
+| G03 | `POST /workflows/{id}/run` | route | 8 | gateway.md §Route Structure | ARQ worker, WorkflowRegistry |
+| G04 | `GET /workflows/{id}/status` | route | 8 | gateway.md §Route Structure | `workflows` table |
+| G05 | `GET /workflows` | route | 10 | gateway.md §Route Structure | WorkflowRegistry |
+| G06 | `POST /workflows/{id}/intervene` | route | 8 | gateway.md §Route Structure | ADK session, PM agent |
+| G07 | `GET /deliverables` | route | 8 | gateway.md §Route Structure | `deliverables` table |
+| G08 | `GET /deliverables/{id}` | route | 8 | gateway.md §Route Structure | `deliverables` table |
+| G09 | `GET /events/stream` | endpoint | 10 | gateway.md §Route Structure | Redis Streams, SSE |
+| G10 | `POST /chat/{session_id}/messages` | route | 5 | gateway.md §Route Structure | Director agent, `runner.run_async` |
+| G11 | `GET /chat/{session_id}/messages` | route | 5 | gateway.md §Route Structure | ADK session / DB |
+| G12 | `GET /ceo/queue` | route | 5 | gateway.md §Route Structure | `ceo_queue` table |
+| G13 | `PATCH /ceo/queue/{id}` | route | 5 | gateway.md §Route Structure | `ceo_queue` table, session state writeback |
+| G14 | `GET /ceo/queue/stream` | endpoint | 10 | gateway.md §Route Structure | `ceo_queue` table, Redis Streams |
 | G15 | `GET /sessions/{id}/state` | endpoint | 11 | state.md §10 | `DatabaseSessionService` |
 | G16 | `GET /memory/search` | endpoint | 9 | state.md §10 | `PostgresMemoryService` |
 | G17 | `GET /metrics/tokens` | endpoint | 11 | state.md §10 | Token tracking |
 | G18 | `GET /costs` | endpoint | 11 | state.md §10 | Token tracking |
-| G19 | `GET /workflows/{id}/events` | endpoint | 10 | workflows.md §8 | Redis Streams, SSE |
-| G20 | Gateway Pydantic request/response models | module | ✓ | gateway.md §3 | — |
-| G21 | Anti-corruption translation layer | module | 3 | gateway.md §3 | Gateway models, ADK models |
-| G22 | CORS middleware | module | ✓ | gateway.md §3 | — |
-| G23 | Error handling middleware | module | ✓ | gateway.md §3 | — |
-| G24 | Request logging middleware | module | ✓ | gateway.md §3 | — |
-| G25 | Dependency injection (`deps.py`) | module | ✓ | gateway.md §3 | DB sessions, Redis client |
-| G26 | OpenAPI spec auto-generation | mechanism | ✓ | gateway.md §4 | Gateway Pydantic models |
-| G27 | hey-api TypeScript codegen | mechanism | 12 | gateway.md §4 | OpenAPI spec |
+| G19 | `GET /workflows/{id}/events` | endpoint | 10 | workflows.md §Workflow Execution Model | Redis Streams, SSE |
+| G20 | Gateway Pydantic request/response models | module | ✓ | gateway.md §Anti-Corruption Pattern | — |
+| G21 | Anti-corruption translation layer | module | 3 | gateway.md §Anti-Corruption Pattern | Gateway models, ADK models |
+| G22 | CORS middleware | module | ✓ | gateway.md §Anti-Corruption Pattern | — |
+| G23 | Error handling middleware | module | ✓ | gateway.md §Anti-Corruption Pattern | — |
+| G24 | Request logging middleware | module | ✓ | gateway.md §Anti-Corruption Pattern | — |
+| G25 | Dependency injection (`deps.py`) | module | ✓ | gateway.md §Anti-Corruption Pattern | DB sessions, Redis client |
+| G26 | OpenAPI spec auto-generation | mechanism | ✓ | gateway.md §Type Safety Chain | Gateway Pydantic models |
+| G27 | hey-api TypeScript codegen | mechanism | 12 | gateway.md §Type Safety Chain | OpenAPI spec |
 
 ---
 
@@ -73,7 +73,7 @@ Source: `architecture/data.md`, `architecture/state.md`
 | D02 | `workflows` table | db | ✓ | data.md §1 | Alembic |
 | D03 | `deliverables` table | db | ✓ | data.md §1 | Alembic |
 | D04 | `sessions` table (ADK) | db | 3 | data.md §1 | `DatabaseSessionService` |
-| D05 | `ceo_queue` table | db | 5 | data.md §1, events.md §4 | Alembic |
+| D05 | `ceo_queue` table | db | 5 | data.md §1, events.md §Unified CEO Queue | Alembic |
 | D06 | `events` table (audit log) | db | 10 | data.md §1 | Audit consumer |
 | D07 | `webhook_listeners` table | db | 10 | data.md §1 | Alembic |
 | D08 | `project_configs` table | db | 5 | data.md §1, state.md §1.2 | Alembic |
@@ -84,7 +84,7 @@ Source: `architecture/data.md`, `architecture/state.md`
 | D13 | `async_sessionmaker` factory | module | ✓ | state.md §2.1 | SQLAlchemy async engine |
 | D14 | Alembic migration environment | config | ✓ | data.md §1 | — |
 | D15 | Initial migration (core tables) | migration | ✓ | data.md §1 | Alembic |
-| D16 | CEO queue migration | migration | 5 | events.md §4 | Alembic |
+| D16 | CEO queue migration | migration | 5 | events.md §Unified CEO Queue | Alembic |
 | D17 | Memory table migration | migration | 9 | state.md §5 | Alembic, pgvector |
 | D18 | Events + webhook_listeners migration | migration | 10 | data.md §1 | Alembic |
 | D19 | Project configs migration | migration | 5 | data.md §1 | Alembic |
@@ -122,17 +122,17 @@ Source: `architecture/workers.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| W01 | ARQ WorkerSettings | config | ✓ | workers.md §2 | Redis |
-| W02 | ARQ worker entry point | module | ✓ | workers.md §2 | ARQ WorkerSettings |
-| W03 | `run_workflow()` ARQ job function | module | 3 | workers.md §3 | ADK Runner, session, events |
-| W04 | `create_adk_runner()` factory | module | 3 | workers.md §3 | Anti-corruption layer |
-| W05 | `create_or_resume_session()` | module | 3 | workers.md §3 | `DatabaseSessionService` |
-| W06 | `translate_event()` | module | 3 | workers.md §3 | Gateway event models |
-| W07 | `publish_to_stream()` | module | 3 | workers.md §3 | Redis Streams |
-| W08 | `update_workflow_state()` | module | 3 | workers.md §3 | `workflows` table |
-| W09 | ARQ cron jobs (heartbeat, cleanup) | mechanism | ✓ | workers.md §2 | ARQ, Redis |
-| W10 | Worker re-delivery / idempotency handling | mechanism | 11 | workers.md §2 | `create_or_resume_session` |
-| W11 | Multi-worker concurrency validation | mechanism | 11 | workers.md §2 | ARQ |
+| W01 | ARQ WorkerSettings | config | ✓ | workers.md §ARQ Workers | Redis |
+| W02 | ARQ worker entry point | module | ✓ | workers.md §ARQ Workers | ARQ WorkerSettings |
+| W03 | `run_workflow()` ARQ job function | module | 3 | workers.md §Worker Lifecycle | ADK Runner, session, events |
+| W04 | `create_adk_runner()` factory | module | 3 | workers.md §Worker Lifecycle | Anti-corruption layer |
+| W05 | `create_or_resume_session()` | module | 3 | workers.md §Worker Lifecycle | `DatabaseSessionService` |
+| W06 | `translate_event()` | module | 3 | workers.md §Worker Lifecycle | Gateway event models |
+| W07 | `publish_to_stream()` | module | 3 | workers.md §Worker Lifecycle | Redis Streams |
+| W08 | `update_workflow_state()` | module | 3 | workers.md §Worker Lifecycle | `workflows` table |
+| W09 | ARQ cron jobs (heartbeat, cleanup) | mechanism | ✓ | workers.md §ARQ Workers | ARQ, Redis |
+| W10 | Worker re-delivery / idempotency handling | mechanism | 11 | workers.md §ARQ Workers | `create_or_resume_session` |
+| W11 | Multi-worker concurrency validation | mechanism | 11 | workers.md §ARQ Workers | ARQ |
 
 ---
 
@@ -142,24 +142,24 @@ Source: `architecture/events.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| V01 | Per-workflow Redis Stream publishing | mechanism | 3 | events.md §1 | Redis Streams, `translate_event` |
-| V02 | Redis Stream naming convention | config | 3 | events.md §1 | — |
-| V03 | Redis Stream retention config | config | 10 | events.md §1 | Redis |
-| V04 | Redis Stream consumer groups | mechanism | 10 | events.md §1 | Redis Streams |
-| V05 | At-least-once delivery (ACK/NACK) | mechanism | 10 | events.md §1 | Consumer groups |
-| V06 | SSE consumer | module | 10 | events.md §2 | Redis Streams, `GET /events/stream` |
-| V07 | Webhook dispatcher consumer | module | 10 | events.md §2 | `webhook_listeners` table, httpx |
-| V08 | Audit logger consumer | module | 10 | events.md §2 | `events` table |
-| V09 | SSE reconnection (`Last-Event-ID` replay) | mechanism | 10 | events.md §3 | Redis Stream IDs |
-| V10 | Webhook HMAC signature | mechanism | 10 | events.md §3 | Webhook dispatcher |
-| V11 | Webhook retry (exponential backoff) | mechanism | 10 | events.md §3 | Webhook dispatcher |
-| V12 | Event listener CRUD (register/unregister) | module | 10 | events.md §3 | `webhook_listeners` table |
-| V13 | CEO queue type enum (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) | config | 5 | events.md §4 | — |
-| V14 | CEO queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 5 | events.md §4 | — |
-| V15 | CEO queue status enum (`PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`) | config | 5 | events.md §4 | — |
-| V17 | CEO queue Redis Stream trigger consumer | mechanism | DROP | events.md §4 | `escalate_to_ceo` FunctionTool is the write path; second write path via stream consumer is over-engineering |
-| V18 | CEO resolved approval → session state writeback | mechanism | 5 | events.md §4 | CEO queue, ADK session |
-| V19 | Batch completion event publishing | mechanism | 8 | events.md §4 | Redis Streams |
+| V01 | Per-workflow Redis Stream publishing | mechanism | 3 | events.md §Redis Streams | Redis Streams, `translate_event` |
+| V02 | Redis Stream naming convention | config | 3 | events.md §Redis Streams | — |
+| V03 | Redis Stream retention config | config | 10 | events.md §Redis Streams | Redis |
+| V04 | Redis Stream consumer groups | mechanism | 10 | events.md §Redis Streams | Redis Streams |
+| V05 | At-least-once delivery (ACK/NACK) | mechanism | 10 | events.md §Redis Streams | Consumer groups |
+| V06 | SSE consumer | module | 10 | events.md §Consumers | Redis Streams, `GET /events/stream` |
+| V07 | Webhook dispatcher consumer | module | 10 | events.md §Consumers | `webhook_listeners` table, httpx |
+| V08 | Audit logger consumer | module | 10 | events.md §Consumers | `events` table |
+| V09 | SSE reconnection (`Last-Event-ID` replay) | mechanism | 10 | events.md §SSE Reconnection | Redis Stream IDs |
+| V10 | Webhook HMAC signature | mechanism | 10 | events.md §Event Listeners (Webhooks) | Webhook dispatcher |
+| V11 | Webhook retry (exponential backoff) | mechanism | 10 | events.md §Event Listeners (Webhooks) | Webhook dispatcher |
+| V12 | Event listener CRUD (register/unregister) | module | 10 | events.md §Event Listeners (Webhooks) | `webhook_listeners` table |
+| V13 | CEO queue type enum (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) | config | 5 | events.md §Unified CEO Queue | — |
+| V14 | CEO queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 5 | events.md §Unified CEO Queue | — |
+| V15 | CEO queue status enum (`PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`) | config | 5 | events.md §Unified CEO Queue | — |
+| V17 | CEO queue Redis Stream trigger consumer | mechanism | DROP | events.md §Unified CEO Queue | `escalate_to_ceo` FunctionTool is the write path; second write path via stream consumer is over-engineering |
+| V18 | CEO resolved approval → session state writeback | mechanism | 5 | events.md §Unified CEO Queue | CEO queue, ADK session |
+| V19 | Batch completion event publishing | mechanism | 8 | events.md §Unified CEO Queue | Redis Streams |
 | V20 | Director queue type enum (`ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT`) | config | 4 | events.md §Director Queue | — |
 | V21 | Director queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 4 | events.md §Director Queue | — |
 | V22 | Director queue status enum (`PENDING`, `IN_PROGRESS`, `RESOLVED`, `FORWARDED_TO_CEO`) | config | 4 | events.md §Director Queue | — |
@@ -176,68 +176,68 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A01 | Director agent (LlmAgent, opus) | agent | 5 | agents.md §4 | `build_director`, PM agents |
-| A02 | PM agent (LlmAgent, sonnet) | agent | 5 | agents.md §5 | `build_pm`, PM tools |
-| A03 | `build_director()` factory | module | 5 | agents.md §3 | Project IDs from DB |
-| A04 | `build_pm()` factory | module | 5 | agents.md §3 | Project config |
-| A05 | Director → PM delegation (`transfer_to_agent`) | mechanism | 5 | agents.md §5, §12 | ADK primitives |
-| A06 | PM → Director escalation (`transfer_to_agent`) | mechanism | 5 | agents.md §5, §12 | ADK primitives |
-| A07 | Hard limits cascade (CEO → Director → PM → Workers) | mechanism | 5 | agents.md §5 | `project_configs` |
-| A08 | Director personality state (`user:` scope) | config | 5 | agents.md §4 | `user:` state, seed config |
-| A09 | Director personality seed config file | config | 5 | agents.md §4 | — |
-| A10 | Director tool authoring + CEO approval gate | mechanism | 13+ | agents.md §4 | Tool registry, CEO queue |
-| A11 | Director cross-project pattern propagation | mechanism | 14 | agents.md §4 | `MemoryService` |
-| A12 | Director governance tools | tool | 13+ | agents.md §4 | `GlobalToolset` |
-| A13 | Director "Main" project (permanent chat session) | mechanism | 5 | agents.md §4 | Session model |
-| A14 | `before_agent_callback` (Director supervision) | callback | 5 | agents.md §5 | Director agent |
-| A15 | `after_agent_callback` (Director supervision) | callback | 5 | agents.md §5 | Director agent |
+| A01 | Director agent (LlmAgent, opus) | agent | 5 | agents.md §Director Agent | `build_director`, PM agents |
+| A02 | PM agent (LlmAgent, sonnet) | agent | 5 | agents.md §PM Agent | `build_pm`, PM tools |
+| A03 | `build_director()` factory | module | 5 | agents.md §Agent Factory Pattern | Project IDs from DB |
+| A04 | `build_pm()` factory | module | 5 | agents.md §Agent Factory Pattern | Project config |
+| A05 | Director → PM delegation (`transfer_to_agent`) | mechanism | 5 | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
+| A06 | PM → Director escalation (`transfer_to_agent`) | mechanism | 5 | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
+| A07 | Hard limits cascade (CEO → Director → PM → Workers) | mechanism | 5 | agents.md §PM Agent | `project_configs` |
+| A08 | Director personality state (`user:` scope) | config | 5 | agents.md §Director Agent | `user:` state, seed config |
+| A09 | Director personality seed config file | config | 5 | agents.md §Director Agent | — |
+| A10 | Director tool authoring + CEO approval gate | mechanism | 13+ | agents.md §Director Agent | Tool registry, CEO queue |
+| A11 | Director cross-project pattern propagation | mechanism | 14 | agents.md §Director Agent | `MemoryService` |
+| A12 | Director governance tools | tool | 13+ | agents.md §Director Agent | `GlobalToolset` |
+| A13 | Director "Main" project (permanent chat session) | mechanism | 5 | agents.md §Director Agent | Session model |
+| A14 | `before_agent_callback` (Director supervision) | callback | 5 | agents.md §PM Agent | Director agent |
+| A15 | `after_agent_callback` (Director supervision) | callback | 5 | agents.md §PM Agent | Director agent |
 
 ### 6.2 Worker Tier — LLM Agents
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A20 | `plan_agent` (LlmAgent, opus) | agent | 5 | agents.md §7 | Read-only tools, skills |
-| A21 | `code_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §7 | Full tools, plan output |
-| A22 | `review_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §7 | Read-only tools, lint/test results |
-| A23 | `fix_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §7 | Full tools, review output |
+| A20 | `plan_agent` (LlmAgent, opus) | agent | 5 | agents.md §Worker-Tier LLM Agents | Read-only tools, skills |
+| A21 | `code_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Full tools, plan output |
+| A22 | `review_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Read-only tools, lint/test results |
+| A23 | `fix_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Full tools, review output |
 
 ### 6.3 Worker Tier — Custom (Deterministic) Agents
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A30 | `SkillLoaderAgent` (CustomAgent) | agent | 5 | agents.md §8 | SkillLibrary |
-| A31 | `LinterAgent` (CustomAgent) | agent | 5 | agents.md §8 | Filesystem |
-| A32 | `TestRunnerAgent` (CustomAgent) | agent | 5 | agents.md §8 | Filesystem |
-| A33 | `FormatterAgent` (CustomAgent) | agent | 5 | agents.md §8 | Filesystem |
-| A34 | `DependencyResolverAgent` (CustomAgent) | agent | 5 | agents.md §8 | Deliverable deps |
-| A35 | `RegressionTestAgent` (CustomAgent) | agent | 5 | agents.md §8 | PM regression policy |
+| A30 | `SkillLoaderAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | SkillLibrary |
+| A31 | `LinterAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
+| A32 | `TestRunnerAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
+| A33 | `FormatterAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
+| A34 | `DependencyResolverAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Deliverable deps |
+| A35 | `RegressionTestAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | PM regression policy |
 
 ### 6.4 Callbacks & Hooks
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A40 | `verify_batch_completion` (`after_agent_callback`) | callback | 5 | agents.md §5 | PM agent |
-| A41 | `checkpoint_project` (`after_agent_callback`) | callback | 5 | agents.md §5 | DeliverablePipeline |
-| A42 | `context_budget_monitor` (`before_model_callback`) | callback | 5 | agents.md §8 | LlmRequest token counting |
-| A43 | `before_model_callback` context injection | callback | 5 | agents.md §7 | Session state |
-| A44 | `before_model_callback` LLM Router override | callback | 3 | agents.md §11 | LlmRouter |
+| A40 | `verify_batch_completion` (`after_agent_callback`) | callback | 5 | agents.md §PM Agent | PM agent |
+| A41 | `checkpoint_project` (`after_agent_callback`) | callback | 5 | agents.md §PM Agent | DeliverablePipeline |
+| A42 | `context_budget_monitor` (`before_model_callback`) | callback | 5 | agents.md §Worker-Tier Custom Agents | LlmRequest token counting |
+| A43 | `before_model_callback` context injection | callback | 5 | agents.md §Worker-Tier LLM Agents | Session state |
+| A44 | `before_model_callback` LLM Router override | callback | 3 | agents.md §LLM Router | LlmRouter |
 
 ### 6.5 Agent Communication
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A50 | `output_key` state communication | mechanism | 5 | agents.md §12.1 | Session state |
-| A51 | `{key}` state template injection | mechanism | 5 | agents.md §12.2 | Session state |
-| A52 | `InstructionProvider` dynamic instructions | mechanism | 5 | agents.md §12.3 | Session state |
-| A53 | `plan_instruction_provider` | mechanism | 5 | agents.md §12.3 | `loaded_skills`, `memory_context` |
-| A54 | `context_from_state` helper | module | 5 | agents.md §8 | Session state |
+| A50 | `output_key` state communication | mechanism | 5 | agents.md §1. output_key | Session state |
+| A51 | `{key}` state template injection | mechanism | 5 | agents.md §2. {key} Templates | Session state |
+| A52 | `InstructionProvider` dynamic instructions | mechanism | 5 | agents.md §Agent Factory Pattern. InstructionProvider | Session state |
+| A53 | `plan_instruction_provider` | mechanism | 5 | agents.md §Agent Factory Pattern. InstructionProvider | `loaded_skills`, `memory_context` |
+| A54 | `context_from_state` helper | module | 5 | agents.md §Worker-Tier Custom Agents | Session state |
 
 ### 6.6 Pipelines & Loops
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A60 | `DeliverablePipeline` (SequentialAgent) | workflow | 5 | agents.md §2.1 | All worker agents |
-| A61 | `ReviewCycle` (LoopAgent, max=3) | workflow | 5 | agents.md §2.1 | review, fix, lint, test agents |
+| A60 | `DeliverablePipeline` (SequentialAgent) | workflow | 5 | agents.md §How Workers Compose | All worker agents |
+| A61 | `ReviewCycle` (LoopAgent, max=3) | workflow | 5 | agents.md §How Workers Compose | review, fix, lint, test agents |
 | A62 | Parallel batch execution (ParallelAgent) | workflow | 8 | execution.md §PM loop | `DeliverablePipeline`, git worktrees |
 | A63 | PM outer loop (batch management) | workflow | 8 | execution.md §PM loop | PM agent, `select_ready_batch` |
 
@@ -334,15 +334,15 @@ Source: `architecture/tools.md`
 
 ## 8. LLM Router
 
-Source: `architecture/agents.md §11`, `architecture/tools.md §6`
+Source: `architecture/agents.md §LLM Router`, `architecture/tools.md §6`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| R01 | `LlmRouter` module | module | 3 | agents.md §11 | LiteLLM |
-| R02 | Routing rules (static config) | config | 3 | agents.md §11 | — |
-| R03 | Fallback chain resolution (3-step) | mechanism | 3 | agents.md §11 | Provider availability |
-| R04 | `before_model_callback` model override | callback | 3 | agents.md §11 | LlmRouter |
-| R05 | Adaptive router (cost-aware, latency-aware) | mechanism | 11 | agents.md §11 | Token tracking |
+| R01 | `LlmRouter` module | module | 3 | agents.md §LLM Router | LiteLLM |
+| R02 | Routing rules (static config) | config | 3 | agents.md §LLM Router | — |
+| R03 | Fallback chain resolution (3-step) | mechanism | 3 | agents.md §LLM Router | Provider availability |
+| R04 | `before_model_callback` model override | callback | 3 | agents.md §LLM Router | LlmRouter |
+| R05 | Adaptive router (cost-aware, latency-aware) | mechanism | 11 | agents.md §LLM Router | Token tracking |
 
 ---
 
@@ -354,38 +354,38 @@ Source: `architecture/skills.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| S01 | `SkillEntry` Pydantic model | module | 6 | skills.md §2 | Pydantic |
-| S02 | `SkillLibrary` class | module | 6 | skills.md §3 | SkillEntry, frontmatter parser |
-| S03 | Frontmatter parser (YAML from markdown) | module | 6 | skills.md §2 | — |
-| S04 | `deliverable_type` trigger matcher | mechanism | 6 | skills.md §4 | — |
-| S05 | `file_pattern` trigger matcher (glob) | mechanism | 6 | skills.md §4 | — |
-| S06 | `tag_match` trigger matcher (set intersection) | mechanism | 6 | skills.md §4 | — |
-| S07 | `explicit` trigger matcher | mechanism | 6 | skills.md §4 | — |
-| S08 | `always` trigger matcher | mechanism | 6 | skills.md §4 | — |
-| S09 | Description keyword fallback (interop) | mechanism | 6 | skills.md §5 | — |
-| S10 | Two-tier scan (global + project-local override) | mechanism | 6 | skills.md §3 | — |
-| S11 | Three-tier merge (+ workflow-specific) | mechanism | 7 | workflows.md §7 | SkillLibrary, WorkflowRegistry |
-| S12 | `InstructionProvider` skill injection (`{loaded_skills}`) | mechanism | 6 | skills.md §6 | Session state, agent identity |
-| S13 | Skill index Redis cache | mechanism | 6 | skills.md §7 | Redis |
-| S14 | Skill cache invalidation (file change + gateway API) | mechanism | 6 | skills.md §7 | Redis, gateway |
+| S01 | `SkillEntry` Pydantic model | module | 6 | skills.md §Skill File Format | Pydantic |
+| S02 | `SkillLibrary` class | module | 6 | skills.md §Two-Tier Library | SkillEntry, frontmatter parser |
+| S03 | Frontmatter parser (YAML from markdown) | module | 6 | skills.md §Skill File Format | — |
+| S04 | `deliverable_type` trigger matcher | mechanism | 6 | skills.md §Trigger Matching | — |
+| S05 | `file_pattern` trigger matcher (glob) | mechanism | 6 | skills.md §Trigger Matching | — |
+| S06 | `tag_match` trigger matcher (set intersection) | mechanism | 6 | skills.md §Trigger Matching | — |
+| S07 | `explicit` trigger matcher | mechanism | 6 | skills.md §Trigger Matching | — |
+| S08 | `always` trigger matcher | mechanism | 6 | skills.md §Trigger Matching | — |
+| S09 | Description keyword fallback (interop) | mechanism | 6 | skills.md §Trigger Matching | — |
+| S10 | Two-tier scan (global + project-local override) | mechanism | 6 | skills.md §Two-Tier Library | — |
+| S11 | Three-tier merge (+ workflow-specific) | mechanism | 7 | workflows.md §auto-code: The First Workflow | SkillLibrary, WorkflowRegistry |
+| S12 | `InstructionProvider` skill injection (`{loaded_skills}`) | mechanism | 6 | skills.md §ADK Integration | Session state, agent identity |
+| S13 | Skill index Redis cache | mechanism | 6 | skills.md §Two-Tier Library | Redis |
+| S14 | Skill cache invalidation (file change + gateway API) | mechanism | 6 | skills.md §Two-Tier Library | Redis, gateway |
 
 ### 9.2 Skill Files
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| S20 | `app/skills/` directory structure | config | 6 | skills.md §3 | — |
-| S21 | `.app/skills/` project-local directory | config | 6 | skills.md §3 | — |
-| S22 | Skill: `code/api-endpoint` | skill | 6 | skills.md §3 | — |
-| S23 | Skill: `code/data-model` | skill | 6 | skills.md §3 | — |
-| S24 | Skill: `code/database-migration` | skill | 6 | skills.md §3 | — |
-| S25 | Skill: `review/security-review` | skill | 6 | skills.md §3 | — |
-| S26 | Skill: `review/performance-review` | skill | 6 | skills.md §3 | — |
-| S27 | Skill: `test/unit-test-patterns` | skill | 6 | skills.md §3 | — |
-| S28 | Skill: `planning/task-decomposition` | skill | 6 | skills.md §3 | — |
-| S29 | Skill: `research/source-evaluation` | skill | 13 | skills.md §3 | — |
-| S30 | Skill: `research/citation-standards` | skill | 13 | skills.md §3 | — |
-| S31 | Auto-code skill: `test-generation` | skill | 7 | workflows.md §7 | — |
-| S32 | Director/PM governance skills | skill | 13+ | agents.md §4 | — |
+| S20 | `app/skills/` directory structure | config | 6 | skills.md §Directory Layout | — |
+| S21 | `.app/skills/` project-local directory | config | 6 | skills.md §Directory Layout | — |
+| S22 | Skill: `code/api-endpoint` | skill | 6 | skills.md §Directory Layout | — |
+| S23 | Skill: `code/data-model` | skill | 6 | skills.md §Directory Layout | — |
+| S24 | Skill: `code/database-migration` | skill | 6 | skills.md §Directory Layout | — |
+| S25 | Skill: `review/security-review` | skill | 6 | skills.md §Directory Layout | — |
+| S26 | Skill: `review/performance-review` | skill | 6 | skills.md §Directory Layout | — |
+| S27 | Skill: `test/unit-test-patterns` | skill | 6 | skills.md §Directory Layout | — |
+| S28 | Skill: `planning/task-decomposition` | skill | 6 | skills.md §Directory Layout | — |
+| S29 | Skill: `research/source-evaluation` | skill | 13 | skills.md §Directory Layout | — |
+| S30 | Skill: `research/citation-standards` | skill | 13 | skills.md §Directory Layout | — |
+| S31 | Auto-code skill: `test-generation` | skill | 7 | workflows.md §auto-code: The First Workflow | — |
+| S32 | Director/PM governance skills | skill | 13+ | agents.md §Director Agent | — |
 
 ---
 
@@ -395,24 +395,24 @@ Source: `architecture/workflows.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| F01 | `WorkflowRegistry` class | module | 7 | workflows.md §4 | WorkflowEntry |
-| F02 | `WorkflowRegistry.match()` (keyword matching) | mechanism | 7 | workflows.md §4 | — |
-| F03 | `WorkflowRegistry.get()` (explicit lookup) | mechanism | 7 | workflows.md §4 | — |
-| F04 | `WorkflowRegistry.list_available()` | mechanism | 7 | workflows.md §4 | — |
-| F05 | `WorkflowRegistry.create_pipeline()` | mechanism | 7 | workflows.md §4 | GlobalToolset, SkillLibrary |
-| F06 | `WorkflowEntry` Pydantic model | module | 7 | workflows.md §4 | — |
-| F07 | `WORKFLOW.yaml` manifest schema | config | 7 | workflows.md §5 | — |
-| F08 | Workflow trigger matching (keywords) | mechanism | 7 | workflows.md §4 | — |
-| F09 | Workflow trigger matching (explicit) | mechanism | 7 | workflows.md §4 | — |
-| F10 | Workflow ambiguity resolution (user prompt) | mechanism | 7 | workflows.md §4 | — |
-| F11 | `RunConfig` model | config | 7 | workflows.md §4 | — |
-| F12 | Custom workflows directory (overrides) | config | 7 | workflows.md §4 | — |
-| F13 | `auto-code/WORKFLOW.yaml` manifest | workflow | 7 | workflows.md §7 | — |
-| F14 | `auto-code/pipeline.py` module | module | 7 | workflows.md §7 | All auto-code agents |
-| F15 | `auto-code/agents/` (plan, code, review, fix) | module | 7 | workflows.md §7 | — |
-| F16 | `auto-code/skills/` (workflow-specific) | config | 7 | workflows.md §7 | — |
-| F17 | Compound workflow decomposition | mechanism | 11 | workflows.md §6 | WorkflowRegistry |
-| F18 | `pipeline.py` interface contract (function signature) | config | 7 | workflows.md §4 | — |
+| F01 | `WorkflowRegistry` class | module | 7 | workflows.md §WorkflowRegistry | WorkflowEntry |
+| F02 | `WorkflowRegistry.match()` (keyword matching) | mechanism | 7 | workflows.md §WorkflowRegistry | — |
+| F03 | `WorkflowRegistry.get()` (explicit lookup) | mechanism | 7 | workflows.md §WorkflowRegistry | — |
+| F04 | `WorkflowRegistry.list_available()` | mechanism | 7 | workflows.md §WorkflowRegistry | — |
+| F05 | `WorkflowRegistry.create_pipeline()` | mechanism | 7 | workflows.md §WorkflowRegistry | GlobalToolset, SkillLibrary |
+| F06 | `WorkflowEntry` Pydantic model | module | 7 | workflows.md §WorkflowRegistry | — |
+| F07 | `WORKFLOW.yaml` manifest schema | config | 7 | workflows.md §Workflow Manifest | — |
+| F08 | Workflow trigger matching (keywords) | mechanism | 7 | workflows.md §WorkflowRegistry | — |
+| F09 | Workflow trigger matching (explicit) | mechanism | 7 | workflows.md §WorkflowRegistry | — |
+| F10 | Workflow ambiguity resolution (user prompt) | mechanism | 7 | workflows.md §WorkflowRegistry | — |
+| F11 | `RunConfig` model | config | 7 | workflows.md §WorkflowRegistry | — |
+| F12 | Custom workflows directory (overrides) | config | 7 | workflows.md §WorkflowRegistry | — |
+| F13 | `auto-code/WORKFLOW.yaml` manifest | workflow | 7 | workflows.md §auto-code: The First Workflow | — |
+| F14 | `auto-code/pipeline.py` module | module | 7 | workflows.md §auto-code: The First Workflow | All auto-code agents |
+| F15 | `auto-code/agents/` (plan, code, review, fix) | module | 7 | workflows.md §auto-code: The First Workflow | — |
+| F16 | `auto-code/skills/` (workflow-specific) | config | 7 | workflows.md §auto-code: The First Workflow | — |
+| F17 | Compound workflow decomposition | mechanism | 11 | workflows.md §Compound Workflows | WorkflowRegistry |
+| F18 | `pipeline.py` interface contract (function signature) | config | 7 | workflows.md §WorkflowRegistry | — |
 
 ---
 
@@ -483,16 +483,16 @@ Source: `architecture/execution.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| X01 | Spec submission + decomposition | mechanism | 8 | execution.md §1 | `specifications` table |
-| X02 | Deliverable status tracking | mechanism | 8 | execution.md §2 | `deliverables` table |
-| X03 | Director execution loop | workflow | 8 | execution.md §3 | Director agent, PM agents |
-| X04 | PM batch loop (autonomous) | workflow | 8 | execution.md §4 | PM agent, `select_ready_batch` |
-| X05 | Git worktree creation per deliverable | mechanism | 8 | execution.md §4 | Git |
-| X06 | Git worktree merge on completion | mechanism | 8 | execution.md §4 | Git |
-| X07 | Git worktree cleanup | mechanism | 8 | execution.md §4 | Git |
-| X08 | Autonomous failure handling (retry/reorder/skip) | mechanism | 8 | execution.md §4 | PM agent |
-| X09 | Human-in-the-loop pause at batch boundary | mechanism | 8 | execution.md §4 | Intervention API |
-| X10 | Concurrency limits (configurable, cascaded) | config | 8 | execution.md §4 | `project_configs` |
+| X01 | Spec submission + decomposition | mechanism | 8 | execution.md §Director loop | `specifications` table |
+| X02 | Deliverable status tracking | mechanism | 8 | execution.md §PM loop | `deliverables` table |
+| X03 | Director execution loop | workflow | 8 | execution.md §Director loop | Director agent, PM agents |
+| X04 | PM batch loop (autonomous) | workflow | 8 | execution.md §PM loop | PM agent, `select_ready_batch` |
+| X05 | Git worktree creation per deliverable | mechanism | 8 | execution.md §PM loop | Git |
+| X06 | Git worktree merge on completion | mechanism | 8 | execution.md §PM loop | Git |
+| X07 | Git worktree cleanup | mechanism | 8 | execution.md §PM loop | Git |
+| X08 | Autonomous failure handling (retry/reorder/skip) | mechanism | 8 | execution.md §PM loop | PM agent |
+| X09 | Human-in-the-loop pause at batch boundary | mechanism | 8 | execution.md §PM loop | Intervention API |
+| X10 | Concurrency limits (configurable, cascaded) | config | 8 | execution.md §PM loop | `project_configs` |
 
 ---
 
@@ -502,12 +502,12 @@ Source: `architecture/clients.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| C01 | `autobuilder run <spec>` | cli | 10 | clients.md §1 | `POST /specs`, `POST /workflows/{id}/run` |
-| C02 | `autobuilder status <id>` | cli | 10 | clients.md §1 | `GET /workflows/{id}/status` |
-| C03 | `autobuilder intervene <id>` | cli | 10 | clients.md §1 | `POST /workflows/{id}/intervene` |
-| C04 | `autobuilder list` | cli | 10 | clients.md §1 | `GET /workflows` |
-| C05 | `autobuilder logs <id>` | cli | 10 | clients.md §1 | `GET /events/stream` |
-| C06 | Typer CLI scaffold (arg parsing, API client) | cli | 10 | clients.md §1 | — |
+| C01 | `autobuilder run <spec>` | cli | 10 | clients.md §CLI Architecture | `POST /specs`, `POST /workflows/{id}/run` |
+| C02 | `autobuilder status <id>` | cli | 10 | clients.md §CLI Architecture | `GET /workflows/{id}/status` |
+| C03 | `autobuilder intervene <id>` | cli | 10 | clients.md §CLI Architecture | `POST /workflows/{id}/intervene` |
+| C04 | `autobuilder list` | cli | 10 | clients.md §CLI Architecture | `GET /workflows` |
+| C05 | `autobuilder logs <id>` | cli | 10 | clients.md §CLI Architecture | `GET /events/stream` |
+| C06 | Typer CLI scaffold (arg parsing, API client) | cli | 10 | clients.md §CLI Architecture | — |
 
 ---
 
@@ -517,16 +517,16 @@ Source: `architecture/clients.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| U01 | React 19 + Vite SPA scaffold | ui | 12 | clients.md §2 | — |
-| U02 | TanStack Query server state layer | ui | 12 | clients.md §2 | hey-api codegen |
-| U03 | Zustand SSE buffer + UI state store | ui | 12 | clients.md §2 | — |
-| U04 | Tailwind v4 `@theme` design system | ui | 12 | clients.md §2 | — |
-| U05 | hey-api codegen (`npm run generate`) | config | 12 | clients.md §2 | OpenAPI spec |
-| U06 | Pipeline visualization (real-time SSE) | ui | 12 | clients.md §2 | SSE endpoint |
-| U07 | Batch progress display (dependency graph) | ui | 12 | clients.md §2 | — |
-| U08 | State inspector (session state, skills, memory) | ui | 12 | clients.md §2 | `GET /sessions/{id}/state` |
-| U09 | Cost dashboards (per-run, per-agent, per-model) | ui | 12 | clients.md §2 | `GET /costs` |
-| U10 | Static build (CDN-deployable) | config | 12 | clients.md §2 | Vite |
+| U01 | React 19 + Vite SPA scaffold | ui | 12 | clients.md §Dashboard Architecture | — |
+| U02 | TanStack Query server state layer | ui | 12 | clients.md §Dashboard Architecture | hey-api codegen |
+| U03 | Zustand SSE buffer + UI state store | ui | 12 | clients.md §Dashboard Architecture | — |
+| U04 | Tailwind v4 `@theme` design system | ui | 12 | clients.md §Dashboard Architecture | — |
+| U05 | hey-api codegen (`npm run generate`) | config | 12 | clients.md §Dashboard Architecture | OpenAPI spec |
+| U06 | Pipeline visualization (real-time SSE) | ui | 12 | clients.md §Dashboard Architecture | SSE endpoint |
+| U07 | Batch progress display (dependency graph) | ui | 12 | clients.md §Dashboard Architecture | — |
+| U08 | State inspector (session state, skills, memory) | ui | 12 | clients.md §Dashboard Architecture | `GET /sessions/{id}/state` |
+| U09 | Cost dashboards (per-run, per-agent, per-model) | ui | 12 | clients.md §Dashboard Architecture | `GET /costs` |
+| U10 | Static build (CDN-deployable) | config | 12 | clients.md §Dashboard Architecture | Vite |
 
 ---
 
@@ -570,6 +570,7 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2.3 | 2026-02-27 | Fix: all source references updated from ordinal §N to named section headings across gateway, workers, events, agents, skills, workflows, execution, clients domain files |
 | 1.2.2 | 2026-02-18 | Fix: drop duplicate V16 entry (`escalate_to_ceo` counted twice); canonical entry is T17 in Section 7.1; update statistics (Total 306→305, Dropped 2→3, Active 304→302, Phase 4 63→62) |
 | 1.2.1 | 2026-02-18 | Fix: section ref mismatches (T06-T17), ID collisions (Tool Modules → TM##, Toolset → TS##), add missing fix_agent scoping (TS07), correct statistics, fix dashboard phase comment in 03-STRUCTURE.md |
 | 1.2.0 | 2026-02-18 | Phase 4 toolset expansion: 42 tools, Director queue enums, management.py module + new code.py |
@@ -578,5 +579,5 @@ Components removed from the registry as unnecessary or over-engineered:
 
 ---
 
-*Document Version: 1.2.2*
-*Last Updated: 2026-02-18*
+*Document Version: 1.2.3*
+*Last Updated: 2026-02-27*

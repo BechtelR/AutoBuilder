@@ -130,7 +130,66 @@ Detailed architecture documentation is organized by domain in the `architecture/
 
 ---
 
-## 5. Key Architectural Decisions
+## 5. PRD → Architecture Traceability
+
+Every PRD requirement maps to at least one architecture domain. Gaps in this table indicate architecture coverage issues.
+
+### Functional Requirements
+
+| PRD ID | Requirement (short) | Architecture Domain(s) |
+|--------|---------------------|------------------------|
+| PR-1 | Brief definition & validation | [agents.md](./architecture/agents.md) §Director Agent, [execution.md](./architecture/execution.md) §Director-Level Loop |
+| PR-2 | Project status tracking | [data.md](./architecture/data.md) §1, [gateway.md](./architecture/gateway.md) §Route Structure |
+| PR-3 | Pause / resume / abort | [execution.md](./architecture/execution.md) §PM-Level Loop, [state.md](./architecture/state.md) §1 |
+| PR-4 | Workflows are plugins | [workflows.md](./architecture/workflows.md) §WorkflowRegistry, §Workflow Manifest |
+| PR-5 | Stage agent configuration | [agents.md](./architecture/agents.md) §PM Agent, [workflows.md](./architecture/workflows.md) §Workflow Execution Model |
+| PR-6 | Default workflow plugins | [workflows.md](./architecture/workflows.md) §auto-code: The First Workflow |
+| PR-7 | Project conventions override | [workflows.md](./architecture/workflows.md) §Workflow Manifest, [state.md](./architecture/state.md) §1.2 |
+| PR-8 | Resource pre-flight validation | [execution.md](./architecture/execution.md) §Director-Level Loop, [workers.md](./architecture/workers.md) §Worker Lifecycle |
+| PR-9 | Observable async work queues | [workers.md](./architecture/workers.md) §ARQ Workers, [events.md](./architecture/events.md) §Redis Streams |
+| PR-10 | PM execution loop | [execution.md](./architecture/execution.md) §PM-Level Loop, [agents.md](./architecture/agents.md) §PM Agent |
+| PR-11 | Validator pipeline | [agents.md](./architecture/agents.md) §Worker-Tier Custom Agents, [execution.md](./architecture/execution.md) §PM-Level Loop |
+| PR-12 | Failed deliverable escalation | [agents.md](./architecture/agents.md) §PM Agent, [events.md](./architecture/events.md) §Unified CEO Queue |
+| PR-13 | Director as executive partner | [agents.md](./architecture/agents.md) §Director Agent, [execution.md](./architecture/execution.md) §Multi-Session |
+| PR-14 | Dedicated PM per project | [agents.md](./architecture/agents.md) §PM Agent, [engine.md](./architecture/engine.md) §5 |
+| PR-15 | Bounded authority (budgets) | [agents.md](./architecture/agents.md) §PM Agent, [state.md](./architecture/state.md) §1.2 |
+| PR-16 | Consecutive batch failure → suspend | [agents.md](./architecture/agents.md) §PM Agent, [events.md](./architecture/events.md) §Unified CEO Queue |
+| PR-17 | CEO queue | [events.md](./architecture/events.md) §Unified CEO Queue, [gateway.md](./architecture/gateway.md) §Route Structure |
+| PR-18 | Director queue | [events.md](./architecture/events.md) §Director Queue, [agents.md](./architecture/agents.md) §PM Agent |
+| PR-19 | CEO queue item structure | [events.md](./architecture/events.md) §Unified CEO Queue |
+| PR-20 | Resume on CEO resolve | [events.md](./architecture/events.md) §Unified CEO Queue, [execution.md](./architecture/execution.md) §PM-Level Loop |
+| PR-21 | Notification channels | [events.md](./architecture/events.md) §Event Listeners (Webhooks) |
+| PR-22 | Three-layer completion reports | [execution.md](./architecture/execution.md) §PM-Level Loop, [agents.md](./architecture/agents.md) §PM Agent |
+| PR-23 | Phase close conditions | [execution.md](./architecture/execution.md) §PM-Level Loop |
+| PR-24 | Report contents (cost, decisions) | [execution.md](./architecture/execution.md) §PM-Level Loop, [observability.md](./architecture/observability.md) §1 |
+| PR-25 | Remediation (re-execute failed only) | [execution.md](./architecture/execution.md) §PM-Level Loop |
+| PR-26 | Memory as platform infrastructure | [state.md](./architecture/state.md) §5 |
+| PR-27 | Global memory scope | [state.md](./architecture/state.md) §5 |
+| PR-28 | Workflow memory scope | [state.md](./architecture/state.md) §5 |
+| PR-29 | Project memory scope | [state.md](./architecture/state.md) §5 |
+| PR-30 | Session memory scope | [state.md](./architecture/state.md) §1.2 |
+| PR-31 | Skills (Agent Skills standard) | [skills.md](./architecture/skills.md) §Skill File Format |
+| PR-32 | Skill activation (trigger matching) | [skills.md](./architecture/skills.md) §Trigger Matching |
+| PR-33 | Third-party skill install | [skills.md](./architecture/skills.md) §Two-Tier Library |
+| PR-34 | Persistent replayable event stream | [events.md](./architecture/events.md) §Redis Streams, [gateway.md](./architecture/gateway.md) §Route Structure |
+| PR-35 | Token/cost tracking | [observability.md](./architecture/observability.md) §1, [engine.md](./architecture/engine.md) §5 |
+| PR-36 | CLI full operational surface | [clients.md](./architecture/clients.md) §CLI Architecture |
+| PR-37 | Dashboard CEO command center | [clients.md](./architecture/clients.md) §Dashboard Architecture |
+
+### Non-Functional Requirements
+
+| PRD ID | Requirement (short) | Architecture Domain(s) |
+|--------|---------------------|------------------------|
+| NFR-1 | API response / SSE latency | [gateway.md](./architecture/gateway.md) §Route Structure, [events.md](./architecture/events.md) §Redis Streams |
+| NFR-2 | Stage completion time | [execution.md](./architecture/execution.md) §PM-Level Loop |
+| NFR-3 | Crash recovery / LLM reliability | [engine.md](./architecture/engine.md) §5, [state.md](./architecture/state.md) §1, [workers.md](./architecture/workers.md) §ARQ Workers |
+| NFR-4 | Security (validation, credentials, isolation) | [gateway.md](./architecture/gateway.md) §Anti-Corruption Pattern, [tools.md](./architecture/tools.md) §7.3, [engine.md](./architecture/engine.md) §5 |
+| NFR-5 | Extensibility (plugins, codegen, API contract) | [workflows.md](./architecture/workflows.md) §WorkflowRegistry, [skills.md](./architecture/skills.md) §Two-Tier Library, [gateway.md](./architecture/gateway.md) §Type Safety Chain |
+| NFR-6 | Local deployment, env var config | [data.md](./architecture/data.md) §Infrastructure |
+
+---
+
+## 6. Key Architectural Decisions
 
 | # | Decision | Rationale | Details |
 |---|----------|-----------|---------|
@@ -145,5 +204,5 @@ Detailed architecture documentation is organized by domain in the `architecture/
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: 2026-02-17*
+*Document Version: 2.1*
+*Last Updated: 2026-02-28*

@@ -151,6 +151,8 @@ Worker startup initializes `app:`-scoped state keys as scaffolding for later pha
 **Validation:**
 - `uv run pyright app/config/ app/models/`
 
+> **Delta note (2026-02-27):** `parse_redis_settings()` was consolidated to `app/config/settings.py` and exported from `app.config` during Phase 3. The function originated as a private `_parse_redis_settings()` in `app/workers/settings.py` (Phase 2); Phase 3's DD-8 ArqRedis gateway integration required the gateway to also parse Redis URLs, so it was made public and moved to shared config. Not listed in P3.D1's requirements. Note: `search_provider` field in Settings was added by Phase 4 (Phase 4 spec P4.D2), not Phase 3.
+
 ---
 
 ### P3.D2: LLM Router + Model Override Callback
@@ -285,6 +287,7 @@ Also adds `error_message` column to the Workflow model (D11) via Alembic migrati
 - [x] Task reads workflow record from database; raises `NotFoundError(message=f"Workflow {workflow_id} not found")` if not found
 - [x] Task updates workflow `status` to `RUNNING` (with `started_at` timestamp) before pipeline execution
 - [x] Task creates or resumes ADK session using `app_name="autobuilder"`, `user_id="system"`, `session_id=workflow_id`
+  > **Delta note (2026-02-27):** Actual implementation uses `APP_NAME` and `SYSTEM_USER_ID` constants from `app.models.constants` instead of string literals. `INIT_SESSION_ID = "__init__"` was also added to constants.py — used for the `app:` scope initialization session (DD-12), not for workflow sessions which still use `session_id=workflow_id`.
 - [x] Task creates App container with EchoAgent (model from LlmRouter, `before_model_callback` from `create_model_override_callback`) and Runner with DatabaseSessionService
 - [x] ADK events are translated via `EventPublisher.translate()` and published to Redis Stream
 - [x] `WORKFLOW_STARTED` event published before pipeline execution; `WORKFLOW_COMPLETED` or `WORKFLOW_FAILED` published after
@@ -292,6 +295,7 @@ Also adds `error_message` column to the Workflow model (D11) via Alembic migrati
 - [x] On error: workflow `status` updated to `FAILED`, `error_message` set on workflow record, `WORKFLOW_FAILED` event published with error message in `metadata`, exception logged at `ERROR` level with `workflow_id` and stack trace
 - [x] Worker `on_startup` initializes `DatabaseSessionService` and `LlmRouter` in worker context (`ctx`)
 - [x] Worker `on_startup` calls `router.cache_to_redis()` to cache routing config
+  > **Delta note (2026-02-27):** Worker `on_startup` also creates `db_engine` and `db_session_factory` (SQLAlchemy) and stores them in worker context for `run_workflow` to use when reading/writing Workflow records. These are not listed in the spec's worker startup requirements above but are present in the actual implementation.
 - [x] Worker `on_startup` initializes `app:` scope state: `app:skill_index` = `{}`, `app:workflow_registry` = `{}` (idempotent — skip if keys already exist)
 - [x] Worker `on_shutdown` disposes of session service resources
 - [x] Existing tasks (`test_task`, `heartbeat`) remain functional and registered

@@ -91,6 +91,8 @@ Standing up a working empty project that builds, lints, type-checks, and tests c
 - [x] `uv run python -m app` runs without import error
 **Validation:** `uv run python -m app && python -c "import app; import app.models; import app.config; import app.gateway; import app.workers; import app.db"`
 
+> **Delta note (2026-02-27):** `03-STRUCTURE.md` was updated to v1.5 (2026-02-18) after this deliverable was built. Two diffs vs. what Phase 0 created: (1) `app/orchestrator/` was removed from the canonical structure — this directory exists in the codebase as an empty placeholder but is now an orphan (no BOM component, no architecture reference). Remediation required: remove `app/orchestrator/`. (2) `app/cli/` was added to the canonical structure — this directory is Phase 10 scope (BOM C01–C06) and will be created when the CLI is built.
+
 ### P0.D6: Create configuration module
 **Files:** `app/config/__init__.py`, `app/config/settings.py`
 **Depends on:** P0.D1
@@ -139,6 +141,8 @@ Standing up a working empty project that builds, lints, type-checks, and tests c
 - [x] Comments explaining each variable
 - [x] `.env.example` is NOT in `.gitignore`
 **Validation:** `test -f .env.example && ! git check-ignore .env.example`
+
+> **Delta note (2026-02-27):** Three stale entries identified by delta audit: (1) Line 26 references `.dev/11-PROVIDERS.md` which does not exist — should be `.dev/06-PROVIDERS.md`. (2) Lines 16–19 comment "Phase 1 provider TBD" with `SEARXNG_URL` as an option — Roadmap Q7 was closed (Tavily primary, Brave fallback; SearXNG rejected). (3) Lines 23–24 document `AUTOBUILDER_MAX_CONCURRENCY` and `AUTOBUILDER_SKILLS_DIR` but these have no corresponding fields in `app/config/settings.py`. Remediation required: fix broken reference, update search provider comment, and resolve the Settings gap (remove vars from `.env.example` or add fields to Settings when Phases 6 and 8 implement them respectively).
 
 ### P0.D10: Quality gate verification
 **Files:** — (validation only)
