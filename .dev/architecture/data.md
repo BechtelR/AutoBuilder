@@ -26,6 +26,8 @@ No separate dashboard database. No separate session database. One schema, one mi
 | `deliverables` | Individual deliverable records within a workflow |
 | `project_configs` | Per-project configuration (limits, conventions, model overrides) -- DB entity, not state |
 | `sessions` | ADK session state (persisted via DatabaseSessionService adapter) |
+| `chats` | Chat sessions — Director conversations and project-scoped chats (session_id, type, status, title) |
+| `chat_messages` | Individual messages within a chat session (role: USER or DIRECTOR, content) |
 | `ceo_queue` | Unified queue: notifications, approvals, escalations, tasks (type + priority + structured metadata) |
 | `events` | Audit log (subset of events written by audit consumer) |
 | `webhook_listeners` | Registered webhook endpoints and filters |
@@ -75,4 +77,4 @@ Redis serves four distinct roles from day one. This is fundamental infrastructur
 ---
 
 *Extracted from 02-ARCHITECTURE.md v2.9*
-*Last Updated: 2026-02-17*
+*Last Updated: 2026-02-28*

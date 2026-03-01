@@ -70,6 +70,34 @@ def create_echo_agent(
 
 
 # ---------------------------------------------------------------------------
+# Director Agent (stub — real implementation in Phase 5)
+# ---------------------------------------------------------------------------
+
+
+def create_director_agent(
+    model: str,
+    before_model_callback: (
+        Callable[[CallbackContext, LlmRequest], LlmResponse | None] | None
+    ) = None,
+) -> LlmAgent:
+    """Create a Director agent stub.
+
+    Returns a simple echo agent until Phase 5 implements the real Director
+    with hierarchical supervision capabilities.
+    """
+    return LlmAgent(
+        name="director_agent",
+        model=LiteLlm(model=model),
+        instruction=(
+            "You are the AutoBuilder Director. You help the CEO manage projects and "
+            "coordinate work. Respond concisely and helpfully to the user's message."
+        ),
+        output_key="director_response",
+        before_model_callback=before_model_callback,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Logging Plugin
 # ---------------------------------------------------------------------------
 

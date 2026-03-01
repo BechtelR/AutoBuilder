@@ -98,6 +98,9 @@ Canonical term is "deliverable" (not "feature"). Code examples, state keys, clas
 ## Doc-Code Constant Drift
 When a standard value changes (e.g., module line limit), grep ALL docs for the old value and batch/script replace.
 
+## Pydantic `strict=True` on API Models
+Never use `strict=True` on gateway models. FastAPI uses `model_validate()` (dict), not `model_validate_json()` — strict rejects `str→enum`/`str→datetime` coercion, breaking any model with those fields.
+
 ## `hasattr()` on Pydantic Models
 Pydantic v2 fields always exist on the class. `hasattr()` is always `True` — use direct access + None check.
 - ❌ `if hasattr(model, "field") and model.field:`

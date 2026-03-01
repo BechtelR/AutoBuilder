@@ -16,6 +16,19 @@ The CLI is a thin API client built with **typer**. It has no database, no direct
 
 The CLI connects to the gateway via REST + SSE. It can be used for scripting, CI/CD integration, and headless operation.
 
+### Chat Interface (Conversational Model)
+
+Both CLI and dashboard interact with the Director via the `/chat` endpoints — a session-oriented conversational model distinct from the fire-and-forget work queue (`/workflows`).
+
+| Operation | API Call | Purpose |
+|-----------|----------|---------|
+| Start conversation | `POST /chat` | Create a new chat session |
+| List conversations | `GET /chat` | Browse active/archived chats |
+| View conversation | `GET /chat/{session_id}` | Get chat detail |
+| Send message | `POST /chat/{session_id}/messages` | User message → Director turn |
+| Read history | `GET /chat/{session_id}/messages` | Full message history |
+| Stream response | `GET /chat/{session_id}/stream` | SSE for real-time Director output |
+
 ---
 
 ## Dashboard Architecture
@@ -63,6 +76,6 @@ The dashboard is a static asset. It can be served from any CDN, file server, or 
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2026-02-17*
+*Document Version: 1.1*
+*Last Updated: 2026-02-28*
 *Extracted from [02-ARCHITECTURE.md](../02-ARCHITECTURE.md) v2.9*

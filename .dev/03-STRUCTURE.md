@@ -17,8 +17,8 @@ AutoBuilder/
 │   │
 │   ├── gateway/                    # FastAPI application
 │   │   ├── main.py                 # FastAPI app factory, lifespan
-│   │   ├── routes/                 # Route modules (workflows, sessions, events, health)
-│   │   ├── models/                 # Pydantic request/response models (API contracts)
+│   │   ├── routes/                 # Route modules (workflows, chat, sessions, events, health)
+│   │   ├── models/                 # Pydantic request/response models (API contracts, incl. chat.py)
 │   │   ├── middleware/             # Auth, rate limiting, error handling, CORS
 │   │   ├── sse.py                  # SSE endpoint — subscribes to Redis Streams
 │   │   └── deps.py                 # Dependency injection (DB sessions, Redis, services)
@@ -208,5 +208,5 @@ AutoBuilder/
 
 ---
 
-*Document Version: 1.5*
-*Last Updated: 2026-02-18*
+*Document Version: 1.6*
+*Last Updated: 2026-02-28*

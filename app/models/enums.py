@@ -149,6 +149,36 @@ class TaskStatus(enum.StrEnum):
     BLOCKED = "BLOCKED"
 
 
+class DirectorQueueStatus(enum.StrEnum):
+    """Status of an item in the Director queue (BOM V22)."""
+
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    RESOLVED = "RESOLVED"
+    FORWARDED_TO_CEO = "FORWARDED_TO_CEO"
+
+
+class ChatType(enum.StrEnum):
+    """Type of chat session."""
+
+    DIRECTOR = "DIRECTOR"
+    PROJECT = "PROJECT"
+
+
+class ChatStatus(enum.StrEnum):
+    """Status of a chat session."""
+
+    ACTIVE = "ACTIVE"
+    ARCHIVED = "ARCHIVED"
+
+
+class ChatMessageRole(enum.StrEnum):
+    """Role of a message sender in a chat."""
+
+    USER = "USER"
+    DIRECTOR = "DIRECTOR"
+
+
 class ErrorCode(enum.StrEnum):
     """Machine-readable error codes for API error responses."""
 

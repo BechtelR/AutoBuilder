@@ -2,19 +2,25 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from google.genai.types import Content, Part
 from sqlalchemy import select
 
-from app.db.models import Workflow
+from app.db.models import Chat, ChatMessage, Workflow
 from app.events.publisher import EventPublisher
 from app.lib import NotFoundError, get_logger
 from app.models.constants import APP_NAME, SYSTEM_USER_ID
-from app.models.enums import ModelRole, PipelineEventType, WorkflowStatus
+from app.models.enums import ChatMessageRole, ModelRole, PipelineEventType, WorkflowStatus
 from app.router import LlmRouter, create_model_override_callback
-from app.workers.adk import create_app_container, create_echo_agent, create_runner
+from app.workers.adk import (
+    create_app_container,
+    create_director_agent,
+    create_echo_agent,
+    create_runner,
+)
 
 if TYPE_CHECKING:
     from arq.connections import ArqRedis
@@ -145,4 +151,102 @@ async def run_workflow(ctx: dict[str, object], workflow_id: str) -> dict[str, st
             )
         except Exception:
             logger.error("Failed to publish WORKFLOW_FAILED event", exc_info=True)
+        raise
+
+
+async def run_director_turn(
+    ctx: dict[str, object], chat_id: str, message_id: str
+) -> dict[str, str]:
+    """Process a user message through the Director agent and store the response.
+
+    This is the conversational interaction model: each user message triggers a
+    single Director invocation. The response is persisted as a ChatMessage.
+    """
+    session_service: BaseSessionService = ctx["session_service"]  # type: ignore[assignment]
+    router: LlmRouter = ctx["llm_router"]  # type: ignore[assignment]
+    factory: async_sessionmaker[AsyncSession] = ctx["db_session_factory"]  # type: ignore[assignment]
+
+    try:
+        # Load the user message
+        async with factory() as db_session:
+            msg_result = await db_session.execute(
+                select(ChatMessage).where(ChatMessage.id == message_id)  # type: ignore[reportArgumentType]
+            )
+            user_message = msg_result.scalar_one_or_none()
+            if user_message is None:
+                raise NotFoundError(message=f"ChatMessage {message_id} not found")
+            prompt_text = user_message.content
+
+            # Load the chat to get session_id
+            chat_result = await db_session.execute(
+                select(Chat).where(Chat.id == chat_id)  # type: ignore[reportArgumentType]
+            )
+            chat = chat_result.scalar_one_or_none()
+            if chat is None:
+                raise NotFoundError(message=f"Chat {chat_id} not found")
+            adk_session_id = chat.session_id
+
+        # Create Director agent pipeline
+        callback = create_model_override_callback(router)
+        director = create_director_agent(
+            model=router.select_model(ModelRole.PLAN),
+            before_model_callback=callback,
+        )
+        app_container = create_app_container(root_agent=director)
+        runner = create_runner(app_container, session_service)
+
+        # Create or resume ADK session
+        session = await session_service.get_session(  # type: ignore[reportUnknownMemberType]
+            app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=adk_session_id
+        )
+        if session is None:
+            session = await session_service.create_session(  # type: ignore[reportUnknownMemberType]
+                app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=adk_session_id
+            )
+
+        # Run Director turn
+        message = Content(parts=[Part(text=prompt_text)])
+        response_text = ""
+        async for event in runner.run_async(  # type: ignore[reportUnknownMemberType]
+            user_id=SYSTEM_USER_ID,
+            session_id=session.id,  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+            new_message=message,
+        ):
+            # Collect text from agent responses (getattr ACL: no ADK imports)
+            content = getattr(event, "content", None)
+            if content is not None:
+                content_parts = getattr(content, "parts", None)
+                if content_parts is not None:
+                    for part in content_parts:
+                        text = getattr(part, "text", None)
+                        if text:
+                            response_text += text
+
+        # Persist the Director's response
+        if not response_text:
+            response_text = "(No response from Director)"
+
+        async with factory() as db_session:
+            director_message = ChatMessage(
+                chat_id=uuid.UUID(chat_id),
+                role=ChatMessageRole.DIRECTOR,
+                content=response_text,
+            )
+            db_session.add(director_message)
+            await db_session.commit()
+
+        logger.info(
+            "Director turn completed",
+            extra={"chat_id": chat_id, "message_id": message_id},
+        )
+        return {"status": "completed", "chat_id": chat_id}
+
+    except NotFoundError:
+        raise
+    except Exception:
+        logger.error(
+            "Director turn failed",
+            extra={"chat_id": chat_id, "message_id": message_id},
+            exc_info=True,
+        )
         raise

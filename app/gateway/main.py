@@ -12,6 +12,7 @@ from app.config import get_settings, parse_redis_settings
 from app.db import async_session_factory, create_engine
 from app.gateway.middleware.errors import ErrorHandlingMiddleware
 from app.gateway.middleware.logging import RequestLoggingMiddleware
+from app.gateway.routes.chat import router as chat_router
 from app.gateway.routes.health import router as health_router
 from app.gateway.routes.workflows import router as workflow_router
 from app.lib import get_logger, setup_logging
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     # Routes
     app.include_router(health_router)
     app.include_router(workflow_router)
+    app.include_router(chat_router)
 
     return app
 

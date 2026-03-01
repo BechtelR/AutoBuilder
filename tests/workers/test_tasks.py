@@ -8,13 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings, parse_redis_settings
-from app.db.models import Base, Workflow
+from app.db.models import Base, Chat, ChatMessage, Workflow
 from app.events.streams import stream_key
 from app.lib import NotFoundError
-from app.models.enums import ModelRole, WorkflowStatus
+from app.models.enums import ChatMessageRole, ChatStatus, ChatType, ModelRole, WorkflowStatus
 from app.router import LlmRouter
 from app.workers.adk import create_session_service
-from app.workers.tasks import heartbeat, run_workflow
+from app.workers.tasks import heartbeat, run_director_turn, run_workflow
 from app.workers.tasks import test_task as worker_test_task
 from tests.conftest import TEST_DB_URL, TEST_REDIS_URL, require_infra, require_llm
 
@@ -219,6 +219,82 @@ class TestRunWorkflowIntegration:
                 assert wf.status == WorkflowStatus.FAILED
                 assert wf.error_message is not None
                 assert len(wf.error_message) > 0
+
+        finally:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+            await engine.dispose()
+            await redis.aclose()
+
+
+@require_infra
+@require_llm
+class TestRunDirectorTurnIntegration:
+    """Integration tests for run_director_turn with real infrastructure + LLM."""
+
+    @pytest.mark.asyncio
+    async def test_director_turn_stores_response(self) -> None:
+        """Send a message to the Director and verify the response is persisted."""
+        engine = create_async_engine(TEST_DB_URL)
+        redis_settings = parse_redis_settings(TEST_REDIS_URL)
+        redis: ArqRedis = await create_pool(redis_settings)
+
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+            # Create chat + user message
+            chat_id = str(uuid.uuid4())
+            message_id = str(uuid.uuid4())
+            session_id = str(uuid.uuid4())
+
+            async with factory() as session:
+                chat = Chat(
+                    id=uuid.UUID(chat_id),
+                    session_id=session_id,
+                    type=ChatType.DIRECTOR,
+                    status=ChatStatus.ACTIVE,
+                )
+                session.add(chat)
+                await session.flush()
+
+                user_msg = ChatMessage(
+                    id=uuid.UUID(message_id),
+                    chat_id=uuid.UUID(chat_id),
+                    role=ChatMessageRole.USER,
+                    content="Hello Director, what can you help me with?",
+                )
+                session.add(user_msg)
+                await session.commit()
+
+            # Build worker context
+            settings = get_settings()
+            session_service = create_session_service(TEST_DB_URL)
+            router = LlmRouter.from_settings(settings)
+
+            ctx: dict[str, object] = {
+                "session_service": session_service,
+                "llm_router": router,
+                "redis": redis,
+                "db_session_factory": factory,
+            }
+
+            result = await run_director_turn(ctx, chat_id, message_id)
+            assert result["status"] == "completed"
+            assert result["chat_id"] == chat_id
+
+            # Verify Director response was persisted
+            async with factory() as session:
+                db_result = await session.execute(
+                    select(ChatMessage)
+                    .where(ChatMessage.chat_id == chat_id)  # type: ignore[reportArgumentType]
+                    .where(ChatMessage.role == ChatMessageRole.DIRECTOR)
+                )
+                director_msg = db_result.scalar_one_or_none()
+                assert director_msg is not None
+                assert len(director_msg.content) > 0
 
         finally:
             async with engine.begin() as conn:

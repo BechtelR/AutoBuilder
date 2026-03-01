@@ -8,7 +8,14 @@ from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.models.enums import DeliverableStatus, SpecificationStatus, WorkflowStatus
+from app.models.enums import (
+    ChatMessageRole,
+    ChatStatus,
+    ChatType,
+    DeliverableStatus,
+    SpecificationStatus,
+    WorkflowStatus,
+)
 
 
 class Base(DeclarativeBase):
@@ -86,3 +93,39 @@ class Deliverable(TimestampMixin, Base):
     result: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True, default=None)
 
     workflow: Mapped[Workflow] = relationship(back_populates="deliverables", lazy="raise")
+
+
+class Chat(TimestampMixin, Base):
+    """A chat session (Director conversation or project-scoped)."""
+
+    __tablename__ = "chats"
+
+    session_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    type: Mapped[ChatType] = mapped_column(
+        SqlEnum(ChatType, native_enum=False),
+        default=ChatType.DIRECTOR,
+    )
+    status: Mapped[ChatStatus] = mapped_column(
+        SqlEnum(ChatStatus, native_enum=False),
+        default=ChatStatus.ACTIVE,
+    )
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, default=None, index=True)
+
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="chat", lazy="raise", order_by="ChatMessage.created_at"
+    )
+
+
+class ChatMessage(TimestampMixin, Base):
+    """A single message within a chat session."""
+
+    __tablename__ = "chat_messages"
+
+    chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id"), index=True)
+    role: Mapped[ChatMessageRole] = mapped_column(
+        SqlEnum(ChatMessageRole, native_enum=False),
+    )
+    content: Mapped[str] = mapped_column(Text)
+
+    chat: Mapped[Chat] = relationship(back_populates="messages", lazy="raise")

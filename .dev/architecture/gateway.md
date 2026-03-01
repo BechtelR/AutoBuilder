@@ -24,8 +24,12 @@ The gateway owns the external API contract. ADK is an internal implementation de
 | `GET` | `/deliverables` | Query deliverables (filter by workflow, status) |
 | `GET` | `/deliverables/{id}` | Get deliverable detail |
 | `GET` | `/events/stream` | SSE endpoint for real-time events |
+| `POST` | `/chat` | Create a new chat session |
+| `GET` | `/chat` | List chat sessions (filter by type, status) |
+| `GET` | `/chat/{session_id}` | Get chat session detail |
 | `POST` | `/chat/{session_id}/messages` | Send message to Director chat session |
 | `GET` | `/chat/{session_id}/messages` | Retrieve chat history |
+| `GET` | `/chat/{session_id}/stream` | SSE stream for Director responses |
 | `GET` | `/ceo/queue` | List CEO queue items (filter by type, priority, status) |
 | `PATCH` | `/ceo/queue/{id}` | Resolve/dismiss a queue item |
 | `GET` | `/ceo/queue/stream` | SSE push for new queue items |
@@ -69,6 +73,6 @@ Build-time type safety from Python models to TypeScript UI without maintaining a
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2026-02-17*
+*Document Version: 1.1*
+*Last Updated: 2026-02-28*
 *Extracted from [02-ARCHITECTURE.md](../02-ARCHITECTURE.md) v2.9*
