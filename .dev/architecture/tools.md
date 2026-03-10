@@ -345,16 +345,16 @@ deliverable_pipeline = SequentialAgent(
     name="DeliverablePipeline",
     sub_agents=[
         SkillLoaderAgent(name="LoadSkills"),     # Custom agent (deterministic)
-        plan_agent,                                # LLM agent (uses FunctionTools)
-        code_agent,                                # LLM agent (uses FunctionTools)
+        planner,                                # LLM agent (uses FunctionTools)
+        coder,                                # LLM agent (uses FunctionTools)
         LinterAgent(name="Lint"),                  # Custom agent (deterministic)
         TestRunnerAgent(name="Test"),               # Custom agent (deterministic)
         LoopAgent(
             name="ReviewCycle",
             max_iterations=3,
             sub_agents=[
-                review_agent,                      # LLM agent
-                fix_agent,                         # LLM agent (uses FunctionTools)
+                reviewer,                      # LLM agent
+                fixer,                         # LLM agent (uses FunctionTools)
                 LinterAgent(name="ReLint"),        # Custom agent (deterministic)
                 TestRunnerAgent(name="ReTest"),     # Custom agent (deterministic)
             ]
@@ -480,19 +480,19 @@ Within each tier, individual agents have scoping based on their role. The table 
 
 | Role | Filesystem | Code Intelligence | Execution | Git | Web | Task Mgmt | Management |
 |------|-----------|-------------------|-----------|-----|-----|-----------|------------|
-| `plan_agent` | Read-only | Full | -- | Read-only | Full | Session todos | -- |
-| `code_agent` | Full | Full | Full | Full | Full | Session todos | -- |
-| `review_agent` | Read-only | Full | -- | Read-only | Full | Session todos | -- |
-| `fix_agent` | Full | Full | `bash_exec` only | Read-only (no commit) | Full | Session todos | -- |
+| `planner` | Read-only | Full | -- | Read-only | Full | Session todos | -- |
+| `coder` | Full | Full | Full | Full | Full | Session todos | -- |
+| `reviewer` | Read-only | Full | -- | Read-only | Full | Session todos | -- |
+| `fixer` | Full | Full | `bash_exec` only | Read-only (no commit) | Full | Session todos | -- |
 | PM | -- | -- | -- | -- | -- | Shared tasks | PM tools (6) |
 | Director | -- | -- | -- | -- | -- | Shared tasks | Director tools (6) |
 
 **Detailed per-role breakdown:**
 
-- **`plan_agent`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
-- **`code_agent`** (worker): Full filesystem (all 10), full code intelligence (2), full execution (`bash_exec`, `http_request`), full git (all 8), full web (2), session todos (3)
-- **`review_agent`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
-- **`fix_agent`** (worker): Full filesystem (all 10), full code intelligence (2), `bash_exec` (no `http_request`), read-only git (`git_status`, `git_diff`, `git_log`, `git_show` -- no `git_commit`, `git_branch`, `git_worktree`, `git_apply`; `code_agent` handles commits), `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
+- **`planner`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
+- **`coder`** (worker): Full filesystem (all 10), full code intelligence (2), full execution (`bash_exec`, `http_request`), full git (all 8), full web (2), session todos (3)
+- **`reviewer`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
+- **`fixer`** (worker): Full filesystem (all 10), full code intelligence (2), `bash_exec` (no `http_request`), read-only git (`git_status`, `git_diff`, `git_log`, `git_show` -- no `git_commit`, `git_branch`, `git_worktree`, `git_apply`; `coder` handles commits), `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
 - **PM**: `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`. Note: `checkpoint_project` (`after_agent_callback` on DeliverablePipeline) and `run_regression_tests` (`RegressionTestAgent`, CustomAgent in pipeline) are not tools -- they are not LLM-discretionary.
 - **Director**: `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`
 

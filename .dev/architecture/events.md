@@ -59,6 +59,8 @@ A single DB-backed queue that aggregates all items requiring CEO attention acros
 
 **Read path**: Dashboard polls `GET /ceo/queue` or subscribes to `GET /ceo/queue/stream` (SSE). CEO resolves items via `PATCH /ceo/queue/{id}`. Resolved approvals are written back to the relevant session's state for the agent to observe on next invocation.
 
+**Re-escalation reminders**: CEO queue items with status `PENDING` or `SEEN` trigger periodic re-escalation reminders until the CEO takes action. The reminder interval is configurable per priority level (default: `CRITICAL` = 15 min, `HIGH` = 1 hour, `NORMAL` = 4 hours, `LOW` = 24 hours). Reminders are delivered via the same channels as the original notification (SSE push, webhook if configured). The system does NOT auto-resolve or timeout -- stalling is by design (human-in-the-loop). The CEO must explicitly resolve, dismiss, or delegate each item. An ARQ periodic task (`ceo_queue_reminder`) scans for stale items and re-publishes notifications.
+
 ### Director Queue
 
 A DB-backed queue for PM-to-Director escalation. Parallel design to the CEO queue.
@@ -92,6 +94,6 @@ PM → Director Queue → Director → resolves OR → CEO Queue → CEO
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: 2026-02-18*
+*Document Version: 2.1*
+*Last Updated: 2026-03-10*
 *Extracted from [02-ARCHITECTURE.md](../02-ARCHITECTURE.md) v2.9*

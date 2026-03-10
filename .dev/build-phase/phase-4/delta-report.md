@@ -43,7 +43,7 @@ Most findings are documentation-only. One code gap requires remediation: BOM com
 
 | Contract Item | Drift | Recommendation |
 |--------------|-------|----------------|
-| All contract items (9) | No drift. All items verified: 42 tools callable from LlmAgent, schemas auto-generated, role filtering correct, bash_exec timeout/capture verified, code intelligence verified, three-tier task system verified, PM escalation path verified, Director management signatures verified, fix_agent role permissions verified. | No action |
+| All contract items (9) | No drift. All items verified: 42 tools callable from LlmAgent, schemas auto-generated, role filtering correct, bash_exec timeout/capture verified, code intelligence verified, three-tier task system verified, PM escalation path verified, Director management signatures verified, fixer role permissions verified. | No action |
 
 ---
 

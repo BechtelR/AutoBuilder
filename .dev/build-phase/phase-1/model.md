@@ -23,7 +23,7 @@ flowchart TB
 
         subgraph AGENTS_D3["P1.D3 — Mixed Agent Coordination"]
             SeqPipeline["SequentialAgent\n(pipeline)"]
-            PlanAgent["plan_agent\n(LlmAgent)"]
+            PlanAgent["planner\n(LlmAgent)"]
             LinterAgentProto["LinterAgent\n(CustomAgent / BaseAgent)"]
             SeqPipeline --> PlanAgent --> LinterAgentProto
         end
@@ -197,7 +197,7 @@ class AgentRole(str, enum.Enum):
 | Prototype | State Key | Type | Written By |
 |-----------|-----------|------|------------|
 | P1.D2 | *(no state writes — validates tool execution)* | — | — |
-| P1.D3 | `plan_output` | `str` | `plan_agent` via `output_key` |
+| P1.D3 | `plan_output` | `str` | `planner` via `output_key` |
 | P1.D3 | `lint_results` | `str` | `LinterAgent` via `state_delta` |
 | P1.D3 | `lint_passed` | `bool` | `LinterAgent` via `state_delta` |
 | P1.D4 | `agent_1_output` | `str` | `ocean_agent` via `output_key` |

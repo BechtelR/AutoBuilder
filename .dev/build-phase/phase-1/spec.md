@@ -113,7 +113,7 @@ async for event in runner.run_async(
 **Files:** `tests/phase1/test_p2_mixed_agents.py`
 **Depends on:** P1.D2
 
-**Description:** Validate that an `LlmAgent` and a `CustomAgent` (deterministic) compose in a `SequentialAgent` pipeline with shared state. The plan_agent (LLM) writes a plan to state via `output_key`; the linter_agent (CustomAgent, inheriting BaseAgent) reads it, runs a deterministic check, and writes results to state. Key validations: unified event stream contains events from both agent types, state persists across agents in the sequence.
+**Description:** Validate that an `LlmAgent` and a `CustomAgent` (deterministic) compose in a `SequentialAgent` pipeline with shared state. The planner (LLM) writes a plan to state via `output_key`; the linter_agent (CustomAgent, inheriting BaseAgent) reads it, runs a deterministic check, and writes results to state. Key validations: unified event stream contains events from both agent types, state persists across agents in the sequence.
 
 **Key API patterns:**
 ```python
@@ -134,12 +134,12 @@ class LinterAgent(BaseAgent):
 
 pipeline = SequentialAgent(
     name="pipeline",
-    sub_agents=[plan_agent, linter_agent]
+    sub_agents=[planner, linter_agent]
 )
 ```
 
 **Acceptance criteria:**
-- [x] `plan_agent` writes structured output to state via `output_key="plan_output"`
+- [x] `planner` writes structured output to state via `output_key="plan_output"`
 - [x] `linter_agent` (CustomAgent) reads `plan_output` from `ctx.session.state`
 - [x] `linter_agent` emits Event objects visible in the event stream alongside LLM events
 - [x] `lint_results` and `lint_passed` state keys are set after pipeline completes

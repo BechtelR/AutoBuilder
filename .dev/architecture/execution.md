@@ -46,11 +46,11 @@ The Director operates via **multiple ADK sessions** -- same agent definition, di
       i.   Select next batch (respecting deps + concurrency limits)
       ii.  For each deliverable in batch (parallel):
            - Load relevant skills (deterministic: SkillLoaderAgent)
-           - Plan implementation (LLM: plan_agent)
-           - Execute plan (LLM: code_agent)
+           - Plan implementation (LLM: planner)
+           - Execute plan (LLM: coder)
            - Validate output (deterministic: workflow-specific, e.g. LinterAgent)
            - Verify output (deterministic: workflow-specific, e.g. TestRunnerAgent)
-           - Review quality (LLM: review_agent)
+           - Review quality (LLM: reviewer)
            - Loop review-fix-validate-verify if review fails (max N)
       iii. Merge completed deliverables
       iv.  Run regression checks

@@ -63,11 +63,11 @@ Searchable cross-session knowledge archive. Two operations:
 
 Built-in tools for agent access:
 
-| Tool | Behavior |
-|------|----------|
-| `PreloadMemoryTool` | Auto-loads relevant memories every turn |
-| `LoadMemory` | Agent-decided retrieval (on-demand) |
-| `tool.Context.search_memory()` | Programmatic search from within custom tools |
+| Mechanism | Type | Behavior |
+|-----------|------|----------|
+| `MemoryLoaderAgent` | CustomAgent (deterministic) | Loads relevant memories into session state at pipeline start -- guaranteed, not LLM-discretionary |
+| `LoadMemory` | FunctionTool | Agent-decided retrieval (on-demand) |
+| `tool.Context.search_memory()` | Programmatic | Search from within custom tools |
 
 ### 1.5 Session Rewind (v1.17+)
 
@@ -219,8 +219,8 @@ Mapping the original "multi-level memory" requirement (Problem #7 from plan-shap
 | **Pipeline context** | Session state (no prefix) | Deliverable spec, plan, execution output, validation results, verification results | Written by agents via `state_delta`, read via `{key}` templates |
 | **Project conventions** | Database entity (project table) + Skills | Standards, architecture decisions, workflow patterns, tech stack settings | Loaded at session start via tool/init callback; Skills via SkillLoaderAgent |
 | **Director personality + user preferences** | `user:` state | Director personality profile, model preferences, notification settings, review strictness | Auto-merged into session at load; personality seeded from config on first login |
-| **Project learnings** | `MemoryService` (project-scoped) | Conventions, architectural decisions, and resolved escalations from this project's prior phases and stages. Written on phase or stage approval. | `PreloadMemoryTool` or `LoadMemory` tool |
-| **Workflow expertise** | `MemoryService` (workflow-type-scoped) | Domain expertise accumulated across all projects of this workflow type: recurring failure patterns, quality signals, edge cases. Written at project completion after Director approval. Immediately available to subsequent projects of the same type. | `PreloadMemoryTool` or `LoadMemory` tool |
+| **Project learnings** | `MemoryService` (project-scoped) | Conventions, architectural decisions, and resolved escalations from this project's prior phases and stages. Written on phase or stage approval. | `MemoryLoaderAgent` (deterministic) or `LoadMemory` tool (on-demand) |
+| **Workflow expertise** | `MemoryService` (workflow-type-scoped) | Domain expertise accumulated across all projects of this workflow type: recurring failure patterns, quality signals, edge cases. Written at project completion after Director approval. Immediately available to subsequent projects of the same type. | `MemoryLoaderAgent` (deterministic) or `LoadMemory` tool (on-demand) |
 | **Business knowledge** | Skills files (global + project-local) | Domain rules, compliance requirements, workflow conventions | SkillLoaderAgent (deterministic matching) |
 
 This is six levels of progressively broader context, all using ADK-native mechanisms. No custom memory framework needed -- just proper use of state scopes + MemoryService + Skills.
@@ -246,15 +246,15 @@ Worker execution:
     --> loads relevant skills into session state (deterministic matching)
     |
     v
-  PreloadMemoryTool
-    --> searches MemoryService for relevant cross-session context
+  MemoryLoaderAgent
+    --> searches MemoryService for relevant cross-session context (deterministic)
     |
     v
-  plan_agent reads:
+  planner reads:
     {current_deliverable_spec}, {loaded_skills}, {memory_context}, {project_config}
     |
     v
-  code_agent reads:
+  coder reads:
     {implementation_plan}, {loaded_skills}, {project_config}
     |
     v
@@ -262,7 +262,7 @@ Worker execution:
   TestRunnerAgent writes: test_results to session state
     |
     v
-  review_agent reads:
+  reviewer reads:
     {code_output}, {lint_results}, {test_results}, {loaded_skills}
     |
     v
@@ -284,7 +284,7 @@ Agents communicate via four mechanisms, all operating through session state:
 |---|-----------|-------------|
 | 1 | `output_key` | Agent writes its result to a named state key |
 | 2 | `{key}` templates | Agent reads from state via template injection in instructions |
-| 3 | `InstructionProvider` | Dynamic function reads state and constructs context-appropriate instructions at invocation time |
+| 3 | `InstructionAssembler` | Composes typed fragments (safety, identity, governance, project, task, skill) into context-appropriate instructions at invocation time (Decisions #50, #55) |
 | 4 | `before_model_callback` | Injects additional context (file contents, test results) right before LLM call |
 
 Within a pipeline tier, no agent calls another agent directly. All coordination flows through the shared state system, making data flow explicit and debuggable.
@@ -361,12 +361,13 @@ Cache reads are opportunistic -- a cache miss falls through to the database. Cac
 
 ### 9.6 Context Window Management
 
-ADK's `LlmAgent` automatically receives session event history as part of each LLM prompt. Two built-in mechanisms manage growth:
+ADK's `LlmAgent` automatically receives session event history as part of each LLM prompt. Built-in mechanisms manage growth:
 
-- **Context compression** -- sliding window summarization of older events (config-driven, interval + overlap)
+- **Context compression** (ADK built-in) -- sliding window summarization of older events (fallback safety net)
 - **Context caching** -- caches static prompt parts server-side (system instructions, knowledge bases)
+- **Context recreation** (Decision #52) -- primary strategy: when context budget threshold hit, persist to memory -> seed critical state keys -> create fresh session -> reassemble via `InstructionAssembler` + `SkillLoaderAgent` + `MemoryLoaderAgent`. Lossless with respect to durable state and instructions. See [context.md §Context Recreation](./context.md#context-recreation) for the full 4-step process.
 
-**Gap identified:** ADK has no built-in context-window usage metric. Agents cannot reactively respond to "you are at 90% capacity." Solution: `before_model_callback` that token-counts the assembled `LlmRequest`, writes percentage to state, and downstream logic reacts (trigger summarization, prune skills, checkpoint and restart). Approximately 50 lines of code.
+**Implementation:** `before_model_callback` token-counts the assembled `LlmRequest`, writes percentage to state, and triggers context recreation when threshold is reached. See [agents.md §Context Management](./agents.md#context-management) and [context.md §Context Budget Monitoring](./context.md#context-budget-monitoring) for full details.
 
 **Pipeline design implication:** For longer pipelines, agents should not rely on reading raw event history from prior steps. Better to use SkillLoaderAgent + explicit state writes so each agent gets precisely the context it needs, not the full event log.
 
@@ -413,5 +414,5 @@ The rest of the state and memory architecture (state scopes, session management,
 
 ---
 
-*Document Version: 3.1*
-*Last Updated: 2026-02-21*
+*Document Version: 3.3*
+*Last Updated: 2026-03-10*

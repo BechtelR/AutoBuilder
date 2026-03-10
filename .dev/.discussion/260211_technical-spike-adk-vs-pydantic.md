@@ -238,12 +238,12 @@ Your instinct about Google is valid but nuanced: the code is genuinely open, but
 deliverable_pipeline = SequentialAgent(
     name="DeliverablePipeline",
     sub_agents=[
-        plan_agent,           # LlmAgent: produces plan
+        planner,           # LlmAgent: produces plan
         execute_agent,        # LlmAgent: implements plan
         LoopAgent(
             name="ReviewLoop",
             max_iterations=3,
-            sub_agents=[review_agent, fix_agent]
+            sub_agents=[reviewer, fixer]
         ),
         merge_agent,          # LlmAgent or deterministic tool
     ]
@@ -279,14 +279,14 @@ async def run_until_complete(spec_path: str, max_concurrency: int = 3):
                 await run_regression_tests()
 
 async def process_deliverable(deliverable: Deliverable) -> DeliverableResult:
-    plan = await plan_agent.run(f"Plan: {deliverable.spec}", deps=project_deps)
+    plan = await planner.run(f"Plan: {deliverable.spec}", deps=project_deps)
 
     for attempt in range(3):
         code = await execute_agent.run(plan.data, deps=project_deps)
-        review = await review_agent.run(code.data, deps=project_deps)
+        review = await reviewer.run(code.data, deps=project_deps)
         if review.data.approved:
             return DeliverableResult(deliverable=deliverable, output=code.data)
-        plan = await fix_agent.run(review.data.feedback, deps=project_deps)
+        plan = await fixer.run(review.data.feedback, deps=project_deps)
 
     return DeliverableResult(deliverable=deliverable, status="failed_review")
 ```
@@ -355,12 +355,12 @@ class LinterAgent(BaseAgent):
 
 feature_pipeline = SequentialAgent(
     sub_agents=[
-        plan_agent,         # LLM — probabilistic
+        planner,         # LLM — probabilistic
         execute_agent,      # LLM — probabilistic
         LinterAgent(),      # DETERMINISTIC — cannot be skipped by LLM
         TestRunnerAgent(),  # DETERMINISTIC — cannot be skipped by LLM
         LoopAgent(
-            sub_agents=[review_agent, fix_agent, LinterAgent(), TestRunnerAgent()]
+            sub_agents=[reviewer, fixer, LinterAgent(), TestRunnerAgent()]
         )
     ]
 )
@@ -473,7 +473,7 @@ To validate the revised recommendation before full commitment:
 - **Critical validation:** Does Claude work reliably through LiteLLM? Latency? Token counting accuracy?
 
 ### Prototype 2: Mixed Agent Coordination (LLM + Deterministic)
-- Create plan_agent (LlmAgent) and linter_agent (CustomAgent/BaseAgent)
+- Create planner (LlmAgent) and linter_agent (CustomAgent/BaseAgent)
 - Wire them in a SequentialAgent pipeline
 - Pass data via session state (output_key → state read)
 - Validate: unified event stream, state persistence across agent types, observability of deterministic steps
@@ -527,7 +527,7 @@ triggers:
   - file_pattern: "*/routes/*.py"
   - file_pattern: "*/api/*.py"
 tags: [api, http, routing, fastapi]
-applies_to: [code_agent, review_agent]  # Which agents can use this skill
+applies_to: [coder, reviewer]  # Which agents can use this skill
 priority: 10  # Higher = loaded first when multiple skills match
 ---
 
@@ -663,10 +663,10 @@ Skills plug into ADK at two points:
 **Point 1: InstructionProvider** — matches and loads skills at invocation time:
 
 ```python
-def code_agent_instructions(context: ReadonlyContext) -> str:
+def coder_instructions(context: ReadonlyContext) -> str:
     # Deterministic skill matching based on current task
     match_context = SkillMatchContext(
-        agent_name="code_agent",
+        agent_name="coder",
         feature_type=context.state.get("current_feature_type"),
         file_paths=context.state.get("target_files", []),
         tags=context.state.get("feature_tags", []),
@@ -686,10 +686,10 @@ def code_agent_instructions(context: ReadonlyContext) -> str:
 Current deliverable: {context.state.get('current_deliverable_spec')}
 """
 
-code_agent = LlmAgent(
-    name="code_agent",
+coder = LlmAgent(
+    name="coder",
     model=LiteLlm(model="anthropic/claude-sonnet-4-6"),
-    instruction=code_agent_instructions,
+    instruction=coder_instructions,
 )
 ```
 
@@ -730,8 +730,8 @@ deliverable_pipeline = SequentialAgent(
     name="DeliverablePipeline",
     sub_agents=[
         SkillLoaderAgent(name="LoadSkills"),   # Deterministic: resolve skills
-        plan_agent,                             # LLM: plan using loaded skills
-        code_agent,                             # LLM: implement using loaded skills
+        planner,                             # LLM: plan using loaded skills
+        coder,                             # LLM: implement using loaded skills
         LinterAgent(),                          # Deterministic: lint
         TestRunnerAgent(),                       # Deterministic: test
     ]
@@ -769,7 +769,7 @@ autobuild/
 └── ... (AutoBuilder core code)
 
 user-project/
-├── .autobuilder/
+├── .agents/
 │   └── skills/                      # Project-local skills (override/extend global)
 │       ├── code/
 │       │   ├── api-endpoint.md       # Overrides global — project-specific conventions

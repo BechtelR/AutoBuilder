@@ -23,7 +23,7 @@ ADK runs inside workers, behind the anti-corruption layer. This section document
 | `Session State` | Inter-agent communication (4 scopes: session, user, app, temp). Cross-session bridge via `app:`/`user:` state + `MemoryService` + Redis Streams. |
 | `Event Stream` | Unified observability for all agent types (translated to Redis Streams at boundary) |
 | `FunctionTool` | Wrap Python functions as LLM-callable tools (auto-schema from type hints) |
-| `InstructionProvider` | Dynamic context/knowledge loading per invocation |
+| `InstructionAssembler` | Fragment-based instruction composition (safety, identity, governance, project, task, skill) per invocation (Decisions #50, #55); base instruction content sourced from agent definition files (Decision #54) |
 | `before_model_callback` | Context injection, token budget monitoring |
 | `DatabaseSessionService` | State persistence (adapter bridges to shared database). All agent continuity lives here. |
 | `transfer_to_agent` / `sub_agents` | Director → PM delegation via `sub_agents` + `transfer_to_agent`; PM → Worker delegation |
@@ -63,18 +63,20 @@ flowchart TB
     subgraph PIPELINE["PIPELINE LAYER (per deliverable)"]
         FP["DeliverablePipeline (SequentialAgent)"]
         S1["1. SkillLoaderAgent -- Deterministic"]
-        S2["2. plan_agent -- LLM"]
-        S3["3. code_agent -- LLM"]
-        S4["4. LinterAgent -- Deterministic"]
-        S5["5. TestRunnerAgent -- Deterministic"]
-        subgraph ReviewCycle["6. ReviewCycle (LoopAgent, max=3)"]
-            R1["a. review_agent -- LLM"]
-            R2["b. fix_agent -- LLM"]
+        S1b["2. MemoryLoaderAgent -- Deterministic"]
+        S2["3. planner -- LLM"]
+        S3["4. coder -- LLM"]
+        S4["5. LinterAgent -- Deterministic"]
+        S5["6. TestRunnerAgent -- Deterministic"]
+        S6["7. DiagnosticsAgent -- Hybrid"]
+        subgraph ReviewCycle["8. ReviewCycle (LoopAgent, max=3)"]
+            R1["a. reviewer -- LLM"]
+            R2["b. fixer -- LLM"]
             R3["c. LinterAgent -- Deterministic"]
             R4["d. TestRunnerAgent -- Deterministic"]
             R1 --> R2 --> R3 --> R4
         end
-        FP --> S1 --> S2 --> S3 --> S4 --> S5 --> ReviewCycle
+        FP --> S1 --> S1b --> S2 --> S3 --> S4 --> S5 --> S6 --> ReviewCycle
     end
 
     subgraph INFRA["SHARED ENGINE INFRASTRUCTURE"]
@@ -103,7 +105,7 @@ ADK's `App` class is the top-level container for the agent workflow, instantiate
 | Feature | Purpose | AutoBuilder Use |
 |---------|---------|----------------|
 | `root_agent` | The top-level agent tree | `Director` (LlmAgent, opus) — **recreated per invocation** from config; session carries continuity |
-| `events_compaction_config` | Context compression (sliding window summarization) | Keep long autonomous runs within context limits |
+| `events_compaction_config` | Context compression (sliding window summarization) | Fallback safety net; primary strategy is context recreation (Decision #52) |
 | `resumability_config` | Workflow resume after interruption | Pick up where we left off after crash/power loss |
 | `plugins` | Global lifecycle hooks (logging, metrics, guardrails) | Token tracking, cost monitoring, security guardrails |
 | `context_cache_config` | Cache static prompt parts server-side | Cache system instructions and skill content |
@@ -121,10 +123,11 @@ summarizer = LlmEventSummarizer(
 )
 
 # Director is recreated per invocation (stateless config); session carries continuity
-director_agent = build_director(active_project_ids)
+# AgentRegistry (Decisions #51, #54) scans agent definition files; replaces hardcoded factories
+director_agent = registry.build("director", ctx)  # LlmAgent (opus)
 app = App(
     name="autobuilder",
-    root_agent=director_agent,  # LlmAgent (opus) — rebuilt from config each invocation
+    root_agent=director_agent,  # rebuilt from agent definition file each invocation (Decision #54)
 
     events_compaction_config=EventsCompactionConfig(
         compaction_interval=5,
@@ -158,10 +161,12 @@ ADK's Resume feature (v1.16+) tracks workflow execution and allows picking up af
 - [Architecture Overview](../02-ARCHITECTURE.md) -- full system architecture
 - [Agents](./agents.md) -- hierarchical agent structure and pipeline composition
 - [Tools](./tools.md) -- tool registry and permission model
-- [Observability](./observability.md) -- tracing, logging, context management
+- [Context](./context.md) -- context assembly, budgeting, knowledge loading, recreation
+- [Observability](./observability.md) -- tracing, logging, event stream
 - [Data](./data.md) -- database, Redis, and filesystem infrastructure
 
 ---
 
+*Document Version: 3.1*
 *Extracted from 02-ARCHITECTURE.md v2.9*
-*Last Updated: 2026-02-17*
+*Last Updated: 2026-03-10*

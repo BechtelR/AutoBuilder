@@ -58,7 +58,7 @@ ADK is used behind an **anti-corruption layer** to isolate the rest of the syste
 | `Session State` | Inter-agent communication (4 scopes: session/user/app/temp) |
 | `Event Stream` | Unified observability for all agent types |
 | `FunctionTool` | Wrap Python functions as LLM-callable tools (auto-schema from type hints) |
-| `InstructionProvider` | Dynamic context/knowledge loading per invocation |
+| `InstructionAssembler` | Fragment-based instruction composition (identity, governance, project, task, skill) per invocation (Decision #50) |
 | `before_model_callback` | Context injection, token budget monitoring |
 | `BaseToolset` | Dynamic tool selection based on deliverable type |
 | `DatabaseSessionService` | State persistence to PostgreSQL |

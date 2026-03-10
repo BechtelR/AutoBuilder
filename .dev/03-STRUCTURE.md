@@ -48,9 +48,22 @@ AutoBuilder/
 │   │   ├── tokens.py               # Token counting, budget calculations
 │   │   └── hashing.py              # Hashing, checksums
 │   │
-│   ├── agents/                     # Agent definitions
-│   │   ├── custom/                 # CustomAgent subclasses (linter, test runner, skill loader)
-│   │   └── llm/                    # LlmAgent definitions (planner, coder, reviewer)
+│   ├── agents/                     # Agent definition files (Markdown + YAML frontmatter)
+│   │   ├── director.md             # Director agent definition (LLM)
+│   │   ├── pm.md                   # PM agent definition (LLM)
+│   │   ├── planner.md              # Planning agent definition (LLM)
+│   │   ├── coder.md                # Coding agent definition (LLM)
+│   │   ├── reviewer.md             # Review agent definition (LLM)
+│   │   ├── fixer.md                # Fix agent definition (LLM)
+│   │   ├── linter.md               # Linter agent definition (custom, deterministic)
+│   │   ├── tester.md               # Test runner agent definition (custom, deterministic)
+│   │   ├── formatter.md            # Formatter agent definition (custom, deterministic)
+│   │   ├── skill_loader.md         # Skill loader agent definition (custom, deterministic)
+│   │   ├── memory_loader.md        # Memory loader agent definition (custom, deterministic)
+│   │   ├── dependency_resolver.md  # Dependency resolver agent definition (custom, hybrid)
+│   │   ├── diagnostics.md          # Diagnostics agent definition (custom, hybrid)
+│   │   ├── regression_tester.md    # Regression test agent definition (custom, deterministic)
+│   │   └── _registry.py            # AgentRegistry + class registry (CustomAgent string→type resolution)
 │   │
 │   ├── tools/                      # FunctionTool wrappers + GlobalToolset
 │   │   ├── _toolset.py             # GlobalToolset(BaseToolset) — per-role tool vending
@@ -63,16 +76,27 @@ AutoBuilder/
 │   │   └── management.py           # 12 tools (PM: 6 + Director: 6)
 │   │
 │   ├── skills/                     # Global skill files (Markdown + YAML frontmatter)
-│   │   ├── code/                   # Code-generation skills
-│   │   ├── review/                 # Code-review skills
-│   │   ├── test/                   # Test-writing skills
-│   │   └── planning/               # Planning and decomposition skills
+│   │   ├── code/                   # Code-generation skills (api-endpoint, data-model, database-migration)
+│   │   ├── review/                 # Code-review skills (security-review, performance-review)
+│   │   ├── test/                   # Test-writing skills (unit-test-patterns)
+│   │   ├── planning/               # Planning and decomposition skills (task-decomposition)
+│   │   ├── research/               # Research skills (source-evaluation, citation-standards)
+│   │   └── authoring/              # Authoring skills for system artifacts
+│   │       ├── agent-definition/   # How to write agent definition files (SKILL.md + references/)
+│   │       ├── skill-authoring/    # How to write skills (SKILL.md + references/)
+│   │       ├── workflow-authoring/ # How to compose workflows (SKILL.md + references/)
+│   │       └── project-conventions/ # How to configure project-level overrides (SKILL.md)
 │   │
 │   ├── workflows/                  # Pluggable workflow definitions
 │   │   ├── auto-code/              # First workflow
 │   │   │   ├── WORKFLOW.yaml       # Manifest: triggers, tools, models, pipeline type
 │   │   │   ├── pipeline.py         # ADK agent composition
-│   │   │   └── agents/             # Workflow-specific agent definitions
+│   │   │   ├── agents/             # Workflow-specific agent definitions
+│   │   │   │   ├── planner.md      # Planning agent overrides for auto-code
+│   │   │   │   ├── coder.md        # Coding agent overrides for auto-code
+│   │   │   │   └── reviewer.md     # Review agent overrides for auto-code
+│   │   │   └── skills/             # Workflow-specific skills (extend global)
+│   │   │       └── code/           # auto-code specific skills (test-generation, etc.)
 │   │   ├── auto-design/            # Future
 │   │   └── auto-market/            # Future
 │   │
@@ -140,7 +164,7 @@ AutoBuilder/
 │   ├── 06-PROVIDERS.md             # External providers
 │   ├── 07-COMPONENTS.md            # Component registry (BOM)
 │   ├── 08-ROADMAP.md               # Project roadmap and phased delivery
-│   ├── architecture/               # Domain-specific architecture reference (13 files)
+│   ├── architecture/               # Domain-specific architecture reference (14 files)
 │   │   ├── gateway.md              # Gateway layer, ACL, routes, type safety
 │   │   ├── workers.md              # ARQ workers, lifecycle, concurrency
 │   │   ├── events.md               # Event system, Redis Streams, CEO queue
@@ -152,7 +176,8 @@ AutoBuilder/
 │   │   ├── tools.md                # FunctionTools, GlobalToolset
 │   │   ├── skills.md               # Skill system, format, triggers
 │   │   ├── workflows.md            # Pluggable workflows, manifests, registry
-│   │   ├── observability.md        # Observability, context management
+│   │   ├── observability.md        # Observability: tracing, logging
+│   │   ├── context.md             # Context assembly, budgeting, recreation
 │   │   └── clients.md              # CLI + Dashboard architecture
 │   ├── build-phase/                # Per-phase build artifacts
 │   │   ├── .templates/             # FRD, spec, model templates
@@ -184,7 +209,7 @@ AutoBuilder/
 | `app/models/` | Shared domain definitions (enums, constants, base Pydantic models) |
 | `app/lib/` | Shared libraries — logging, exceptions, decorators, base classes |
 | `app/utils/` | Stateless utility functions — string helpers, token counting, hashing |
-| `app/agents/` | ADK agent definitions (deterministic and LLM) |
+| `app/agents/` | ADK agent definitions (LLM, deterministic, hybrid) — Markdown + YAML frontmatter files + AgentRegistry |
 | `app/tools/` | 42 FunctionTool wrappers (8 modules) + `GlobalToolset(BaseToolset)` for per-role vending |
 | `app/skills/` | Markdown skill files with YAML frontmatter |
 | `app/workflows/` | Pluggable workflow definitions (each a self-contained directory) |
@@ -208,5 +233,5 @@ AutoBuilder/
 
 ---
 
-*Document Version: 1.6*
-*Last Updated: 2026-02-28*
+*Document Version: 1.7*
+*Last Updated: 2026-03-10*

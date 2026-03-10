@@ -11,27 +11,30 @@
 
 1. [Overview](#overview)
 2. [Agent Hierarchy](#agent-hierarchy)
-3. [Agent Factory Pattern](#agent-factory-pattern)
+3. [Agent Definitions](#agent-definitions)
 4. [Director Agent](#director-agent)
 5. [PM Agent](#pm-agent)
 6. [Execution Environment](#execution-environment)
 7. [Worker-Tier LLM Agents](#worker-tier-llm-agents)
-8. [Worker-Tier Custom Agents (Deterministic)](#worker-tier-custom-agents)
-9. [Plan/Execute Separation](#planexecute-separation)
-10. [Agent Tool Restrictions](#agent-tool-restrictions)
-11. [LLM Router](#llm-router)
-12. [Agent Communication via Session State](#agent-communication-via-session-state)
+8. [Worker-Tier Custom Agents](#worker-tier-custom-agents)
+9. [Context Management](#context-management)
+10. [Plan/Execute Separation](#planexecute-separation)
+11. [Agent Tool Restrictions](#agent-tool-restrictions)
+12. [LLM Router](#llm-router)
+13. [Agent Communication via Session State](#agent-communication-via-session-state)
 
 ---
 
 ## Overview
 
-AutoBuilder uses a **three-tier hierarchical supervision model** (CEO -> Director -> PM -> Workers) mapped to ADK's native agent tree. Within this hierarchy, two fundamentally different types of agents participate as equal workflow citizens:
+AutoBuilder uses a **three-tier hierarchical supervision model** (Director -> PM -> Workers) mapped to ADK's native agent tree. The CEO (human user) sits above the hierarchy but is not a tier -- the Director is the top-level agent. Within this hierarchy, two ADK primitives participate as equal workflow citizens:
 
 | Agent Type | ADK Primitive | Execution Model | Examples |
 |------------|---------------|-----------------|----------|
-| **LLM Agents** | `LlmAgent` | Probabilistic -- LLM decides approach | Director, PM, `plan_agent`, `code_agent`, `review_agent`, `fix_agent` |
-| **Custom Agents** | `CustomAgent` (inherits `BaseAgent`) | Guaranteed -- runs exactly as coded | `SkillLoaderAgent`, `LinterAgent`, `TestRunnerAgent`, `FormatterAgent`, `DependencyResolverAgent`, `RegressionTestAgent` |
+| **LLM Agents** | `LlmAgent` | Probabilistic -- ADK manages the LLM interaction loop | Director, PM, `planner`, `coder`, `reviewer`, `fixer` |
+| **Custom Agents** | `CustomAgent` (inherits `BaseAgent`) | Deterministic control flow in `_run_async_impl`. Purely deterministic or **hybrid** (internal LLM calls via LiteLLM). | Deterministic: `SkillLoaderAgent`, `MemoryLoaderAgent`, `LinterAgent`, `TestRunnerAgent`, `FormatterAgent`, `RegressionTestAgent`. Hybrid: `DependencyResolverAgent`, `DiagnosticsAgent`. |
+
+Pure LlmAgent and pure deterministic CustomAgent are two ends of a spectrum. Hybrid CustomAgents use LiteLLM calls inside `_run_async_impl` for specific reasoning steps while maintaining deterministic process flow. The `type` field in agent definitions is always `llm` or `custom` -- hybrid is a behavioral subcategory of `custom`, not a separate type.
 
 Both types participate in the same state system, emit events into the same unified event stream, and compose naturally with ADK's `SequentialAgent`, `ParallelAgent`, and `LoopAgent` workflow primitives. This is the decisive architectural advantage of Google ADK over alternatives: deterministic agents are first-class workflow citizens, not shadow functions called outside the framework.
 
@@ -65,7 +68,7 @@ CEO (dev user / human)
 |------|-----------|-------|------|-------|
 | **Director** | `LlmAgent` | opus | Cross-project governance, CEO liaison, strategic decisions, resource allocation | All projects, global settings |
 | **PM** | `LlmAgent` | sonnet | Autonomous project management, batch strategy, quality oversight, worker supervision. IS the outer batch loop. | Single project |
-| **Workers** | `LlmAgent` + `CustomAgent` | varies | Execution -- planning, coding, reviewing, linting, testing, formatting | Single deliverable |
+| **Workers** | `LlmAgent` + `CustomAgent` (deterministic and hybrid) | varies | Execution -- planning, coding, reviewing, linting, testing, formatting, diagnostics | Single deliverable |
 
 Each tier operates autonomously. Escalation is the exception, not the norm:
 - **Workers** handle execution problems (lint failures, test failures, review feedback)
@@ -80,19 +83,21 @@ Each tier operates autonomously. Escalation is the exception, not the norm:
 deliverable_pipeline = SequentialAgent(
     name="DeliverablePipeline",
     sub_agents=[
-        SkillLoaderAgent(name="LoadSkills"),     # Deterministic
-        plan_agent,                                # LLM
-        code_agent,                                # LLM
-        LinterAgent(name="Lint"),                  # Deterministic
-        TestRunnerAgent(name="Test"),               # Deterministic
+        SkillLoaderAgent(name="LoadSkills"),     # CustomAgent — deterministic
+        MemoryLoaderAgent(name="LoadMemory"),    # CustomAgent — deterministic
+        planner,                                # LlmAgent
+        coder,                                # LlmAgent
+        LinterAgent(name="Lint"),                  # CustomAgent — deterministic
+        TestRunnerAgent(name="Test"),               # CustomAgent — deterministic
+        DiagnosticsAgent(name="Diagnostics"),      # CustomAgent — hybrid (LiteLLM internally)
         LoopAgent(
             name="ReviewCycle",
             max_iterations=3,
             sub_agents=[
-                review_agent,                      # LLM
-                fix_agent,                         # LLM
-                LinterAgent(name="ReLint"),        # Deterministic
-                TestRunnerAgent(name="ReTest"),     # Deterministic
+                reviewer,                      # LlmAgent
+                fixer,                         # LlmAgent
+                LinterAgent(name="ReLint"),        # CustomAgent — deterministic
+                TestRunnerAgent(name="ReTest"),     # CustomAgent — deterministic
             ]
         )
     ]
@@ -101,58 +106,349 @@ deliverable_pipeline = SequentialAgent(
 
 ---
 
-## Agent Factory Pattern
+## Agent Definitions
 
-Agents are **stateless config objects** -- recreated from configuration on every invocation. All continuity lives in database-backed ADK sessions. The factory rebuilds the agent tree; the session carries the memory.
+Agents are defined as **markdown files with YAML frontmatter** (Decision #54). Frontmatter carries structured metadata. The markdown body is the agent's base instruction content (IDENTITY + GOVERNANCE fragments). No Python dataclasses -- the filesystem is the registry.
+
+For **LlmAgents**, everything is data: the name, what model to use, what tools are available, what instructions to compose. ADK manages the full LLM interaction loop. The Director can influence any of these per-project through configuration and state.
+
+For **CustomAgents (deterministic)**, the behavior is pure code (`_run_async_impl`). No LLM calls. The definition file registers them so the system knows they exist and maps `class` to a Python type, but their logic is fixed. Examples: `SkillLoaderAgent`, `MemoryLoaderAgent`, `LinterAgent`, `TestRunnerAgent`, `FormatterAgent`.
+
+For **CustomAgents (hybrid)**, the outer behavior is code (`_run_async_impl`) with deterministic control flow, but specific steps make LLM calls via LiteLLM as an intelligence layer. The definition file uses `type: custom` (same as deterministic), maps `class` to a Python type, and optionally carries `model_role` (for LLM routing via LiteLLM) and a markdown body (instruction content consumed by the internal LLM calls, not by ADK's agent loop). Examples: `DependencyResolverAgent`, `DiagnosticsAgent`. Four common hybrid patterns:
+
+1. **LLM input -> deterministic output** -- LLM analyzes input, agent enforces structured output
+2. **LLM input -> LLM process -> deterministic output** -- multi-step LLM reasoning within deterministic guardrails
+3. **Deterministic input -> LLM output** -- deterministic preparation, LLM synthesis
+4. **Deterministic input -> LLM process -> deterministic output** -- deterministic framing, LLM reasoning, deterministic validation
+
+### Agent Definition Files
+
+Each agent is a single `.md` file. The filename (`{agent_name}.md`) is the discovery key for override resolution.
+
+**LlmAgent example** -- `coder.md`:
+
+```markdown
+---
+name: coder
+description: Implement code according to plan using project conventions
+type: llm
+tool_role: coder
+model_role: code_implementation
+output_key: code_output
+---
+
+You are the Code Agent. You write production-quality code that follows
+project conventions and passes all quality gates.
+
+## Governance
+
+- Never modify files outside the deliverable scope
+- Escalate to PM if the plan is ambiguous or contradictory
+- Always include error handling for I/O operations
+```
+
+**CustomAgent example** -- `linter.md`:
+
+```markdown
+---
+name: linter
+description: Run project linters and return structured diagnostics
+type: custom
+class: app.engine.agents.linter.LinterAgent
+output_key: lint_results
+---
+```
+
+Purely deterministic CustomAgent files have no body -- their behavior is entirely in `_run_async_impl`. The `class` field is a dotted path resolved by the class registry at build time.
+
+**CustomAgent (hybrid) example** -- `dependency_resolver.md`:
+
+```markdown
+---
+name: dependency_resolver
+description: Resolve deliverable dependencies using topological sort with LLM-assisted ambiguity resolution
+type: custom
+class: app.engine.agents.dependency_resolver.DependencyResolverAgent
+model_role: classification
+output_key: dependency_order
+---
+
+When dependency relationships are ambiguous, analyze the deliverable descriptions
+and infer implicit dependencies based on:
+- Data flow (if A produces data that B consumes, A depends on B)
+- API contracts (if A defines an interface that B implements, A should come first)
+- Shared resources (if both modify the same file, serialize them)
+
+Be conservative -- when unsure, declare a dependency rather than risk parallel conflicts.
+```
+
+**CustomAgent (hybrid) example** -- `diagnostics.md`:
+
+```markdown
+---
+name: diagnostics
+description: Analyze lint and test results to produce structured diagnostics with pattern detection
+type: custom
+class: app.engine.agents.diagnostics.DiagnosticsAgent
+model_role: classification
+output_key: diagnostics_analysis
+---
+
+Analyze the provided lint errors and test failures. Identify:
+- Recurring patterns (same error type across files)
+- Root causes vs symptoms (a missing import may cause cascading failures)
+- Priority ordering (fix structural issues before style issues)
+
+Output a structured analysis, not raw error lists.
+```
+
+Note the frontmatter is identical to deterministic CustomAgents (`type: custom`) -- the distinction is behavioral: the class uses LiteLLM internally for the analysis step. Hybrid agent files have a markdown body that provides instruction content for internal LLM calls made within `_run_async_impl`, not for ADK's agent loop. The `model_role` field routes the internal LLM calls through the same `LlmRouter` used by LlmAgents.
+
+**Frontmatter field reference:**
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `name` | yes | `str` | Canonical agent identity. Must match filename stem. |
+| `description` | yes | `str` | Human-readable purpose. |
+| `type` | yes | `llm` \| `custom` | Determines build path. Hybrid agents use `custom`. |
+| `tool_role` | llm only | `str` | Maps to GlobalToolset for tool filtering. |
+| `model_role` | llm required, custom optional | `str` | Maps to LlmRouter for model selection. Required for LlmAgents. Optional for hybrid CustomAgents (routes internal LiteLLM calls). |
+| `output_key` | no | `str` | Session state key for agent output. |
+| `class` | custom only | `str` | Dotted path to `BaseAgent` subclass (deterministic and hybrid). |
+
+### Definition Cascade
+
+Agent definitions follow a **3-scope file cascade** parallel to [Skills](./skills.md):
+
+| Priority | Scope | Location | Author |
+|----------|-------|----------|--------|
+| 1 (lowest) | Global | `app/agents/` | AutoBuilder ships these |
+| 2 | Workflow | `app/workflows/{name}/agents/` | Workflow-specific agents |
+| 3 (highest) | Project | `{project}/.agents/agents/` | User or Director overrides |
+
+**Override semantics: full replacement by name.** A project-scope `coder.md` replaces the global `coder.md` entirely -- no merge. This mirrors Skill override behavior.
+
+**Partial override (frontmatter-only):** If a project-scope file contains only frontmatter (no markdown body after the closing `---`), it is treated as a partial override: its frontmatter fields merge over the parent scope's frontmatter, and the parent's body is inherited. This avoids copying entire instruction content to change a single field like `model_role`.
+
+```markdown
+# {project}/.agents/agents/coder.md -- partial override
+---
+name: coder
+model_role: planning
+---
+```
+
+This overrides only `model_role` -- identity, governance, tool_role, and output_key are inherited from the workflow or global scope.
+
+**Resolution order:**
+
+```
+scan(global_dir) → scan(workflow_dir) → scan(project_dir)
+         ↓                  ↓                   ↓
+      base set          override by          override by
+                        filename match       filename match
+```
+
+Later scopes override earlier scopes. The final index maps each agent name to exactly one definition source.
+
+**Director runtime influence** is a separate mechanism, not a fourth cascade scope. The Director writes governance and project fragments to session state, which the InstructionAssembler consumes at assembly time. This shapes agent behavior per-project without modifying definition files. See [§Instruction Composition](#instruction-composition) for fragment types.
+
+**Scan timing:** Global and workflow scopes (deployment artifacts) are scanned at worker startup and cached. Project scope (user-mutable) is scanned per-invocation. Cache invalidation follows the same pattern as the [Skills library](./skills.md).
+
+#### Project-Scope Restrictions
+
+Project-scope definition files are user-mutable and therefore subject to security constraints:
+
+- **`type: llm` only.** Project-scope files with `type: custom` are rejected at scan time. Arbitrary `class` paths from user-controlled directories are not loaded.
+- **`tool_role` ceiling.** Project-scope `tool_role` must be within the workflow's permitted tool ceiling, validated against the workflow's `required_tools` + `optional_tools` in `WORKFLOW.yaml`. A project-scope override cannot grant tools that the workflow does not permit.
+- **`model_role` unrestricted.** Users can choose their preferred model routing -- this affects cost and quality but not security.
+
+### How Definitions Resolve
+
+Resolution happens in two phases. At **build time**, `AgentRegistry.build()` resolves the definition into an ADK agent. At **runtime**, ADK resolves state templates just before each LLM call.
+
+```
+BUILD TIME (registry.build)                    RUNTIME (ADK per LLM call)
+─────────────────────────                      ────────────────────────────
+Agent Definition File                          Session State
+  ├── model_role  → LlmRouter → model string     ├── {loaded_skills}    ← SkillLoaderAgent
+  ├── tool_role   → GlobalToolset → tool list     ├── {memory_context}   ← MemoryLoaderAgent
+  └── body        → InstructionAssembler          ├── {current_deliverable_spec} ← PM
+                     ├── + PROJECT (DB)            └── {key} templates resolved
+                     ├── + TASK (state)                 into final LLM prompt
+                     ├── + SKILL (loaded)
+                     └── → instruction string
+                          (contains {key} placeholders)
+```
+
+| System | Input | Output | Details |
+|--------|-------|--------|---------|
+| **LlmRouter** | `model_role` (e.g. "planning") | LiteLLM model string | Routing rules + fallback chains. See [§LLM Router](#llm-router). |
+| **GlobalToolset** | `tool_role` (e.g. "planner") | List of FunctionTools | Role-based filtering via ADK's `BaseToolset.get_tools()`. See [Tools](./tools.md). |
+| **InstructionAssembler** | file body + runtime context | Composed instruction string | Fragment-based composition. See below. |
+
+These are implementation details -- the agent definition doesn't know or care how they work. It just declares role strings.
+
+`InstructionContext` is a lightweight container carrying the runtime data needed for assembly: project configuration (from DB), current deliverable spec (from session state), and loaded skills. It is created per invocation and passed through to all resolution systems.
+
+### Instruction Composition
+
+All LLM agent instructions are composed from **typed fragments** by the `InstructionAssembler`. Each fragment has a category, content, and audit source:
 
 ```python
-# Agent factory -- called per invocation, not once at startup
-def build_director(project_ids: list[str]) -> LlmAgent:
-    """Recreate Director agent tree from config. Stateless -- all
-    continuity is in the ADK session (DB-backed)."""
-    pms = [build_pm(pid) for pid in project_ids]
-    return LlmAgent(
-        name="Director",
-        model="anthropic/claude-opus-4-6",
-        instruction="Cross-project governance agent. Manage PMs, allocate resources, "
-                    "enforce hard limits, intervene when patterns go wrong. "
-                    "Your personality and preferences are in user: state. "
-                    "Delegate to PMs via transfer_to_agent.",
-        tools=[
-            FunctionTool(escalate_to_ceo),
-            FunctionTool(list_projects),
-            FunctionTool(query_project_status),
-            FunctionTool(override_pm),
-            FunctionTool(get_project_context),
-            FunctionTool(query_dependency_graph),
-        ],
-        sub_agents=pms,  # PMs are Director's sub_agents; delegation via transfer_to_agent
-    )
+@dataclass
+class InstructionFragment:
+    fragment_type: str              # "safety", "identity", "governance", "project", "task", "skill"
+    content: str
+    source: str = ""                # Audit: where this came from
 
-def build_pm(project_id: str) -> LlmAgent:
-    """Recreate PM agent from project config (DB entity). Stateless."""
-    return LlmAgent(
-        name=f"PM_{project_id}",
-        model="anthropic/claude-sonnet-4-6",
-        instruction="Autonomous project manager. You manage batch execution. "
-                    "Use select_ready_batch to pick work, supervise DeliverablePipeline workers, "
-                    "and escalate only when you cannot resolve an issue.",
-        tools=[
-            FunctionTool(select_ready_batch),
-            FunctionTool(escalate_to_director),
-            FunctionTool(update_deliverable),
-            FunctionTool(query_deliverables),
-            FunctionTool(reorder_deliverables),
-            FunctionTool(manage_dependencies),
-        ],
-        sub_agents=[],  # DeliverablePipeline instances added dynamically per batch
-        after_agent_callback=verify_batch_completion,
-        # checkpoint_project: after_agent_callback on DeliverablePipeline
-        #   Fires after each deliverable completes, persists state via CallbackContext.
-        # run_regression_tests: RegressionTestAgent (CustomAgent) in pipeline after each batch
-        #   Reads PM regression policy from session state. Runs when policy says to, no-ops otherwise.
-    )
+class InstructionAssembler:
+    """Composes typed fragments into agent instructions. ~100 lines."""
+
+    def assemble(self, agent_name: str, body: str, ctx: InstructionContext) -> str:
+        """Assemble full instructions from file body + dynamic context + skills.
+        SAFETY fragment is always prepended (hardcoded, non-overridable).
+        The body provides IDENTITY + GOVERNANCE base content.
+        Filters skills by applies_to per agent role."""
 ```
+
+The assembler receives the file body directly during `assemble()` -- no `register_base()` step needed.
+
+| Category | Source | Content | Lifecycle |
+|----------|--------|---------|-----------|
+| **SAFETY** | Hardcoded in InstructionAssembler | Core safety constraints, tool boundary enforcement, escalation protocol | Immutable, always prepended |
+| **IDENTITY** | Agent definition file body | Role, persona, behavioral boundaries | Static per agent role |
+| **GOVERNANCE** | Agent definition file body | Hard limits, escalation rules, safety constraints | Static per agent role |
+| **PROJECT** | Database (project entity) | Coding standards, conventions, project-specific patterns | Dynamic per invocation |
+| **TASK** | Session state | Current deliverable spec, implementation plan, review feedback | Dynamic per invocation |
+| **SKILL** | SkillLoaderAgent output | Loaded skill content, filtered by `applies_to` per agent role | Dynamic per invocation |
+
+Each fragment carries a `source` field for auditability -- you can trace exactly where every piece of an agent's instruction came from.
+
+**Skill fragment vs state template:** The SKILL fragments composed by the assembler are role-filtered (via `applies_to`) and baked into the instruction at build time. The `{loaded_skills}` state template is NOT used for LLM agents -- it exists for CustomAgents that need programmatic access to loaded skill content. LLM agents receive skills exclusively through the assembler's SKILL fragments, avoiding duplication.
+
+**Constitutional safety layer:** The SAFETY fragment is hardcoded in the InstructionAssembler and cannot be overridden by any scope -- not by project-scope definition files, not by Director session state, not by skill content. It contains core safety constraints: no data exfiltration, respect tool boundaries, follow escalation protocol. This is distinct from the GOVERNANCE fragment in definition files, which carries agent-specific behavioral rules and CAN be overridden via the cascade. SAFETY is the floor; GOVERNANCE is the ceiling.
+
+**Director influence:** The Director controls agent behavior per-project by writing governance and project fragments to session state. It doesn't rewrite prompts -- it shapes the fragments that the assembler composes.
+
+#### Coexistence with ADK Layers
+
+| Layer | Mechanism | Status |
+|-------|----------|--------|
+| Static instruction string | File body content (IDENTITY, GOVERNANCE) | Fed to assembler |
+| Static assembled string | `InstructionAssembler.assemble()` (all 6 fragment types) | Produced by assembler, passed as `instruction=str` |
+| `before_model_callback` | Unchanged -- heavyweight runtime injection (file contents, codebase analysis) | Coexists |
+| `{key}` state templates | Unchanged -- direct state value injection within assembled output | Coexists |
+
+#### What the Assembler Produces vs What ADK Resolves
+
+The assembled instruction string contains `{key}` state template placeholders (e.g., `{loaded_skills}`, `{memory_context}`, `{current_deliverable_spec}`). The assembler does NOT resolve these -- ADK resolves them at runtime from session state, just before each LLM call. This means state can be populated *after* the agent is built but *before* it runs.
+
+The assembler escapes literal curly braces in SKILL and PROJECT fragments (`{` -> `{{`, `}` -> `}}`) before composing the instruction string. Only explicitly declared state template references (e.g., `{loaded_skills}`, `{memory_context}`) remain unescaped for ADK resolution. This prevents coding standards or skill content containing curly-brace syntax (common in Python, Rust, Go) from being misinterpreted as state templates.
+
+The pipeline populates state in execution order before LLM agents read it:
+
+```
+SkillLoaderAgent    → state["loaded_skills"]         # deterministic, runs first
+MemoryLoaderAgent   → state["memory_context"]         # searches MemoryService
+PM writes           → state["current_deliverable_spec"]  # from batch selection
+```
+
+LLM agents consume these via `{key}` templates in their assembled instructions. See [§Agent Communication via Session State](#agent-communication-via-session-state) for the full pipeline data flow.
+
+#### Callbacks
+
+Agent definition files do not carry callbacks. Callbacks are wired in Python — either in `pipeline.py` via `registry.build()` overrides or directly on structural agents:
+
+- `before_model_callback` on LlmAgents: context budget monitor, system reminders (see [§Context Management](#context-management))
+- `after_agent_callback` on pipeline agents: `verify_batch_completion`, `checkpoint_project`
+
+These are infrastructure concerns, not agent identity — they belong in code, not in definition files.
+
+### AgentRegistry
+
+The registry scans directories for `.md` agent definition files, indexes them by frontmatter, and builds ADK agents on demand. Shared across all workflows.
+
+The registry index is rebuilt per-pipeline. `scan()` is called with exactly the relevant directories for the current workflow: `scan(global_dir, current_workflow_agents_dir, project_agents_dir)`. Agents from other workflows are not in the index.
+
+```python
+class AgentRegistry:
+    """Scans agent definition files, builds ADK agents. ~60 lines."""
+
+    def __init__(self, assembler: InstructionAssembler, router: LlmRouter, toolset: GlobalToolset):
+        self._index: dict[str, AgentFileEntry] = {}  # name → parsed file entry
+        self._class_registry: dict[str, type] = {}   # dotted path → BaseAgent subclass
+        self._assembler = assembler
+        self._router = router
+        self._toolset = toolset
+
+    def scan(self, *dirs: Path) -> None:
+        """Scan directories for .md files. Later dirs override earlier by filename.
+        Parses frontmatter and body eagerly — full file read at scan time.
+        parse_agent_file() validates that frontmatter `name` matches the filename stem;
+        mismatch raises an error at scan time. Invalid files are skipped with a warning log."""
+        for d in dirs:
+            for f in d.glob("*.md"):
+                entry = parse_agent_file(f)  # raises on name/filename mismatch
+                self._index[entry.name] = entry
+
+    def build(self, name: str, ctx: InstructionContext, *, definition: str | None = None, **overrides) -> BaseAgent:
+        """Resolve a definition file into a running ADK agent.
+        name: the ADK agent name (can be dynamic, e.g., 'PM_alpha').
+        definition: the definition file to look up (defaults to name).
+        Raises AgentNotFoundError (not KeyError) with available names and scan dirs."""
+        key = definition or name
+        if key not in self._index:
+            raise AgentNotFoundError(key, available=list(self._index.keys()))
+        entry = self._index[key]
+        if entry.type == "custom":
+            cls = self._class_registry[entry.class_ref]
+            # Warning logged if overrides are passed — CustomAgents ignore them.
+            # Hybrid CustomAgents receive model_role and body for internal LLM calls.
+            return cls(
+                name=name,
+                model_role=entry.model_role,       # None for purely deterministic
+                instruction_body=entry.body,        # None for purely deterministic
+            )
+        # Permitted overrides: sub_agents, before_model_callback, after_model_callback,
+        # before_agent_callback, after_agent_callback. Do NOT override instruction/model/tools.
+        return LlmAgent(
+            name=name,
+            model=self._router.select_model(entry.model_role),
+            instruction=self._assembler.assemble(name, entry.body, ctx),
+            tools=self._toolset.get_tools_for_role(entry.tool_role),
+            output_key=entry.output_key,
+            **overrides,
+        )
+```
+
+The `_class_registry` maps dotted path strings from the `class` frontmatter field to actual Python types. It is populated via explicit manual registration in `_registry.py` — a dict literal mapping class names to imported types. This is the security allowlist; only pre-registered classes can be instantiated from definition files.
+
+**Resolution auditability:** `build()` logs the resolution source (scope + file path) for each agent to the event stream. The resolution map is also written to session state at `agent_resolution_sources` for diagnostic inspection.
+
+### Agent Tree Construction
+
+The agent tree is built per invocation using the registry. All agents are **stateless config** -- recreated each time. Continuity lives in the database via `DatabaseSessionService`.
+
+```python
+def build_agent_tree(registry: AgentRegistry, project_ids: list[str], ctx: InstructionContext) -> LlmAgent:
+    """Recreate agent tree from registry + runtime context. Stateless --
+    all continuity is in the ADK session (DB-backed)."""
+    pms = [registry.build(f"PM_{pid}", ctx, definition="pm", sub_agents=[]) for pid in project_ids]
+    return registry.build("director", ctx, sub_agents=pms)
+```
+
+### File vs Code Split
+
+| In Definition Files (.md) | In Python Code |
+|---------------------------|----------------|
+| Agent identity and governance instructions (LlmAgent + hybrid CustomAgent body) | `CustomAgent._run_async_impl` logic (deterministic and hybrid -- hybrid agents make LiteLLM calls within this method) |
+| Metadata: model_role, tool_role, output_key | Pipeline composition (Sequential/Parallel/Loop) |
+| Description and discovery info | Callback functions (before/after agent/model) |
+| CustomAgent class reference (dotted path) | Tool implementations |
+| | `build_agent_tree()` orchestration |
+
+The definition file format is identical for deterministic and hybrid CustomAgents (`type: custom`). Hybrid agents simply have a `model_role` field and a markdown body consumed by internal LiteLLM calls. Pipeline composition stays in code because ADK structural primitives (`SequentialAgent`, `ParallelAgent`, `LoopAgent`) are programmatic -- they wire agents together, not configure them.
 
 ---
 
@@ -214,6 +510,7 @@ A "Main" project acts as the permanent default -- the Director's home context. M
 ### ADK Integration
 
 ```python
+# Simplified for illustration; actual construction via AgentRegistry.build()
 director_agent = LlmAgent(
     name="Director",
     model="anthropic/claude-opus-4-6",
@@ -280,6 +577,7 @@ The PM manages the batch execution loop directly, rather than delegating to a se
 ### ADK Integration
 
 ```python
+# Simplified for illustration; actual construction via AgentRegistry.build()
 pm_alpha = LlmAgent(
     name="PM_ProjectAlpha",
     model="anthropic/claude-sonnet-4-6",
@@ -355,7 +653,7 @@ This architecture means agents are unaware of the gateway. They interact with st
 
 Worker-tier LLM Agents handle execution tasks that require reasoning, creativity, and judgment. Each agent has a distinct role, instruction set, tool subset, and model assignment. These agents operate under PM supervision within a project's `DeliverablePipeline` structure.
 
-### plan_agent (auto-code example)
+### planner (auto-code example)
 
 | Property | Value |
 |----------|-------|
@@ -367,7 +665,7 @@ Worker-tier LLM Agents handle execution tasks that require reasoning, creativity
 
 The plan agent reads the deliverable specification, loaded skills, cross-session memory context, and project coding standards from session state. It produces a structured implementation plan that the code agent consumes. It never writes code or modifies files.
 
-### code_agent (auto-code example)
+### coder (auto-code example)
 
 | Property | Value |
 |----------|-------|
@@ -379,19 +677,19 @@ The plan agent reads the deliverable specification, loaded skills, cross-session
 
 The code agent consumes the structured plan and writes implementation code. Model selection is handled dynamically by the LLM Router based on task complexity. The code agent has full write access to the filesystem within its git worktree.
 
-### review_agent (auto-code example)
+### reviewer (auto-code example)
 
 | Property | Value |
 |----------|-------|
-| **Role** | Evaluate code quality against project standards, lint results, and test results |
-| **Input** | `{code_output}`, `{lint_results}`, `{test_results}`, `{loaded_skills}` |
+| **Role** | Evaluate code quality against project standards, lint results, test results, and diagnostics |
+| **Input** | `{code_output}`, `{lint_results}`, `{test_results}`, `{diagnostics_analysis}`, `{loaded_skills}` |
 | **Output** | `output_key: "review_result"` |
 | **Model** | `anthropic/claude-sonnet-4-6` |
 | **Tool Access** | Read-only -- filesystem read, directory list, search. No write tools. |
 
 The review agent reads the code output alongside lint and test results written to state by deterministic agents. It evaluates quality and either approves the deliverable or produces structured feedback for the fix agent. If the review fails, the `LoopAgent` wrapper triggers another fix/lint/test/review cycle (up to `max_iterations`).
 
-### fix_agent (auto-code example)
+### fixer (auto-code example)
 
 | Property | Value |
 |----------|-------|
@@ -403,28 +701,17 @@ The review agent reads the code output alongside lint and test results written t
 
 The fix agent receives structured review feedback and applies targeted corrections. It operates within the `LoopAgent` review cycle, iterating until the review agent approves or `max_iterations` is reached.
 
-### Instruction Patterns
-
-All LLM agents receive instructions through a layered mechanism:
-
-| Layer | Mechanism | What It Provides |
-|-------|-----------|-----------------|
-| 1 | Static instruction string | Base personality and role definition |
-| 2 | `InstructionProvider` function | Project conventions, deliverable spec, patterns (resolved at invocation time from state) |
-| 3 | `before_model_callback` | File context, codebase analysis, test results (injected right before LLM call) |
-| 4 | `{key}` state templates | Direct injection of specific state values into instruction text |
-
 ---
 
 ## Worker-Tier Custom Agents
 
-Worker-tier deterministic agents inherit from ADK's `BaseAgent` and implement `_run_async_impl`. They execute guaranteed workflow steps that must not be skippable by LLM judgment. Each emits events into the unified event stream and writes results to session state.
+Worker-tier Custom Agents inherit from ADK's `BaseAgent` and implement `_run_async_impl`. They execute guaranteed workflow steps that must not be skippable by LLM judgment. Each emits events into the unified event stream and writes results to session state. Custom Agents are either **purely deterministic** (no LLM calls) or **hybrid** (deterministic process flow with internal LLM calls via LiteLLM).
 
-The `SkillLoaderAgent` is shared across all workflows at worker level. Other deterministic agents are workflow-specific -- auto-code uses LinterAgent and TestRunnerAgent; other workflows define their own validators appropriate to their output type.
+The `SkillLoaderAgent` is shared across all workflows at worker level. Other Custom Agents are workflow-specific -- auto-code uses LinterAgent and TestRunnerAgent; other workflows define their own validators appropriate to their output type.
 
-Like all agents, deterministic agents execute inside worker processes. Their subprocess calls (linter, test runner, formatter) have access to the worker's filesystem and environment.
+Like all agents, Custom Agents execute inside worker processes. Their subprocess calls (linter, test runner, formatter) and any internal LiteLLM calls have access to the worker's filesystem and environment.
 
-### SkillLoaderAgent
+### SkillLoaderAgent (deterministic)
 
 **Purpose:** Resolve and load relevant skills into session state as the first step in every deliverable pipeline.
 
@@ -446,7 +733,19 @@ class SkillLoaderAgent(BaseAgent):
 
 **Why a CustomAgent instead of a tool:** Skill resolution must be observable in the event stream, deterministic (cannot be skipped by LLM judgment), and load skills into state once for all subsequent agents. A FunctionTool would be LLM-discretionary.
 
-### LinterAgent
+### MemoryLoaderAgent (deterministic)
+
+**Purpose:** Search the MemoryService for cross-session context relevant to the current deliverable and load it into session state.
+
+Runs immediately after SkillLoaderAgent as the second step in every deliverable pipeline. Queries the memory service using deliverable context (project, workflow, deliverable spec) and writes retrieved memory fragments to state so all subsequent agents can access cross-session learnings.
+
+| State Write | Value |
+|-------------|-------|
+| `memory_context` | Retrieved memory fragments relevant to the current deliverable |
+
+If the MemoryService is unavailable, the agent writes an empty `memory_context` and logs a warning -- it does not halt the pipeline.
+
+### LinterAgent (deterministic)
 
 **Purpose:** Run the project linter against generated code and write structured results to session state.
 
@@ -457,7 +756,7 @@ class SkillLoaderAgent(BaseAgent):
 
 The review agent reads `{lint_results}` to evaluate code quality. If lint fails, the fix agent receives the errors as actionable feedback.
 
-### TestRunnerAgent
+### TestRunnerAgent (deterministic)
 
 **Purpose:** Run the project test suite against generated code and write structured results to session state.
 
@@ -466,27 +765,43 @@ The review agent reads `{lint_results}` to evaluate code quality. If lint fails,
 | `test_results` | Structured test output (passed, failed, errors, coverage) |
 | `tests_passed` | Boolean pass/fail |
 
-### FormatterAgent
+### FormatterAgent (deterministic)
 
-**Purpose:** Run the project code formatter (e.g., Black, Prettier) on generated code. Unlike lint, formatting is auto-corrective -- it modifies files directly.
+**Purpose:** Run the project code formatter (e.g., Black, Prettier) on generated code. Unlike lint, formatting is auto-corrective -- it modifies files directly. Runs after coder and before linter in the pipeline (omitted from the simplified pipeline example in [§How Workers Compose](#how-workers-compose) for brevity).
 
-### DependencyResolverAgent
+### DependencyResolverAgent (hybrid)
 
 **Purpose:** Perform topological sorting of deliverables based on their declared dependencies. Determines which deliverables can execute in parallel and which must wait for predecessors.
 
-This agent runs once before the batch loop begins. It writes the sorted deliverable execution order to session state, which the PM reads (via `select_ready_batch` tool) to construct batches.
+This agent runs once before the batch loop begins. It writes the sorted deliverable execution order to session state, which the PM reads (via `select_ready_batch` tool) to construct batches. The topological sort is deterministic; when dependency relationships are ambiguous (e.g., implicit data flow between deliverables), the agent uses an internal LiteLLM call to classify the relationship before enforcing a deterministic ordering.
 
-### Regression Testing (`run_regression_tests`)
+### DiagnosticsAgent (hybrid)
+
+**Purpose:** Analyze lint errors and test failures to produce structured diagnostics with pattern detection. Takes deterministic inputs (lint_results, test_results), uses an internal LiteLLM call to identify recurring patterns, root causes vs symptoms, and priority ordering, then outputs a structured analysis to session state.
+
+| State Write | Value |
+|-------------|-------|
+| `diagnostics_analysis` | Structured analysis (patterns, root causes, priority ordering) |
+
+This is a pattern 4 hybrid agent: deterministic input -> LLM process -> deterministic output. The LLM reasoning is bounded by the structured input and validated output schema.
+
+### Regression Testing (`run_regression_tests`) (deterministic)
 
 **Purpose:** Run cross-deliverable regression tests after each batch completes. Ensures that newly implemented deliverables have not broken previously completed deliverables.
 
 Implemented as `RegressionTestAgent` (CustomAgent, inherits `BaseAgent`). Wired into the pipeline after each batch (after `ParallelAgent` completes), not at the individual deliverable level. Always present in the pipeline -- cannot be skipped by LLM judgment. Reads the PM's regression policy from session state (`regression_policy`). When the policy says to run (e.g., every batch, every N deliverables, on specific triggers), executes the cross-deliverable regression suite and writes results to state. When the policy says to skip, no-ops (yields a state_delta recording the skip). This is a substantial operation involving cross-deliverable test execution and result analysis.
 
-### Context Budget Monitor
+---
 
-**Purpose:** Check token usage against context window limits and trigger compression if needed.
+## Context Management
 
-Implements the gap identified in ADK: there is no built-in context-window usage metric. Implemented as a `before_model_callback` (not a standalone agent) that token-counts the assembled `LlmRequest`, writes the usage percentage to state, and downstream logic reacts (trigger summarization, prune skills, checkpoint and restart). Approximately 50 lines of implementation.
+Long-running sessions require two runtime mechanisms to manage agent context effectively:
+
+- **Context Recreation** (Decision #52) -- when the context window fills up, the session is recreated losslessly: persist progress to memory, seed critical state keys into a fresh session, reassemble instructions via `InstructionAssembler` + `SkillLoaderAgent` + `MemoryLoaderAgent`. Superior to lossy summarization. The `context_budget_monitor` (`before_model_callback`) tracks token usage and triggers recreation at threshold. ADK's `EventsCompactionConfig` remains as a fallback safety net.
+
+- **System Reminders** (Decision #53) -- ephemeral governance nudges (token budget warnings, state change notifications, progress notes) injected via `before_model_callback`. Soft nudges only -- hard governance lives in IDENTITY and GOVERNANCE instruction fragments. Acceptable to lose during context recreation.
+
+For the full context lifecycle -- assembly, budgeting, recreation, and knowledge loading -- see [context.md](./context.md).
 
 ---
 
@@ -499,7 +814,7 @@ This follows the oh-my-opencode Prometheus/Atlas pattern: strict role boundaries
 ### How It Works in AutoBuilder
 
 ```
-plan_agent (LLM)          code_agent (LLM)
+planner (LLM)          coder (LLM)
   |                          |
   | Reads: deliverable spec,  | Reads: implementation_plan,
   |   skills, memory,        |   skills, coding_standards
@@ -538,10 +853,10 @@ Tools are Python functions in `app/tools/`, organized by function type (filesyst
 
 | Agent | Filesystem | Code Intelligence | Execution | Git | Web | Tasks |
 |-------|-----------|-------------------|-----------|-----|-----|-------|
-| `plan_agent` | Read-only (`file_read`, `file_glob`, `file_grep`, `directory_list`) | Full (`code_symbols`, `run_diagnostics`) | None | Read-only (`git_status`, `git_diff`, `git_log`, `git_show`) | Full | Session todos |
-| `code_agent` | Full (all 10) | Full | Full (`bash_exec`, `http_request`) | Full (all 8) | Full | Session todos |
-| `review_agent` | Read-only | Full | None | Read-only | Full | Session todos |
-| `fix_agent` | Full | Full | `bash_exec` | Read-only (code agent handles commits) | Full | Session todos |
+| `planner` | Read-only (`file_read`, `file_glob`, `file_grep`, `directory_list`) | Full (`code_symbols`, `run_diagnostics`) | None | Read-only (`git_status`, `git_diff`, `git_log`, `git_show`) | Full | Session todos |
+| `coder` | Full (all 10) | Full | Full (`bash_exec`, `http_request`) | Full (all 8) | Full | Session todos |
+| `reviewer` | Read-only | Full | None | Read-only | Full | Session todos |
+| `fixer` | Full | Full | `bash_exec` | Read-only (code agent handles commits) | Full | Session todos |
 
 ### Management-Level Tool Matrix
 
@@ -658,9 +973,9 @@ Within a pipeline tier, agents do not communicate via direct message passing. Al
 Each agent writes its result to a named state key. The next agent in the pipeline reads from that key.
 
 ```
-plan_agent  --writes-->  state["implementation_plan"]
-code_agent  --reads-->   state["implementation_plan"]
-code_agent  --writes-->  state["code_output"]
+planner  --writes-->  state["implementation_plan"]
+coder  --reads-->   state["implementation_plan"]
+coder  --writes-->  state["code_output"]
 ```
 
 ### 2. {key} Templates
@@ -668,8 +983,8 @@ code_agent  --writes-->  state["code_output"]
 Agent instructions reference state values via template injection. ADK auto-resolves these at invocation time.
 
 ```python
-plan_agent = LlmAgent(
-    name="plan_agent",
+planner = LlmAgent(
+    name="planner",
     instruction="""
     Implement the following deliverable: {current_deliverable_spec}
 
@@ -684,19 +999,9 @@ plan_agent = LlmAgent(
 
 Use `{key?}` for optional keys that may not exist in state.
 
-### 3. InstructionProvider
+### 3. InstructionAssembler
 
-A dynamic function that reads state and constructs context-appropriate instructions at invocation time. More powerful than static templates when the instruction structure itself needs to change based on context.
-
-```python
-def plan_instruction_provider(agent, state):
-    base = "You are a planning agent. Produce a structured implementation plan."
-    if state.get("loaded_skills"):
-        base += f"\n\nRelevant skills:\n{state['loaded_skills']}"
-    if state.get("memory_context"):
-        base += f"\n\nPrior learnings:\n{state['memory_context']}"
-    return base
-```
+Composes typed fragments from durable sources into a complete instruction string at invocation time. See [§Agent Definitions](#agent-definitions) for the full architecture.
 
 ### 4. before_model_callback
 
@@ -720,6 +1025,30 @@ State values must be serializable (strings, numbers, booleans, simple lists/dict
 
 > **VERIFIED (Phase 1):** Direct `ctx.session.state["key"] = value` writes inside `_run_async_impl` do NOT persist. This is mandatory, not a style preference -- the session service only processes state changes delivered via `state_delta`. See `.knowledge/adk/ERRATA.md` #1.
 
+#### State Key Authorization (Decision #58)
+
+Governance-sensitive state keys use tier prefixes. The `EventPublisher` ACL validates that the event author's tier matches the prefix on `state_delta` keys before publishing to the event stream.
+
+**Access control matrix:**
+
+| Key Prefix | Director READ | Director WRITE | PM READ | PM WRITE | Worker READ | Worker WRITE |
+|------------|:---:|:---:|:---:|:---:|:---:|:---:|
+| `director:*` | yes | yes | yes | **no** | yes | **no** |
+| `pm:*` | yes | yes | yes | yes | yes | **no** |
+| `worker:*` | yes | yes | yes | yes | yes | yes |
+| `app:*` | yes | yes | yes | yes | yes | **no** |
+| `session` (no prefix) | yes | yes | yes | yes | yes | yes |
+| `user:*` | yes | yes | yes | yes | yes | yes |
+| `temp:*` | yes | yes | yes | yes | yes | yes |
+
+**Key design points:**
+
+- **Reads are unrestricted.** Any tier can read any state key. Visibility is not a security concern -- a worker reading `director:governance_override` to understand constraints is correct behavior. Only writes are restricted.
+- **Writes are tier-gated.** The `EventPublisher` ACL inspects `state_delta` keys on every yielded `Event`. If a key's tier prefix exceeds the author's tier, the entire `state_delta` is rejected (not partially applied) and an error event is published to the stream.
+- **Non-prefixed keys are shared workspace.** Keys like `implementation_plan`, `lint_results`, `code_output` are accessible by all tiers. This is the primary communication mechanism within a pipeline.
+- **`app:` scope is Director/PM-writable only.** `app:` keys are global across all sessions — a write affects every active session in the system. Workers read `app:coding_standards` but never write it. This restriction matches the blast radius: global state changes are governance decisions, not worker-tier operations. `user:` scope follows ADK native semantics (all tiers writable) since it is scoped to a single user.
+- **Violation behavior:** Rejected writes produce a loud error event (author, attempted key, tier mismatch) in the Redis Stream for audit. The originating agent receives an error response, not silent failure.
+
 ### Communication Flow Through the Pipeline
 
 ```
@@ -729,33 +1058,59 @@ Session starts
 SkillLoaderAgent --> state["loaded_skills"], state["loaded_skill_names"]
   |
   v
-PreloadMemoryTool --> state["memory_context"]
+MemoryLoaderAgent --> state["memory_context"]
   |
   v
-plan_agent reads: {current_deliverable_spec}, {loaded_skills}, {memory_context}, {app:coding_standards}
-plan_agent writes: state["implementation_plan"]
+planner reads: {current_deliverable_spec}, {loaded_skills}, {memory_context}, {app:coding_standards}
+planner writes: state["implementation_plan"]
   |
   v
-code_agent reads: {implementation_plan}, {loaded_skills}, {app:coding_standards}
-code_agent writes: state["code_output"]
+coder reads: {implementation_plan}, {loaded_skills}, {app:coding_standards}
+coder writes: state["code_output"]
   |
   v
 LinterAgent writes: state["lint_results"], state["lint_passed"]
 TestRunnerAgent writes: state["test_results"], state["tests_passed"]
   |
   v
-review_agent reads: {code_output}, {lint_results}, {test_results}, {loaded_skills}
-review_agent writes: state["review_result"]
+DiagnosticsAgent reads: {lint_results}, {test_results}
+DiagnosticsAgent writes: state["diagnostics_analysis"]
   |
   v
-(if review fails) fix_agent reads: {review_result}, {code_output}, {lint_results}, {test_results}
-(if review fails) fix_agent writes: state["code_output"] (overwrite)
+reviewer reads: {code_output}, {lint_results}, {test_results}, {diagnostics_analysis}, {loaded_skills}
+reviewer writes: state["review_result"]
+  |
+  v
+(if review fails) fixer reads: {review_result}, {code_output}, {lint_results}, {test_results}
+(if review fails) fixer writes: state["code_output"] (overwrite)
 ```
+
+### Communication Decision Criteria
+
+Two categories of communication serve different architectural needs. Use the decision table to select the right mechanism:
+
+| Criteria | State-Based | Escalation-Based |
+|----------|-------------|------------------|
+| **Session scope** | Same session | Cross-session or cross-tier |
+| **Timing** | Synchronous (pipeline order) | Asynchronous (event-driven) |
+| **Typical use** | Data flow within a pipeline | Failure handling, tier delegation |
+| **Mechanisms** | `output_key`, `{key}` templates, `InstructionAssembler`, `before_model_callback` | `transfer_to_agent`, `escalate_to_director`/`escalate_to_ceo`, Redis Streams events |
+
+**When to use which:**
+
+- **output_key + {key} templates** -- Agent A produces data that Agent B consumes in the same pipeline. This is the default for worker-level communication. Deterministic, auditable, zero overhead.
+- **InstructionAssembler** -- Composing context from multiple durable sources (skills, project config, governance) into a coherent instruction at build time. Not for runtime data passing.
+- **before_model_callback** -- Injecting heavyweight dynamic context (file contents, large diagnostic output) right before an LLM call. Use when the data is too large or too volatile for static state templates.
+- **transfer_to_agent** -- Tier-crossing delegation (Director -> PM, PM -> Director on escalation). Transfers control flow, not just data.
+- **Event publishing (Redis Streams)** -- Cross-session observation, audit logging, real-time UI updates. Consumed by SSE endpoints, webhook dispatchers, and audit loggers. Never for intra-pipeline data flow.
+
+The four state-based mechanisms are distinct: `output_key` writes data, `{key}` templates read data into instructions, `InstructionAssembler` composes fragments at build time, and `before_model_callback` injects at call time. They operate at different lifecycle points and do not overlap.
 
 ---
 
 ## See Also
 
+- [Context](./context.md) -- Context assembly lifecycle, budgeting, recreation, knowledge loading
 - [Execution Loop](./execution.md) -- The autonomous execution loop (Director-level and PM-level)
 - [Tools](./tools.md) -- Tool registry, toolset architecture, and tool restrictions
 - [Workers](./workers.md) -- ARQ worker processes and job execution
@@ -766,6 +1121,6 @@ review_agent writes: state["review_result"]
 
 ---
 
-**Document Version:** 3.0
-**Last Updated:** 2026-02-18
+**Document Version:** 5.2
+**Last Updated:** 2026-03-10
 **Status:** Framework Validated -- Prototyping Phase

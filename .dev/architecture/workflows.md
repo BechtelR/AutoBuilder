@@ -46,19 +46,19 @@ app/workflows/
 ├── auto-code/
 │   ├── WORKFLOW.yaml          # Manifest: name, description, triggers, tools, config
 │   ├── pipeline.py            # ADK agent composition (SequentialAgent, etc.)
-│   ├── agents/                # Workflow-specific agent definitions
-│   │   ├── plan_agent.py
-│   │   ├── code_agent.py
-│   │   └── review_agent.py
+│   ├── agents/                # Workflow-specific agent definition files (override global by name)
+│   │   ├── planner.md
+│   │   ├── coder.md
+│   │   └── reviewer.md
 │   └── skills/                # Workflow-specific skills (extend global skills)
 │       └── code/
 ├── auto-design/
 │   ├── WORKFLOW.yaml
 │   ├── pipeline.py            # Different pipeline: research -> wireframe -> prototype -> review
 │   └── agents/
-│       ├── research_agent.py
-│       ├── design_agent.py
-│       └── critique_agent.py
+│       ├── research_agent.md
+│       ├── design_agent.md
+│       └── critique_agent.md
 └── auto-market/
     ├── WORKFLOW.yaml
     ├── pipeline.py            # Different pipeline: strategy -> content -> channel_adapt -> review
@@ -153,7 +153,9 @@ class WorkflowRegistry:
         """Instantiate the workflow's ADK pipeline with the given config."""
         workflow = self.get(workflow_name)
         module = import_module(workflow.pipeline_module)
-        return module.create_pipeline(config, self.toolset, self.skill_library)
+        return module.create_pipeline(
+            config, self.toolset, self.skill_library, self.agent_registry,
+        )
 ```
 
 ### Key Design Points
@@ -164,7 +166,7 @@ class WorkflowRegistry:
 
 **Pipeline instantiation is deferred.** The registry indexes manifests at startup (lightweight YAML parsing) but only instantiates the ADK pipeline when `create_pipeline()` is called. This avoids loading agent definitions and importing modules for workflows that are not used.
 
-**create_pipeline receives shared infrastructure.** The `toolset` (`GlobalToolset`), `skill_library`, and `config` are passed to the workflow's `pipeline.py` module, which uses them to construct its ADK agent tree. The workflow does not need to know how tools or skills are managed — it receives them as dependencies.
+**create_pipeline receives shared infrastructure.** The `toolset` (`GlobalToolset`), `skill_library`, `agent_registry` (`AgentRegistry`, Decision #51), and `config` are passed to the workflow's `pipeline.py` module, which uses them to construct its ADK agent tree. Pipeline construction uses `registry.build(agent_name, ctx)` instead of direct `LlmAgent`/`CustomAgent` construction — agent definitions are Markdown files with YAML frontmatter scanned by the AgentRegistry using a 3-scope cascade (global `app/agents/` → workflow-specific `agents/` → project); workflow-specific files in `agents/` override global definitions by name (Decision #54). This is the mechanism that makes workflows composable (Decision #15): a second workflow reuses global agent definitions or overrides them with its own.
 
 ---
 
@@ -178,6 +180,8 @@ All workflows operate on the same platform foundation:
 - **Worker execution** — ARQ workers execute ADK pipelines. Workflows run in worker processes.
 - **GlobalToolset** — FunctionTools available to all workflows (filesystem, bash, git, web, todo), vended per-role via ADK's `BaseToolset.get_tools()`
 - **Skill library** — global + project-local skills, loaded by SkillLoaderAgent
+- **AgentRegistry** — scans agent definition files (markdown + YAML frontmatter) and builds ADK agents on demand (Decision #54); workflows call `registry.build()` instead of constructing agents directly
+- **InstructionAssembler** — 6-type fragment composition (SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL) replacing static instruction strings (Decisions #50, #55); assembles context-aware instructions per agent
 - **LLM Router** — dynamic model selection based on task type and routing rules
 - **State management** — session/user/app/temp state scopes via ADK's session system, persisted to single database
 - **Event bus** — Redis Streams for event distribution (SSE, webhooks, audit)
@@ -270,12 +274,14 @@ auto-code is the first workflow shipped with AutoBuilder. It implements autonomo
    a. PM calls select_ready_batch() tool (dependency-aware, respects concurrency)
    b. For each deliverable in batch (parallel via ParallelAgent):
       i.   Load relevant skills       (deterministic: SkillLoaderAgent)
-      ii.  Plan implementation         (LLM: plan_agent)
-      iii. Write code                  (LLM: code_agent)
-      iv.  Lint code                   (deterministic: LinterAgent)
-      v.   Run tests                   (deterministic: TestRunnerAgent)
-      vi.  Review quality              (LLM: review_agent)
-      vii. Loop steps iii-vi if review fails (max N iterations via LoopAgent)
+      ii.  Load memory context         (deterministic: MemoryLoaderAgent)
+      iii. Plan implementation         (LLM: planner)
+      iv.  Write code                  (LLM: coder)
+      v.   Lint code                   (deterministic: LinterAgent)
+      vi.  Run tests                   (deterministic: TestRunnerAgent)
+      vii. Analyze diagnostics         (hybrid: DiagnosticsAgent)
+      viii.Review quality              (LLM: reviewer)
+      ix.  Loop steps iv-viii if review fails (max N iterations via LoopAgent)
    c. after_agent_callback: verify_batch_completion (monitors each DeliverablePipeline)
    d. checkpoint_project                (`after_agent_callback` on DeliverablePipeline; persists state via `CallbackContext`)
    e. run_regression_tests             (`RegressionTestAgent` (CustomAgent) in pipeline after each batch; reads PM regression policy from session state)
@@ -292,16 +298,18 @@ deliverable_pipeline = SequentialAgent(
     name="DeliverablePipeline",
     sub_agents=[
         SkillLoaderAgent(name="LoadSkills"),
-        plan_agent,
-        code_agent,
+        MemoryLoaderAgent(name="LoadMemory"),
+        planner,
+        coder,
         LinterAgent(name="Lint"),
         TestRunnerAgent(name="Test"),
+        DiagnosticsAgent(name="Diagnostics"),
         LoopAgent(
             name="ReviewCycle",
             max_iterations=3,
             sub_agents=[
-                review_agent,
-                fix_agent,
+                reviewer,
+                fixer,
                 LinterAgent(name="ReLint"),
                 TestRunnerAgent(name="ReTest"),
             ]
@@ -347,10 +355,14 @@ The auto-code workflow includes workflow-specific skills in its `skills/` subdir
 ```
 app/workflows/auto-code/skills/
 └── code/
-    ├── api-endpoint.md
-    ├── data-model.md
-    ├── database-migration.md
-    └── test-generation.md
+    ├── api-endpoint/
+    │   └── SKILL.md
+    ├── data-model/
+    │   └── SKILL.md
+    ├── database-migration/
+    │   └── SKILL.md
+    └── test-generation/
+        └── SKILL.md
 ```
 
 These skills load in addition to (not instead of) global skills and project-local skills. The SkillLoaderAgent merges all three tiers when resolving matches.
@@ -359,7 +371,7 @@ These skills load in addition to (not instead of) global skills and project-loca
 
 auto-code defines its own:
 
-- Agent definitions (`agents/plan_agent.py`, `agents/code_agent.py`, `agents/review_agent.py`)
+- Agent definitions (`agents/planner.md`, `agents/coder.md`, `agents/reviewer.md`)
 - Pipeline composition (`pipeline.py` with the SequentialAgent/ParallelAgent/LoopAgent tree)
 - Tool requirements (`required_tools` in WORKFLOW.yaml)
 - Deliverable decomposition strategy (spec-to-deliverable generation adapted from Autocoder patterns)
@@ -410,6 +422,6 @@ The gateway never runs ADK pipelines. It is a job broker and event proxy. This m
 
 ---
 
-**Document Version:** 2.5
-**Last Updated:** 2026-02-17
+**Document Version:** 3.1
+**Last Updated:** 2026-03-10
 **Status:** Framework Validated -- Prototyping Phase

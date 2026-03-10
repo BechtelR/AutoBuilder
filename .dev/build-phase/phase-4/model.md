@@ -313,10 +313,10 @@ def query_dependency_graph(project_id: str, deliverable_id: str | None = None) -
 ```python
 # Agent name -> role mapping
 AGENT_ROLE_MAP: dict[str, str] = {
-    "plan_agent": "planner",
-    "code_agent": "coder",
-    "review_agent": "reviewer",
-    "fix_agent": "fix_agent",
+    "planner": "planner",
+    "coder": "coder",
+    "reviewer": "reviewer",
+    "fixer": "fixer",
     "director": "director",
     # PM agents: matched via name.startswith("pm_")
 }
@@ -343,7 +343,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
                  "git_status", "git_diff", "git_log", "git_show",
                  "web_fetch", "web_search",
                  "todo_read", "todo_write", "todo_list"},
-    "fix_agent":{"file_read", "file_write", "file_edit", "file_insert", "file_multi_edit",
+    "fixer":{"file_read", "file_write", "file_edit", "file_insert", "file_multi_edit",
                  "file_glob", "file_grep", "file_move", "file_delete", "directory_list",
                  "code_symbols", "run_diagnostics",
                  "bash_exec",
@@ -441,7 +441,7 @@ class PmOverrideAction(enum.StrEnum):
 ```python
 from typing import Literal
 
-RoleName = Literal["default", "planner", "coder", "reviewer", "fix_agent", "pm", "director"]
+RoleName = Literal["default", "planner", "coder", "reviewer", "fixer", "pm", "director"]
 ```
 
 ### Task State Schema (stored in session state under key "tasks")

@@ -14,7 +14,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | 00 | `00-VISION.md` | Product vision & strategy | Differentiators, problem statement, what we are NOT |
 | 01 | `01-PRD.md` | Product requirements (PRD) | User experience deconstructed, personas, journeys, FRs |
 | 02 | `02-ARCHITECTURE.md` | System architecture | Five-layer design, data flow, API-first + ADK behind ACL |
-| — | `architecture/` | Architecture reference | 13 domain-specific files; see `02-ARCHITECTURE.md` §4 reference map |
+| — | `architecture/` | Architecture reference | 14 domain-specific files; see `02-ARCHITECTURE.md` §4 reference map |
 | 03 | `03-STRUCTURE.md` | Project scaffold | **Single source of truth** for directory layout |
 | 04 | `04-TECH_STACK.md` | Technology decisions & rationale | Every tech choice with why + rejected alternatives |
 | 05 | `05-DEV_SETUP.md` | Development environment setup | Prerequisites, env vars, local dev workflow |
@@ -29,7 +29,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | Directory | Purpose | Key Contents |
 |-----------|---------|--------------|
 | `.discussion/` | Design evolution & decisions | `design-changelog.md` — canonical decision record (28 decisions) |
-| `architecture/` | Domain-specific architecture reference | 13 files covering gateway, workers, events, data, engine, agents, execution, state, tools, skills, workflows, observability, clients |
+| `architecture/` | Domain-specific architecture reference | 14 files covering gateway, workers, events, data, engine, agents, execution, state, tools, skills, workflows, context, observability, clients |
 | `build-phase/` | Per-phase build artifacts | `.templates/` (frd, spec, model), `phase-{N}/` (frd.md, spec.md, model.md, review.md) |
 | `.knowledge/` | Multi-domain reference index | `README.md` → domain dirs; `adk/` has 13 category files + ERRATA |
 | `.todo/` | Active task tracking | Phase-specific task lists |
@@ -46,7 +46,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | Where does file X go? | `03-STRUCTURE.md` |
 | Why did we pick technology X? | `04-TECH_STACK.md` |
 | How do agents compose? | `architecture/agents.md`, `02-ARCHITECTURE.md` |
-| How do agents get context? | `architecture/skills.md`, `architecture/state.md` |
+| How do agents get context? | `architecture/context.md`, `architecture/skills.md`, `architecture/state.md` |
 | How do I add a new workflow? | `architecture/workflows.md` |
 | How does state persist? | `architecture/state.md` |
 | What tools are available? | `architecture/tools.md` |

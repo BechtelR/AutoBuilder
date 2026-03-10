@@ -1,5 +1,5 @@
 # AutoBuilder — Product Requirements Document
-*Version: 6.0 | Date: 2026-02-21 | Maps to: `00-VISION.md` v3.0*
+*Version: 7.1 | Date: 2026-03-10 | Maps to: `00-VISION.md` v3.0*
 
 ---
 
@@ -109,6 +109,9 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 |----|-------------|
 | PR-4 | Workflows are plugins. A workflow defines its own **stage schema** (e.g., SHAPE → DESIGN → PLAN → BUILD for software), the agents, skills, and tools active at each stage, its mandatory validator pipeline, its deliverable and output format definitions, and its completion report structure. Plugins install via WORKFLOW.yaml with zero core code changes. |
 | PR-5 | At each workflow stage, the PM assembles the appropriate agent configuration: research and architecture agents for design stages, coding and verification agents for build stages. Skills and tool authorizations are scoped per stage. |
+| PR-5a | Agent instructions are composed from 6 typed fragments (safety, identity, governance, project context, task context, domain skills) via an InstructionAssembler (see NFR-4a for constitutional SAFETY fragment). The Director controls agent behavior per-project through governance fragments stored in session state — it does not rewrite agent prompts directly. Skills load progressively based on deliverable context. All fragments are auditable (source-tracked). |
+| PR-5b | Agents are defined as **declarative definition files** (markdown with YAML frontmatter). Frontmatter carries structured metadata (name, type, model routing, tool access, output key). The markdown body provides instruction content. An AgentRegistry scans definition files and builds ADK agents on demand — the filesystem is the registry. No agent identity lives in Python code. |
+| PR-5c | Agent definitions follow a **3-scope file cascade**: global (shipped with platform) → workflow-specific → project-specific. Later scopes override earlier scopes by filename match. A project-scope file with only frontmatter (no body) is a **partial override** — its fields merge over the parent scope, inheriting the parent's instruction body. This parallels the Skill override cascade. |
 | PR-6 | A curated set of default workflow plugins ships with the platform — designed to be directly useful and to model how to compose new workflows, by users or by the Director itself. |
 | PR-7 | Project-level conventions override workflow defaults. The workflow manifest is the execution contract for everything it defines. |
 
@@ -129,6 +132,8 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 | PR-13 | The Director is the user's executive partner. It shapes Briefs through collaborative dialogue, coordinates across all active projects, and maintains per-project chat sessions alongside autonomous work sessions. Each project has its own Director chat session; there is also a primary Director session for portfolio-level conversation. |
 | PR-14 | Each project has one dedicated PM for its lifetime. The PM owns the delivery loop, quality gate enforcement, and PM-level decisions. Workers execute deliverables under PM supervision and escalate blockers upward — they do not surface directly to the user. |
 | PR-15 | Each tier has bounded authority: a **retry budget** (max retries before escalating), a **decision scope** (categories it can resolve autonomously), and a **cost ceiling** (token/spend limit). Exhausting any dimension triggers escalation to the tier above. Limits cascade: user sets project ceiling → Director enforces across projects → PM enforces within the project → workers operate within per-deliverable budgets. |
+| PR-15a | When an agent's context window approaches capacity, the system recreates the session: persisting important state to memory, creating a fresh session, and reassembling context from durable stores (memory, state, skills, instruction fragments). No lossy summarization. The agent resumes from the same logical point with full relevant context reconstructed. |
+| PR-15b | Cross-session memory context is loaded as a **deterministic pipeline step** (MemoryLoaderAgent) at the start of each deliverable pipeline, not as an LLM-discretionary tool call. The agent searches the memory service for relevant context and writes results to session state before any LLM agent runs. This ensures memory context is always available and never skipped by LLM judgment. |
 | PR-16 | When a PM's consecutive batch failures exceed the configured threshold (default: 3), the Director suspends the project and diagnoses the failure pattern — reviewing validator evidence, escalation history, and execution state. It surfaces findings and options to the CEO queue; it does not attempt autonomous repair. |
 
 ### 3.5 CEO Queue & Director Queue
@@ -174,6 +179,7 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 |----|-------------|
 | PR-34 | Every project has a persistent, replayable event stream (Redis Streams + SSE). Clients reconnect via `Last-Event-ID` with no events lost. The stream covers: agent tier changes, deliverable lifecycle, validator results, escalations, cost per deliverable, checkpoints, and errors. |
 | PR-35 | Token usage and cost are tracked per deliverable, phase, stage, and project — in real-time, no manual calculation. An immutable audit log records all state transitions, decisions, escalations, and interventions. |
+| PR-35a | Agent definition resolution is auditable. For each agent built, the system logs which scope (global, workflow, project) provided the definition, which file path was used, and whether a partial override was applied. The resolution map is available for diagnostic inspection. |
 
 ### 3.10 Interfaces
 
@@ -192,6 +198,9 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 | NFR-2 | A standard workflow stage completes within a working day under normal conditions. System overhead is not a meaningful contributor to stage duration. |
 | NFR-3 | Crash recovery: restarts from last checkpoint without re-executing verified deliverables. LLM reliability is AutoBuilder's responsibility — handled through heartbeats, retry hooks, and provider fallback before any user escalation. |
 | NFR-4 | Gateway input validation via Pydantic at all boundaries. Credentials never logged or hardcoded. Tool execution isolated to worker processes. All state transitions produce an immutable audit event. |
+| NFR-4a | A **constitutional SAFETY fragment** is hardcoded in the InstructionAssembler and prepended to every LLM agent's instructions. It cannot be overridden by any scope — not project-scope definitions, not Director session state, not skill content. It enforces core safety constraints: no data exfiltration, respect tool boundaries, follow escalation protocol. |
+| NFR-4b | **Project-scope agent definitions** are restricted: only `type: llm` is permitted (no arbitrary `class` paths from user-controlled directories). The `tool_role` field is validated against the workflow's permitted tool ceiling — a project-scope override cannot grant tools the workflow does not permit. |
+| NFR-4c | **State key authorization** enforces tier-based write access. Governance-sensitive state keys use tier prefixes (`director:`, `pm:`, `worker:`). The event system validates that the event author's tier matches the key prefix on state writes. Non-prefixed keys are shared workspace accessible by all tiers. |
 | NFR-5 | Third-party workflow plugins and Agent Skills standard skills install without code changes. The gateway API is the sole external contract — internal engine changes do not require client updates. Codegen (OpenAPI → TypeScript via hey-api) maintains type safety across the gateway boundary. |
 | NFR-6 | Runs fully on a single machine with no cloud dependencies. All configuration via environment variables. |
 
@@ -275,13 +284,14 @@ Multi-tenant SaaS, workflow marketplace, cross-project dependency orchestration,
 
 | Vision Goal | Vision Section | Requirements |
 |-------------|---------------|-------------|
-| Autonomous execution | Product Vision | PR-1, 2, 7, 10, 20, 24, 36, NFR-2, 3 |
+| Autonomous execution | Product Vision | PR-1, 2, 7, 10, 15a, 20, 24, 36, NFR-2, 3 |
 | Hierarchical supervision | Innovations | PR-7, 8, 13, 14, 15, 16, 18, 21, 37 |
 | Guaranteed quality enforcement | Innovations | PR-9, 10, 11, NFR-4 |
+| Agent governance and safety | Innovations | PR-5a, 5b, 5c, NFR-4a, NFR-4b, NFR-4c |
 | Three-layer verification | Innovations | PR-9, 22, 23 |
 | Brief-to-deliverable traceability | Innovations | PR-1, 22, 23, 24, 35 |
-| Workflow composability | Innovations | PR-4, 5, 6, 31, 33, NFR-5 |
+| Workflow composability | Innovations | PR-4, 5, 5b, 5c, 6, 31, 32, 33, NFR-5 |
 | Cost efficiency | Success Criteria | PR-24, 35, §9 Cost efficiency metric |
-| Transparency and trust | Strategic Advantages | PR-3, 34, 35, 36, 37 |
-| Structured escalation | Product Vision | PR-10, 15, 16, 17, 18, 19, 20, 32 |
-| Memory accumulation | Strategic Advantages | PR-26–30, 32 |
+| Transparency and trust | Strategic Advantages | PR-3, 34, 35, 35a, 36, 37 |
+| Structured escalation | Product Vision | PR-10, 15, 16, 17, 18, 19, 20 |
+| Memory accumulation | Strategic Advantages | PR-15b, 26–30 |

@@ -72,7 +72,8 @@ Redis serves four distinct roles from day one. This is fundamental infrastructur
 - [Architecture Overview](../02-ARCHITECTURE.md) -- full system architecture
 - [Engine](./engine.md) -- ADK engine, App container, LiteLLM routing
 - [Gateway](./gateway.md) -- API routes, type safety chain, transport
-- [Observability](./observability.md) -- tracing, logging, context management
+- [Observability](./observability.md) -- tracing, logging, event stream monitoring
+- [Context](./context.md) -- context assembly, budgeting, knowledge loading, recreation
 
 ---
 

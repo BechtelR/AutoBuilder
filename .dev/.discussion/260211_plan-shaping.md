@@ -166,11 +166,11 @@ If AutoBuilder were primarily an LLM-centric application where agents were the m
    a. Select next batch (respecting deps + concurrency limits)
    b. For each deliverable in batch (parallel):
       i.   Load relevant skills (deterministic: SkillLoaderAgent)
-      ii.  Plan implementation (LLM: plan_agent)
+      ii.  Plan implementation (LLM: planner)
       iii. Execute plan (LLM: execute_agent)
       iv.  Validate output (deterministic: workflow-specific ValidatorAgent)
       v.   Verify output (deterministic: workflow-specific VerifyAgent)
-      vi.  Review quality (LLM: review_agent)
+      vi.  Review quality (LLM: reviewer)
       vii. Loop steps iii-vi if review fails (max N iterations)
    c. Merge completed deliverables
    d. Run regression checks
@@ -192,7 +192,7 @@ deliverable_pipeline = SequentialAgent(
     name="DeliverablePipeline",
     sub_agents=[
         SkillLoaderAgent(name="LoadSkills"),     # Deterministic: shared
-        plan_agent,                                # LLM: workflow-specific
+        planner,                                # LLM: workflow-specific
         execute_agent,                             # LLM: workflow-specific
         LinterAgent(name="Lint"),                  # Deterministic: auto-code
         TestRunnerAgent(name="Test"),               # Deterministic: auto-code
@@ -200,8 +200,8 @@ deliverable_pipeline = SequentialAgent(
             name="ReviewCycle",
             max_iterations=3,
             sub_agents=[
-                review_agent,                      # LLM
-                fix_agent,                         # LLM
+                reviewer,                      # LLM
+                fixer,                         # LLM
                 LinterAgent(name="ReLint"),        # Deterministic: auto-code
                 TestRunnerAgent(name="ReTest"),     # Deterministic: auto-code
             ]
@@ -312,7 +312,7 @@ triggers:
   - deliverable_type: api_endpoint
   - file_pattern: "*/routes/*.py"
 tags: [api, http, routing, fastapi]
-applies_to: [code_agent, review_agent]
+applies_to: [coder, reviewer]
 priority: 10
 ---
 
@@ -372,7 +372,7 @@ autobuilder/skills/              # Global (ships with AutoBuilder)
 └── planning/
     └── feature-decomposition.md
 
-user-project/.autobuilder/skills/  # Project-local (overrides/extends)
+user-project/.agents/skills/  # Project-local (overrides/extends)
 ├── code/
 │   ├── api-endpoint.md            # Overrides global with project conventions
 │   └── auth-middleware.md         # Project-specific, no global equivalent
@@ -520,9 +520,9 @@ autobuilder/workflows/
 │   ├── WORKFLOW.yaml          # Manifest: name, description, triggers, required_tools, pipeline_config
 │   ├── pipeline.py            # ADK agent composition (SequentialAgent, etc.)
 │   ├── agents/                # Workflow-specific agent definitions
-│   │   ├── plan_agent.py
-│   │   ├── code_agent.py
-│   │   └── review_agent.py
+│   │   ├── planner.py
+│   │   ├── coder.py
+│   │   └── reviewer.py
 │   └── skills/                # Workflow-specific skills (extend global skills)
 │       └── code/
 ├── auto-design/
@@ -797,14 +797,14 @@ SkillLoaderAgent → loads relevant skills into session state
   ↓
 PreloadMemoryTool → searches MemoryService for relevant cross-session context
   ↓  
-plan_agent reads: {current_deliverable_spec}, {loaded_skills}, {memory_context}, {app:standards}
+planner reads: {current_deliverable_spec}, {loaded_skills}, {memory_context}, {app:standards}
   ↓
 execute_agent reads: {implementation_plan}, {loaded_skills}, {app:standards}
   ↓
 ValidatorAgent writes: validation_results to session state
 VerifyAgent writes: verification_results to session state  
   ↓
-review_agent reads: {execution_output}, {validation_results}, {verification_results}, {loaded_skills}
+reviewer reads: {execution_output}, {validation_results}, {verification_results}, {loaded_skills}
   ↓
 Session complete → add_session_to_memory() ingests learnings for future runs
 ```
@@ -868,7 +868,7 @@ Before full commitment to ADK, validate with four focused prototypes:
 - **Critical validation**: Claude reliability through LiteLLM? Latency? Token counting?
 
 ### Prototype 2: Mixed Agent Coordination (LLM + Deterministic)
-- Create `plan_agent` (LlmAgent) and `linter_agent` (CustomAgent)
+- Create `planner` (LlmAgent) and `linter_agent` (CustomAgent)
 - Wire in `SequentialAgent` pipeline
 - Pass data via session state (`output_key` → state read)
 - **Validate**: unified event stream, state persistence across agent types, observability of deterministic steps

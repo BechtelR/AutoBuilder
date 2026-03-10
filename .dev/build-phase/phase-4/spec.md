@@ -115,7 +115,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "web_search", "web_fetch",
         "todo_read", "todo_write", "todo_list",
     },
-    "fix_agent": {
+    "fixer": {
         "file_read", "file_write", "file_edit", "file_insert", "file_multi_edit",
         "file_glob", "file_grep", "file_move", "file_delete", "directory_list",
         "code_symbols", "run_diagnostics",
@@ -142,14 +142,14 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 Cascading restriction: a parent tier can further restrict children by providing an `excluded_tools` override. Default is permissive — all tools in the role set are available unless explicitly excluded. This is config-driven (dict), not code-driven (class hierarchy).
 
 ### DD-6: Role Resolution from ReadonlyContext
-`resolve_role(readonly_context)` maps agent names to roles via a configurable dict. Convention: agent names encode their role (`plan_agent` -> `"planner"`, `code_agent` -> `"coder"`, `review_agent` -> `"reviewer"`, `fix_agent` -> `"fix_agent"`, `pm_*` -> `"pm"`, `director` -> `"director"`). Unknown agents get a `"default"` role with read-only tools. The mapping is a module-level dict in `_toolset.py`, extensible without code changes via settings in later phases.
+`resolve_role(readonly_context)` maps agent names to roles via a configurable dict. Convention: agent names encode their role (`planner` -> `"planner"`, `coder` -> `"coder"`, `reviewer` -> `"reviewer"`, `fixer` -> `"fixer"`, `pm_*` -> `"pm"`, `director` -> `"director"`). Unknown agents get a `"default"` role with read-only tools. The mapping is a module-level dict in `_toolset.py`, extensible without code changes via settings in later phases.
 
 ```python
 AGENT_ROLE_MAP: dict[str, str] = {
-    "plan_agent": "planner",
-    "code_agent": "coder",
-    "review_agent": "reviewer",
-    "fix_agent": "fix_agent",
+    "planner": "planner",
+    "coder": "coder",
+    "reviewer": "reviewer",
+    "fixer": "fixer",
     "director": "director",
 }
 # PM agents matched via prefix: name.startswith("pm_") -> "pm"
@@ -415,10 +415,10 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `TS01` — `GlobalToolset` (BaseToolset)
 - [x] `TS02` — `resolve_role()` (role from ReadonlyContext)
 - [x] `TS03` — Cascading permission config
-- [x] `TS04` — Role scoping: `plan_agent` (read-only)
-- [x] `TS05` — Role scoping: `code_agent` (full tools)
-- [x] `TS06` — Role scoping: `review_agent` (read-only)
-- [x] `TS07` — Role scoping: `fix_agent` (full FS, limited exec/git)
+- [x] `TS04` — Role scoping: `planner` (read-only)
+- [x] `TS05` — Role scoping: `coder` (full tools)
+- [x] `TS06` — Role scoping: `reviewer` (read-only)
+- [x] `TS07` — Role scoping: `fixer` (full FS, limited exec/git)
 - [x] `TS08` — Role scoping: PM (management + shared)
 - [x] `TS09` — Role scoping: Director (governance + shared)
 **Requirements:**
@@ -430,7 +430,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `"planner"` role: read-only filesystem + code intelligence + git read + web + session todos
 - [x] `"coder"` role: full filesystem (10) + code intelligence (2) + full execution (2) + full git (8) + web (2) + session todos (3) = 27 tools
 - [x] `"reviewer"` role: read-only filesystem + code intelligence + git read + web + session todos (same as planner)
-- [x] `"fix_agent"` role: full filesystem (10) + code intelligence (2) + `bash_exec` only (no `http_request`) + read-only git (no commit/branch/worktree/apply) + web (2) + session todos (3)
+- [x] `"fixer"` role: full filesystem (10) + code intelligence (2) + `bash_exec` only (no `http_request`) + read-only git (no commit/branch/worktree/apply) + web (2) + session todos (3)
 - [x] `"pm"` role: PM management (6) + shared tasks (3) + session todos (3) = 12 tools
 - [x] `"director"` role: Director management (6) + shared tasks (3) + session todos (3) = 12 tools
 - [x] `excluded_tools` parameter removes tools from the role's allowed set (cascading restriction)
@@ -455,7 +455,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] **Task tests**: `todo_write` add creates task; `todo_list` returns all tasks; `todo_read` returns specific task; `todo_write` complete marks task done; `todo_list` with filter returns filtered results; `task_create` returns placeholder confirmation; `task_update` returns placeholder confirmation; `task_query` returns placeholder message
 - [x] **Management tests**: `select_ready_batch` returns placeholder message; `escalate_to_ceo` with valid params returns confirmation; `escalate_to_ceo` with invalid `item_type` returns validation error; `escalate_to_director` with valid params returns confirmation; `escalate_to_director` with invalid `request_type` returns validation error; `get_project_context` detects project type from filesystem; all other management tools return appropriate placeholder responses
 - [x] **Code intelligence tests**: `code_symbols` extracts symbols from Python file; `code_symbols` auto-detects language from extension; `run_diagnostics` runs lint tool and returns output
-- [x] **Toolset tests**: `GlobalToolset` constructor creates 42 `FunctionTool` instances; `get_tools(None)` returns all tools; planner role gets read-only + code intelligence + web + todos; coder role gets 27 tools (full set minus management); reviewer role matches planner; fix_agent role gets full FS + limited exec/git; PM role includes 12 tools (PM management + shared tasks + todos); Director role includes 12 tools (Director management + shared tasks + todos); `excluded_tools={"bash_exec"}` removes bash from coder role; `resolve_role` maps `"plan_agent"` -> `"planner"`, `"code_agent"` -> `"coder"`, `"fix_agent"` -> `"fix_agent"`, unknown -> `"default"`
+- [x] **Toolset tests**: `GlobalToolset` constructor creates 42 `FunctionTool` instances; `get_tools(None)` returns all tools; planner role gets read-only + code intelligence + web + todos; coder role gets 27 tools (full set minus management); reviewer role matches planner; fixer role gets full FS + limited exec/git; PM role includes 12 tools (PM management + shared tasks + todos); Director role includes 12 tools (Director management + shared tasks + todos); `excluded_tools={"bash_exec"}` removes bash from coder role; `resolve_role` maps `"planner"` -> `"planner"`, `"coder"` -> `"coder"`, `"fixer"` -> `"fixer"`, unknown -> `"default"`
 - [x] **Schema generation tests**: Each `FunctionTool(func)` produces a schema where `name` matches `func.__name__`, description is a non-empty string derived from `func.__doc__`, and parameter names match the function signature (excluding `tool_context`)
 - [x] All Phase 2-3 tests continue to pass (no regressions)
 - [x] All quality gates exit 0: `uv run ruff check .`, `uv run pyright`, `uv run pytest`
@@ -492,13 +492,13 @@ Batch 3: P4.D8
 |---|---|---|---|
 | 1 | All 42 tools callable from within an ADK LlmAgent | P4.D1-D6b, P4.D7, P4.D8 | Schema generation tests verify FunctionTool wrapping; toolset vends tools to agents |
 | 2 | Tool schemas auto-generated from type hints + docstrings | P4.D1-D6b, P4.D8 | Schema generation tests verify each tool produces correct schema with name, description, parameters |
-| 3 | Toolset vends correct tool subsets per role configuration | P4.D7, P4.D8 | Toolset tests verify per-role filtering for planner, coder, reviewer, fix_agent, PM, Director |
+| 3 | Toolset vends correct tool subsets per role configuration | P4.D7, P4.D8 | Toolset tests verify per-role filtering for planner, coder, reviewer, fixer, PM, Director |
 | 4 | bash_exec handles timeout, output capture, error reporting | P4.D2, P4.D8 | Execution tests: timeout kills process, output captured, exit code reported |
 | 5 | Code intelligence tools extract symbols and run diagnostics | P4.D6b, P4.D8 | Code intelligence tests verify tree-sitter extraction and diagnostics execution |
 | 6 | Three-tier task system (todos/tasks/deliverables) has correct interfaces | P4.D5, P4.D6, P4.D8 | Task + management tests verify all 6 task-tier tools |
 | 7 | PM escalation path uses Director queue | P4.D6, P4.D7, P4.D8 | PM role includes `escalate_to_director`; Director role includes `escalate_to_ceo` |
 | 8 | Director management tools have correct signatures for Phase 5 integration | P4.D6, P4.D8 | Management tests verify all 6 Director tools accept correct params |
-| 9 | fix_agent role has distinct permissions from coder (no git commit, no http_request) | P4.D7, P4.D8 | Toolset tests verify fix_agent has limited exec/git vs coder's full set |
+| 9 | fixer role has distinct permissions from coder (no git commit, no http_request) | P4.D7, P4.D8 | Toolset tests verify fixer has limited exec/git vs coder's full set |
 
 ### BOM Coverage
 
@@ -556,10 +556,10 @@ Batch 3: P4.D8
 | TS01 | `GlobalToolset` (BaseToolset) | P4.D7 |
 | TS02 | `resolve_role()` | P4.D7 |
 | TS03 | Cascading permission config | P4.D7 |
-| TS04 | Role scoping: `plan_agent` (read-only) | P4.D7 |
-| TS05 | Role scoping: `code_agent` (full tools) | P4.D7 |
-| TS06 | Role scoping: `review_agent` (read-only) | P4.D7 |
-| TS07 | Role scoping: `fix_agent` (full FS, limited exec/git) | P4.D7 |
+| TS04 | Role scoping: `planner` (read-only) | P4.D7 |
+| TS05 | Role scoping: `coder` (full tools) | P4.D7 |
+| TS06 | Role scoping: `reviewer` (read-only) | P4.D7 |
+| TS07 | Role scoping: `fixer` (full FS, limited exec/git) | P4.D7 |
 | TS08 | Role scoping: PM (management + shared) | P4.D7 |
 | TS09 | Role scoping: Director (governance + shared) | P4.D7 |
 | V20 | Director queue type enum | P4.D6 |

@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 1.2.3*
+*Version: 1.6.0*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -98,8 +98,8 @@ Source: `architecture/engine.md`
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
 | E01 | `App` container (`autobuilder`) | module | 3 | engine.md §5 | Director agent, plugins, configs |
-| E02 | `build_director()` factory | module | 5 | engine.md §5 | Director agent config, project IDs |
-| E03 | `build_pm()` factory | module | 5 | engine.md §5 | Project config, PM tools |
+| E02 | Agent tree construction (via `AgentRegistry.build()`) | module | 5 | engine.md §5, agents.md §Agent Registry | AgentRegistry, InstructionAssembler, project IDs |
+| E03 | PM agent construction (via `AgentRegistry.build()`) | module | 5 | engine.md §5, agents.md §Agent Registry | AgentRegistry, project config |
 | E04 | `EventsCompactionConfig` | config | 3 | engine.md §5 | `LlmEventSummarizer` |
 | E05 | `LlmEventSummarizer` (haiku model) | module | 3 | engine.md §5 | LiteLLM, haiku model |
 | E06 | `ResumabilityConfig` | config | 3 | engine.md §5 | — |
@@ -176,10 +176,10 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A01 | Director agent (LlmAgent, opus) | agent | 5 | agents.md §Director Agent | `build_director`, PM agents |
-| A02 | PM agent (LlmAgent, sonnet) | agent | 5 | agents.md §PM Agent | `build_pm`, PM tools |
-| A03 | `build_director()` factory | module | 5 | agents.md §Agent Factory Pattern | Project IDs from DB |
-| A04 | `build_pm()` factory | module | 5 | agents.md §Agent Factory Pattern | Project config |
+| A01 | Director agent (LlmAgent, opus) | agent | 5 | agents.md §Director Agent | AgentRegistry, PM agents |
+| A02 | PM agent (LlmAgent, sonnet) | agent | 5 | agents.md §PM Agent | AgentRegistry, PM tools |
+| A03 | Director agent definition file (`director.md`) | config | 5 | agents.md §Agent Definition Files | AgentRegistry |
+| A04 | PM agent definition file (`pm.md`) | config | 5 | agents.md §Agent Definition Files | AgentRegistry |
 | A05 | Director → PM delegation (`transfer_to_agent`) | mechanism | 5 | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
 | A06 | PM → Director escalation (`transfer_to_agent`) | mechanism | 5 | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
 | A07 | Hard limits cascade (CEO → Director → PM → Workers) | mechanism | 5 | agents.md §PM Agent | `project_configs` |
@@ -196,12 +196,12 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A20 | `plan_agent` (LlmAgent, opus) | agent | 5 | agents.md §Worker-Tier LLM Agents | Read-only tools, skills |
-| A21 | `code_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Full tools, plan output |
-| A22 | `review_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Read-only tools, lint/test results |
-| A23 | `fix_agent` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Full tools, review output |
+| A20 | `planner` (LlmAgent, opus) | agent | 5 | agents.md §Worker-Tier LLM Agents | Read-only tools, skills |
+| A21 | `coder` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Full tools, plan output |
+| A22 | `reviewer` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Read-only tools, lint/test results |
+| A23 | `fixer` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Full tools, review output |
 
-### 6.3 Worker Tier — Custom (Deterministic) Agents
+### 6.3 Worker Tier — Custom Agents (Deterministic & Hybrid)
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
@@ -209,8 +209,9 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 | A31 | `LinterAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
 | A32 | `TestRunnerAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
 | A33 | `FormatterAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
-| A34 | `DependencyResolverAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Deliverable deps |
+| A34 | `DependencyResolverAgent` (hybrid CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Deliverable deps, LiteLLM |
 | A35 | `RegressionTestAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | PM regression policy |
+| A36 | `DiagnosticsAgent` (hybrid CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | `lint_results`, `test_results`, LiteLLM |
 
 ### 6.4 Callbacks & Hooks
 
@@ -218,7 +219,6 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 |---|-----------|------|-------|--------|--------------|
 | A40 | `verify_batch_completion` (`after_agent_callback`) | callback | 5 | agents.md §PM Agent | PM agent |
 | A41 | `checkpoint_project` (`after_agent_callback`) | callback | 5 | agents.md §PM Agent | DeliverablePipeline |
-| A42 | `context_budget_monitor` (`before_model_callback`) | callback | 5 | agents.md §Worker-Tier Custom Agents | LlmRequest token counting |
 | A43 | `before_model_callback` context injection | callback | 5 | agents.md §Worker-Tier LLM Agents | Session state |
 | A44 | `before_model_callback` LLM Router override | callback | 3 | agents.md §LLM Router | LlmRouter |
 
@@ -228,9 +228,20 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 |---|-----------|------|-------|--------|--------------|
 | A50 | `output_key` state communication | mechanism | 5 | agents.md §1. output_key | Session state |
 | A51 | `{key}` state template injection | mechanism | 5 | agents.md §2. {key} Templates | Session state |
-| A52 | `InstructionProvider` dynamic instructions | mechanism | 5 | agents.md §Agent Factory Pattern. InstructionProvider | Session state |
-| A53 | `plan_instruction_provider` | mechanism | 5 | agents.md §Agent Factory Pattern. InstructionProvider | `loaded_skills`, `memory_context` |
+| A52 | `InstructionAssembler` — fragment-based instruction composition | module | 5 | agents.md §Agent Definitions | InstructionFragment, session state |
+| A53 | `InstructionFragment` dataclass | module | 5 | agents.md §Agent Definitions | — |
 | A54 | `context_from_state` helper | module | 5 | agents.md §Worker-Tier Custom Agents | Session state |
+| A55 | Agent definition files (markdown + YAML frontmatter) | config | 5 | agents.md §Agent Definition Files | — |
+| A56 | `AgentRegistry` class (scan + build from files) | module | 5 | agents.md §AgentRegistry | InstructionAssembler, GlobalToolset, LlmRouter |
+| A57 | Base instruction fragments (6 types: SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL) | config | 5 | agents.md §Agent Definitions | — |
+| A58 | System reminder injection (`before_model_callback`) | callback | 5 | agents.md §System Reminders | Session state |
+| A59 | Context recreation mechanism | mechanism | 5 | context.md §Context Recreation | InstructionAssembler, SkillLoaderAgent, MemoryService |
+| A75 | SAFETY instruction fragment (hardcoded, non-overridable) | config | 5 | agents.md §Instruction Composition | InstructionAssembler |
+| A76 | `InstructionContext` container (per-invocation assembly data) | module | 5 | agents.md §Agent Definitions | Project config, session state, loaded skills |
+| A77 | Partial override (frontmatter-only definition files inherit parent body) | mechanism | 5 | agents.md §Definition Cascade | AgentRegistry |
+| A78 | Project-scope security validation (`type:llm` only, `tool_role` ceiling) | mechanism | 5 | agents.md §Project-Scope Restrictions | AgentRegistry, `WORKFLOW.yaml` |
+| A79 | State key authorization (tier prefixes, EventPublisher ACL) | mechanism | 5 | agents.md §State Key Authorization | EventPublisher |
+| A80 | Resolution auditability (`agent_resolution_sources` session state key) | mechanism | 5 | agents.md §AgentRegistry | AgentRegistry, event stream |
 
 ### 6.6 Pipelines & Loops
 
@@ -323,10 +334,10 @@ Source: `architecture/tools.md`
 | TS01 | `GlobalToolset` (BaseToolset) | module | 4 | tools.md §7.3 | All FunctionTools |
 | TS02 | `resolve_role()` (role from ReadonlyContext) | module | 4 | tools.md §7.3 | ADK ReadonlyContext |
 | TS03 | Cascading permission config | config | 4 | tools.md §7.4 | — |
-| TS04 | Role scoping: `plan_agent` (read-only) | config | 4 | tools.md §7.5 | GlobalToolset |
-| TS05 | Role scoping: `code_agent` (full tools) | config | 4 | tools.md §7.5 | GlobalToolset |
-| TS06 | Role scoping: `review_agent` (read-only) | config | 4 | tools.md §7.5 | GlobalToolset |
-| TS07 | Role scoping: `fix_agent` (full FS, limited exec/git) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS04 | Role scoping: `planner` (read-only) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS05 | Role scoping: `coder` (full tools) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS06 | Role scoping: `reviewer` (read-only) | config | 4 | tools.md §7.5 | GlobalToolset |
+| TS07 | Role scoping: `fixer` (full FS, limited exec/git) | config | 4 | tools.md §7.5 | GlobalToolset |
 | TS08 | Role scoping: PM (batch + shared) | config | 4 | tools.md §7.5 | GlobalToolset |
 | TS09 | Role scoping: Director (governance + shared) | config | 4 | tools.md §7.5 | GlobalToolset |
 
@@ -365,16 +376,17 @@ Source: `architecture/skills.md`
 | S09 | Description keyword fallback (interop) | mechanism | 6 | skills.md §Trigger Matching | — |
 | S10 | Two-tier scan (global + project-local override) | mechanism | 6 | skills.md §Two-Tier Library | — |
 | S11 | Three-tier merge (+ workflow-specific) | mechanism | 7 | workflows.md §auto-code: The First Workflow | SkillLibrary, WorkflowRegistry |
-| S12 | `InstructionProvider` skill injection (`{loaded_skills}`) | mechanism | 6 | skills.md §ADK Integration | Session state, agent identity |
+| S12 | `InstructionAssembler` skill injection | mechanism | 6 | skills.md §ADK Integration, agents.md §Agent Definitions | InstructionAssembler, session state |
 | S13 | Skill index Redis cache | mechanism | 6 | skills.md §Two-Tier Library | Redis |
 | S14 | Skill cache invalidation (file change + gateway API) | mechanism | 6 | skills.md §Two-Tier Library | Redis, gateway |
+| S15 | Skill cascade resolution | mechanism | 6 | skills.md §Skill Cascading | SkillLoaderAgent |
 
 ### 9.2 Skill Files
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
 | S20 | `app/skills/` directory structure | config | 6 | skills.md §Directory Layout | — |
-| S21 | `.app/skills/` project-local directory | config | 6 | skills.md §Directory Layout | — |
+| S21 | `.agents/skills/` project-local directory | config | 6 | skills.md §Directory Layout | — |
 | S22 | Skill: `code/api-endpoint` | skill | 6 | skills.md §Directory Layout | — |
 | S23 | Skill: `code/data-model` | skill | 6 | skills.md §Directory Layout | — |
 | S24 | Skill: `code/database-migration` | skill | 6 | skills.md §Directory Layout | — |
@@ -409,7 +421,7 @@ Source: `architecture/workflows.md`
 | F12 | Custom workflows directory (overrides) | config | 7 | workflows.md §WorkflowRegistry | — |
 | F13 | `auto-code/WORKFLOW.yaml` manifest | workflow | 7 | workflows.md §auto-code: The First Workflow | — |
 | F14 | `auto-code/pipeline.py` module | module | 7 | workflows.md §auto-code: The First Workflow | All auto-code agents |
-| F15 | `auto-code/agents/` (plan, code, review, fix) | module | 7 | workflows.md §auto-code: The First Workflow | — |
+| F15 | `auto-code/agents/` (planner, coder, reviewer) | module | 7 | workflows.md §auto-code: The First Workflow | — |
 | F16 | `auto-code/skills/` (workflow-specific) | config | 7 | workflows.md §auto-code: The First Workflow | — |
 | F17 | Compound workflow decomposition | mechanism | 11 | workflows.md §Compound Workflows | WorkflowRegistry |
 | F18 | `pipeline.py` interface contract (function signature) | config | 7 | workflows.md §WorkflowRegistry | — |
@@ -440,7 +452,7 @@ Source: `architecture/state.md`
 | M12 | `search_memory()` (tsvector) | mechanism | 9 | state.md §5 | PostgresMemoryService |
 | M13 | Embedding model integration (LiteLLM) | module | 9 | state.md §5 | LiteLLM |
 | M14 | Embedding model config | config | 9 | state.md §5 | — |
-| M15 | `PreloadMemoryTool` | tool | 9 | state.md §1.4 | PostgresMemoryService |
+| M15 | `MemoryLoaderAgent` | CustomAgent | 9 | state.md §1.4, agents.md | PostgresMemoryService |
 | M16 | `LoadMemory` tool | tool | 9 | state.md §1.4 | PostgresMemoryService |
 | M17 | Memory ingestion strategy (configurable) | mechanism | 9 | state.md §9.2 | — |
 | M18 | pgvector semantic search upgrade | mechanism | 11 | state.md §5 | pgvector, embeddings |
@@ -460,7 +472,23 @@ Source: `architecture/state.md`
 
 ---
 
-## 12. Observability
+## 12. Context
+
+Source: `architecture/context.md`
+
+| # | Component | Type | Phase | Source | Dependencies |
+|---|-----------|------|-------|--------|--------------|
+| CT01 | Context compression (sliding window summarization) | mechanism | 3 | context.md §Context Recreation | `EventsCompactionConfig` |
+| CT02 | Skill pruning (reactive context response) | mechanism | 11 | context.md §Context Budget Monitoring | Context budget monitor |
+| CT03 | Artifact storage (`save_artifact`/`load_artifact`) | mechanism | 8 | context.md §Knowledge Loading Layers | ADK artifacts API |
+| CT04 | `ContextBudgetMonitor` (`before_model_callback`) | module | 5 | context.md §Context Budget Monitoring | LiteLLM `token_counter`, LlmRequest |
+| CT05 | Context recreation pipeline (persist → seed → fresh session → reassemble) | mechanism | 5 | context.md §Context Recreation | InstructionAssembler, MemoryService, SkillLoaderAgent |
+| CT06 | `ContextRecreationRequired` exception | module | 5 | context.md §Trigger Mechanics | ContextBudgetMonitor |
+| CT07 | Context caching config (provider-dependent prompt caching) | config | 3 | context.md §Context Caching | Engine App container |
+
+---
+
+## 13. Observability
 
 Source: `architecture/observability.md`
 
@@ -469,15 +497,12 @@ Source: `architecture/observability.md`
 | O01 | OpenTelemetry tracing setup | config | 10 | observability.md §1 | — |
 | O02 | Structured logging (`app.*` hierarchy) | config | ✓ | observability.md §1 | — |
 | O03 | Langfuse LLM tracing (self-hosted, OTel ingestion) | plugin | 11 | observability.md §1 | OpenTelemetry |
-| O04 | Context compression (sliding window summarization) | mechanism | 3 | observability.md §2 | `EventsCompactionConfig` |
-| O05 | Skill pruning (reactive context response) | mechanism | 11 | observability.md §2 | Context budget monitor |
-| O06 | Artifact storage (`save_artifact`/`load_artifact`) | mechanism | 8 | observability.md §3 | ADK artifacts API |
 | O07 | ADK Dev UI (local development only) | config | 10 | observability.md §1 | — |
 | O08 | Dashboard observability views (trace explorer, latency) | ui | 12 | observability.md §1 | Dashboard, Langfuse |
 
 ---
 
-## 13. Spec Pipeline & Execution
+## 14. Spec Pipeline & Execution
 
 Source: `architecture/execution.md`
 
@@ -496,7 +521,7 @@ Source: `architecture/execution.md`
 
 ---
 
-## 14. CLI
+## 15. CLI
 
 Source: `architecture/clients.md`
 
@@ -511,7 +536,7 @@ Source: `architecture/clients.md`
 
 ---
 
-## 15. Dashboard
+## 16. Dashboard
 
 Source: `architecture/clients.md`
 
@@ -537,8 +562,9 @@ Components removed from the registry as unnecessary or over-engineered:
 | # | Component | Reason |
 |---|-----------|--------|
 | D09 | `skills` table | File-based + Redis cache is sufficient per current architecture |
-| V16 | `escalate_to_ceo` FunctionTool | Duplicate of T17 — FunctionTool, canonical entry in Section 7.1 |
 | V17 | CEO queue Redis Stream trigger consumer | `escalate_to_ceo` FunctionTool is the write path; second write path via stream consumer is over-engineering |
+
+*V16 (`escalate_to_ceo` FunctionTool) was a duplicate of T17 — removed entirely rather than marked DROP (v1.2.2).*
 
 ---
 
@@ -546,16 +572,16 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Metric | Count |
 |--------|-------|
-| Total components | 305 |
-| Dropped | 3 |
-| Active components | 302 |
-| Assigned (with phase) | 302 |
+| Total components | 321 |
+| Dropped | 2 |
+| Active components | 319 |
+| Assigned (with phase) | 319 |
 | **Unassigned (gaps)** | **0** |
 | Phase 0-2 (done) | 19 |
-| Phase 3 | 35 |
+| Phase 3 | 36 |
 | Phase 4 | 62 |
-| Phase 5 | 53 |
-| Phase 6 | 23 |
+| Phase 5 | 67 |
+| Phase 6 | 24 |
 | Phase 7 | 20 |
 | Phase 8 | 20 |
 | Phase 9 | 11 |
@@ -570,14 +596,18 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.6.0 | 2026-03-10 | New §12 Context section (CT01-CT07) sourced from context.md; O04-O06 migrated to CT01-CT03; A42 absorbed into CT04; sections renumbered (Observability→13, Spec Pipeline→14, CLI→15, Dashboard→16) |
+| 1.5.0 | 2026-03-10 | Add 7 missing agent components: DiagnosticsAgent (A36), SAFETY fragment (A75), InstructionContext (A76), partial override (A77), project-scope security (A78), state key authorization (A79), resolution auditability (A80); update A57 fragment types; fix v1.4.0 cascade scope count (4→3) |
+| 1.4.0 | 2026-03-09 | Agent definitions → declarative markdown files with 3-scope cascade (Decision #54); AgentDef dataclass removed |
+| 1.3.0 | 2026-03-07 | Add InstructionAssembler, AgentDef, AgentRegistry, context recreation, system reminders (Decisions #50-53) |
 | 1.2.3 | 2026-02-27 | Fix: all source references updated from ordinal §N to named section headings across gateway, workers, events, agents, skills, workflows, execution, clients domain files |
 | 1.2.2 | 2026-02-18 | Fix: drop duplicate V16 entry (`escalate_to_ceo` counted twice); canonical entry is T17 in Section 7.1; update statistics (Total 306→305, Dropped 2→3, Active 304→302, Phase 4 63→62) |
-| 1.2.1 | 2026-02-18 | Fix: section ref mismatches (T06-T17), ID collisions (Tool Modules → TM##, Toolset → TS##), add missing fix_agent scoping (TS07), correct statistics, fix dashboard phase comment in 03-STRUCTURE.md |
+| 1.2.1 | 2026-02-18 | Fix: section ref mismatches (T06-T17), ID collisions (Tool Modules → TM##, Toolset → TS##), add missing fixer scoping (TS07), correct statistics, fix dashboard phase comment in 03-STRUCTURE.md |
 | 1.2.0 | 2026-02-18 | Phase 4 toolset expansion: 42 tools, Director queue enums, management.py module + new code.py |
 | 1.1.0 | 2026-02-17 | All 55 gaps resolved: 53 assigned to phases, 2 dropped (D09, V17) |
 | 1.0.0 | 2026-02-17 | Initial BOM — exhaustive extraction from 13 architecture domain files |
 
 ---
 
-*Document Version: 1.2.3*
-*Last Updated: 2026-02-27*
+*Document Version: 1.6.0*
+*Last Updated: 2026-03-10*

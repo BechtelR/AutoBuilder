@@ -1,5 +1,5 @@
 # AutoBuilder Project Roadmap
-*Version: 2.1.0*
+*Version: 2.5.0*
 
 **Single source of truth for phase sequencing, status, and completion contracts.**
 Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-COMPONENTS.md) (the Component Registry / BOM).
@@ -145,7 +145,7 @@ Anti-corruption layer translating gateway commands to ADK Runner calls and ADK E
 
 
 ### Scope Summary
-Supervision hierarchy: Director (LlmAgent, opus) as stateless root_agent and PM (LlmAgent, sonnet) as per-project autonomous manager driving the batch loop through tools and callbacks. Unified CEO queue (DB-backed) for approvals, escalations, and status reports with SSE push. PM loop prototype validating reliable inter-batch reasoning. Worker-tier LLM agents (plan, code, review, fix) and custom agents (SkillLoader, Linter, TestRunner, Formatter, DependencyResolver, RegressionTest). Context budget monitor as before_model_callback. Pipeline composition: DeliverablePipeline (SequentialAgent) with ReviewCycle (LoopAgent).
+Supervision hierarchy: Director (LlmAgent, opus) as stateless root_agent and PM (LlmAgent, sonnet) as per-project autonomous manager driving the batch loop through tools and callbacks. Unified CEO queue (DB-backed) for approvals, escalations, and status reports with SSE push. PM loop prototype validating reliable inter-batch reasoning. Worker-tier LLM agents (plan, code, review, fix) and custom agents — both deterministic (SkillLoader, Linter, TestRunner, Formatter) and hybrid (DependencyResolver, DiagnosticsAgent — deterministic flow with internal LiteLLM calls) (Decision #56). MemoryLoaderAgent (CustomAgent) loads cross-session memory context at pipeline start (Decision #57). Context budget monitor as before_model_callback. Pipeline composition: DeliverablePipeline (SequentialAgent) with ReviewCycle (LoopAgent). InstructionAssembler for fragment-based prompt composition with typed categories (safety, identity, governance, project, task, skill); constitutional SAFETY fragment is non-overridable (Decision #55). Agent definition files (markdown + YAML frontmatter) with 3-scope file cascade (global → workflow → project); AgentRegistry scans files instead of receiving Python registrations (Decision #54). Project-scope security restrictions: `type: llm` only, `tool_role` ceiling validated against workflow manifest. State key authorization via tier prefixes (`director:`, `pm:`, `worker:`) enforced by EventPublisher ACL (Decision #58). Context recreation mechanism replacing lossy compaction — when context fills, persist to memory and recreate session with full context reassembly.
 
 ### Completion Contract
 
@@ -159,6 +159,15 @@ Supervision hierarchy: Director (LlmAgent, opus) as stateless root_agent and PM 
 | | Lint/test agents produce structured results in state | PR-11 |
 | | Review cycle loops on failure, terminates on approval or max iterations | PR-22 |
 | | Context budget `before_model_callback` reports token usage percentage | PR-15 |
+| | InstructionAssembler composes agent instructions from typed fragments with source auditability | PR-5a |
+| | AgentRegistry scans agent definition files (.md) and builds configured agents (LlmAgent and CustomAgent) with 3-scope file cascade | PR-5b, PR-5c |
+| | Context budget monitor triggers context recreation (not lossy compaction) | PR-15a |
+| | Context recreation produces a functional session with equivalent agent context (persist → fresh session → reassemble end-to-end) | PR-15a |
+| | SAFETY fragment present in all assembled instructions, not overridable by project-scope or state | NFR-4a |
+| | MemoryLoaderAgent loads cross-session memory context into state at pipeline start | PR-15b |
+| | Hybrid CustomAgents (DependencyResolver, DiagnosticsAgent) use LiteLLM internally with model_role routing | PR-5 |
+| | Project-scope agent definitions rejected if `type: custom` or `tool_role` exceeds workflow ceiling | NFR-4b |
+| | State key writes with tier prefix rejected when author tier does not match prefix | NFR-4c |
 
 ---
 
@@ -170,7 +179,7 @@ Supervision hierarchy: Director (LlmAgent, opus) as stateless root_agent and PM 
 
 
 ### Scope Summary
-Skill library adopting the Agent Skills open standard file format (`SKILL.md`) with deterministic loading runtime. Two-tier architecture: global skills (`app/skills/`) and project-local skills (`.app/skills/` in user repo) with override semantics. Trigger matchers (deliverable_type, file_pattern, tag_match, explicit, always) with OR-logic. InstructionProvider integration injecting filtered skills per agent. Initial skill set covering API endpoints, data models, migrations, security review, unit tests, and task decomposition. Redis-cached skill index.
+Skill library adopting the Agent Skills open standard file format (`SKILL.md`) with deterministic loading runtime. Two-tier architecture: global skills (`app/skills/`) and project-local skills (`.agents/skills/` in user repo) with override semantics. Trigger matchers (deliverable_type, file_pattern, tag_match, explicit, always) with OR-logic. InstructionAssembler integration injecting filtered skills per agent. Initial skill set covering API endpoints, data models, migrations, security review, unit tests, and task decomposition. Authoring skills for system artifacts: agent-definition, skill-authoring, workflow-authoring, project-conventions. Redis-cached skill index.
 
 ### Completion Contract
 
@@ -237,7 +246,7 @@ Specification processing: submission endpoint, spec-to-deliverable decomposition
 
 
 ### Scope Summary
-PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and semantic search. Memory tools: PreloadMemoryTool (auto-loads relevant memories each turn) and LoadMemory (agent-decided on-demand retrieval). Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end).
+PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and semantic search. Memory loading: MemoryLoaderAgent (CustomAgent, deterministic -- loads relevant memories into session state at pipeline start) and LoadMemory tool (agent-decided on-demand retrieval). Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end).
 
 ### Completion Contract
 
@@ -281,7 +290,7 @@ Event system on Redis Streams: publisher from workers, SSE endpoint with reconne
 
 
 ### Scope Summary
-LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with prompt tracking, latency analysis, and quality scoring. Token/cost tracking per-deliverable and per-agent with context budget awareness and reactive compression. Crash recovery via PM checkpoint resume, ADK session resume with ResumabilityConfig, and tool idempotency validation. Enhanced routing: richer CLI status, agent role-based tool restrictions, adaptive LLM Router (cost/latency-aware). Advanced capabilities: compound workflow composition and semantic memory upgrade (pgvector embeddings).
+LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with prompt tracking, latency analysis, and quality scoring. Token/cost tracking per-deliverable and per-agent with context budget awareness. Crash recovery via PM checkpoint resume, ADK session resume with ResumabilityConfig, and tool idempotency validation. Enhanced routing: richer CLI status, agent role-based tool restrictions, adaptive LLM Router (cost/latency-aware). Advanced capabilities: compound workflow composition and semantic memory upgrade (pgvector embeddings).
 
 ### Completion Contract
 
@@ -291,7 +300,7 @@ LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with promp
 | | Token costs visible per deliverable, per agent, per model | PR-35 |
 | | Pipeline resumes correctly after simulated crash | NFR-3 |
 | | Adaptive router selects models based on cost/latency data | PR-15, NFR-2 |
-| | Context budget triggers compression before window exhaustion | PR-15, NFR-2 |
+| | Adaptive cost/latency data feeds back to LLM Router decisions | NFR-2 |
 
 ---
 
@@ -373,7 +382,7 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 3 | Regression strategy -- random sampling or dependency-aware? | Open | Phase 8 |
 | 4 | Reuse Automaker TS libs or rewrite in Python? | Open | Phase 8 |
 | 5 | Agent role system granularity | Open | Phase 11 |
-| 6 | Context budget strategy -- per-agent limits with pruning? | Open | Phase 11 |
+| 6 | Context budget strategy -- per-agent limits with pruning? | Closed: Context recreation — persist to memory → fresh session → reassemble via InstructionAssembler. Replaces lossy compaction. (Decision #52) | Phase 5 |
 | 7 | Web search provider (SearXNG vs Brave vs Tavily) | Closed: Tavily primary, Brave fallback. Simple `if/elif` dispatch in `web_search`. Settings: `AUTOBUILDER_SEARCH_PROVIDER`, `AUTOBUILDER_SEARCH_API_KEY`. | Phase 4 |
 | 8 | Agent-browser integration approach for UI testing | Closed: Vercel `agent-browser` CLI (npm). Invoked via `bash_exec`. Implementation in Phase 7/13 (workflow-specific). | Phase 7 |
 | 9 | Durable execution -- native ADK resume sufficient or need Temporal? | Likely sufficient | Phase 11 |
@@ -397,7 +406,7 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | Claude unreliable through LiteLLM/ADK | High | Prototype P1 validates first; Pydantic AI fallback path |
 | ADK CustomAgent outer loop too clunky | Medium | Prototype P4 validates; could simplify to plain Python loop |
 | Google deprecates/pivots ADK | Low-Medium | Apache 2.0 license = forkable; patterns transfer to other frameworks |
-| Context window exhaustion in long runs | Medium | Token-counting callback + reactive compression + checkpoint/restart |
+| Context window exhaustion in long runs | Medium | Token-counting callback + context recreation (persist to memory → fresh session → reassemble from durable state) |
 | Non-Gemini models as second-class citizens | Medium | Test thoroughly in prototyping; stay on LiteLLM latest |
 | Redis single point of failure | Low | Single instance acceptable in Phase 1; Sentinel/cluster if needed |
 | ARQ worker crash mid-pipeline | Medium | ADK resume + checkpoint strategy; worker health via ARQ cron |
@@ -468,8 +477,10 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 2.0.0 | 2026-02-17 | Roadmap v2: slim format, component checklists moved to 07-COMPONENTS.md (BOM) |
 | 2.1.0 | 2026-02-18 | Phase 4 scope expanded: 42 tools, 8 categories, Director queue, three-tier task system |
 | 2.2.0 | 2026-02-18 | Phase 4 DONE: 273 tests pass, all quality gates clean; Phase 5 is NEXT |
+| 2.4.0 | 2026-03-07 | Phase 5 scope expanded: InstructionAssembler, AgentRegistry, context recreation (Decisions #50-53); closed Q6 |
+| 2.5.0 | 2026-03-10 | Phase 5: 3-scope file cascade (was 4-scope), SAFETY fragment, hybrid agents, MemoryLoaderAgent, project-scope security, state key authorization (Decisions #55-58); Phase 6: authoring skills added |
 
 ---
 
-*Document Version: 2.3.0*
-*Last Updated: 2026-02-28*
+*Document Version: 2.5.0*
+*Last Updated: 2026-03-10*

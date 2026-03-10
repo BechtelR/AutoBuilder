@@ -124,9 +124,10 @@ Detailed architecture documentation is organized by domain in the `architecture/
 
 | Domain | File | Summary |
 |--------|------|---------|
+| Context | [context.md](./architecture/context.md) | Context assembly lifecycle, budgeting, recreation, knowledge loading |
 | Skills | [skills.md](./architecture/skills.md) | Skill-based knowledge injection, progressive disclosure, trigger matching |
 | Workflows | [workflows.md](./architecture/workflows.md) | Pluggable workflow system, manifests, registry, composition |
-| Observability | [observability.md](./architecture/observability.md) | OpenTelemetry + Langfuse, context window management, dynamic context |
+| Observability | [observability.md](./architecture/observability.md) | OpenTelemetry + Langfuse, tracing, logging, event stream |
 
 ---
 
@@ -143,6 +144,9 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | PR-3 | Pause / resume / abort | [execution.md](./architecture/execution.md) §PM-Level Loop, [state.md](./architecture/state.md) §1 |
 | PR-4 | Workflows are plugins | [workflows.md](./architecture/workflows.md) §WorkflowRegistry, §Workflow Manifest |
 | PR-5 | Stage agent configuration | [agents.md](./architecture/agents.md) §PM Agent, [workflows.md](./architecture/workflows.md) §Workflow Execution Model |
+| PR-5a | Composable agent instructions | [agents.md](./architecture/agents.md) §Agent Definitions, [context.md](./architecture/context.md) §InstructionAssembler Pipeline |
+| PR-5b | Declarative agent definition files | [agents.md](./architecture/agents.md) §Agent Definition Files, §AgentRegistry |
+| PR-5c | 3-scope agent definition cascade | [agents.md](./architecture/agents.md) §Definition Cascade |
 | PR-6 | Default workflow plugins | [workflows.md](./architecture/workflows.md) §auto-code: The First Workflow |
 | PR-7 | Project conventions override | [workflows.md](./architecture/workflows.md) §Workflow Manifest, [state.md](./architecture/state.md) §1.2 |
 | PR-8 | Resource pre-flight validation | [execution.md](./architecture/execution.md) §Director-Level Loop, [workers.md](./architecture/workers.md) §Worker Lifecycle |
@@ -153,6 +157,8 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | PR-13 | Director as executive partner | [agents.md](./architecture/agents.md) §Director Agent, [execution.md](./architecture/execution.md) §Multi-Session |
 | PR-14 | Dedicated PM per project | [agents.md](./architecture/agents.md) §PM Agent, [engine.md](./architecture/engine.md) §5 |
 | PR-15 | Bounded authority (budgets) | [agents.md](./architecture/agents.md) §PM Agent, [state.md](./architecture/state.md) §1.2 |
+| PR-15a | Context recreation | [agents.md](./architecture/agents.md) §Context Management, [context.md](./architecture/context.md) §Context Recreation |
+| PR-15b | Deterministic memory loading | [agents.md](./architecture/agents.md) §Worker-Tier Custom Agents, [state.md](./architecture/state.md) §5 |
 | PR-16 | Consecutive batch failure → suspend | [agents.md](./architecture/agents.md) §PM Agent, [events.md](./architecture/events.md) §Unified CEO Queue |
 | PR-17 | CEO queue | [events.md](./architecture/events.md) §Unified CEO Queue, [gateway.md](./architecture/gateway.md) §Route Structure |
 | PR-18 | Director queue | [events.md](./architecture/events.md) §Director Queue, [agents.md](./architecture/agents.md) §PM Agent |
@@ -173,6 +179,7 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | PR-33 | Third-party skill install | [skills.md](./architecture/skills.md) §Two-Tier Library |
 | PR-34 | Persistent replayable event stream | [events.md](./architecture/events.md) §Redis Streams, [gateway.md](./architecture/gateway.md) §Route Structure |
 | PR-35 | Token/cost tracking | [observability.md](./architecture/observability.md) §1, [engine.md](./architecture/engine.md) §5 |
+| PR-35a | Agent definition resolution audit | [agents.md](./architecture/agents.md) §AgentRegistry, [observability.md](./architecture/observability.md) §1 |
 | PR-36 | CLI full operational surface | [clients.md](./architecture/clients.md) §CLI Architecture |
 | PR-37 | Dashboard CEO command center | [clients.md](./architecture/clients.md) §Dashboard Architecture |
 
@@ -184,6 +191,9 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | NFR-2 | Stage completion time | [execution.md](./architecture/execution.md) §PM-Level Loop |
 | NFR-3 | Crash recovery / LLM reliability | [engine.md](./architecture/engine.md) §5, [state.md](./architecture/state.md) §1, [workers.md](./architecture/workers.md) §ARQ Workers |
 | NFR-4 | Security (validation, credentials, isolation) | [gateway.md](./architecture/gateway.md) §Anti-Corruption Pattern, [tools.md](./architecture/tools.md) §7.3, [engine.md](./architecture/engine.md) §5 |
+| NFR-4a | Constitutional SAFETY fragment | [agents.md](./architecture/agents.md) §Instruction Composition |
+| NFR-4b | Project-scope agent restrictions | [agents.md](./architecture/agents.md) §Project-Scope Restrictions |
+| NFR-4c | State key authorization | [agents.md](./architecture/agents.md) §Agent Communication via Session State, [events.md](./architecture/events.md) §Redis Streams |
 | NFR-5 | Extensibility (plugins, codegen, API contract) | [workflows.md](./architecture/workflows.md) §WorkflowRegistry, [skills.md](./architecture/skills.md) §Two-Tier Library, [gateway.md](./architecture/gateway.md) §Type Safety Chain |
 | NFR-6 | Local deployment, env var config | [data.md](./architecture/data.md) §Infrastructure |
 
@@ -201,8 +211,15 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | — | Workflow-agnostic | Pipeline stages, quality gates, artifact types per workflow | [workflows.md](./architecture/workflows.md) |
 | — | Deterministic + probabilistic | CustomAgent for known outcomes, LlmAgent for judgment | [agents.md](./architecture/agents.md) |
 | — | Multi-session model | Chat sessions (interactive) + work sessions (autonomous) | [execution.md](./architecture/execution.md) |
+| — | Fragment-based instruction assembly | Typed fragments replace ad-hoc prompts; Director governs via state, not prompt rewriting | [agents.md](./architecture/agents.md) |
+| — | Declarative agent definition files | Markdown + YAML frontmatter with 3-scope cascade; AgentRegistry scans files | [agents.md](./architecture/agents.md) |
+| — | Context recreation over compaction | Lossless session reconstruction from durable state replaces lossy summarization | [agents.md](./architecture/agents.md), [context.md](./architecture/context.md) |
+| — | System reminders | Ephemeral governance nudges via `before_model_callback`, not hard prompt rewriting | [agents.md](./architecture/agents.md) |
+| — | Constitutional SAFETY fragment | Non-overridable safety constraints hardcoded in InstructionAssembler; distinct from overridable GOVERNANCE | [agents.md](./architecture/agents.md) |
+| — | Hybrid CustomAgent model | CustomAgents span deterministic to hybrid (internal LiteLLM calls); `type` is always `llm` or `custom` | [agents.md](./architecture/agents.md) |
+| — | Agent security model | Project-scope restricted to `type: llm` + tool_role ceiling; state key authorization via tier prefixes | [agents.md](./architecture/agents.md) |
 
 ---
 
-*Document Version: 2.1*
-*Last Updated: 2026-02-28*
+*Document Version: 2.4*
+*Last Updated: 2026-03-10*

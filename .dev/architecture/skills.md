@@ -81,7 +81,7 @@ metadata:
     - deliverable_type: api_endpoint
     - file_pattern: "*/routes/*.py"
   tags: [api, http, routing, fastapi]
-  applies_to: [code_agent, review_agent]
+  applies_to: [coder, reviewer]
   priority: 10
 ---
 
@@ -216,7 +216,7 @@ class SkillLoaderAgent(BaseAgent):
 |---|---|
 | **Observable** | Skill resolution appears in the event stream. You can see exactly which skills loaded for any deliverable execution. |
 | **Deterministic** | Cannot be skipped by LLM judgment. It is a workflow step, not a suggestion. |
-| **Load once, use many** | Skills load into session state once. All subsequent agents in the pipeline (`plan_agent`, `code_agent`, `review_agent`) read from `{loaded_skills}`. |
+| **Load once, use many** | Skills load into session state once. All subsequent agents in the pipeline (`planner`, `coder`, `reviewer`) read from `{loaded_skills}`. |
 | **Debuggable** | If an agent produces poor output, check `loaded_skill_names` in state to verify the right skills were loaded. |
 | **Traceable** | ADK's event stream captures the skill loading event alongside LLM agent events. Unified observability. |
 
@@ -225,8 +225,8 @@ class SkillLoaderAgent(BaseAgent):
 Downstream LLM agents read skills from state via template injection in their instructions:
 
 ```python
-code_agent = LlmAgent(
-    name="code_agent",
+coder = LlmAgent(
+    name="coder",
     instruction="""
     Implement the deliverable according to the plan.
 
@@ -243,7 +243,7 @@ code_agent = LlmAgent(
 )
 ```
 
-The `metadata.applies_to` field in skill frontmatter controls which agents receive the skill. If a skill specifies `metadata.applies_to: [code_agent, review_agent]`, the `InstructionProvider` filters loaded skills to only include those relevant to the current agent.
+The `metadata.applies_to` field in skill frontmatter controls which agents receive the skill. If a skill specifies `metadata.applies_to: [coder, reviewer]`, the `InstructionAssembler` (Decision #50) filters loaded skills during `assemble()` to only include those relevant to the current agent. The assembler composes SKILL-type fragments from loaded skills alongside IDENTITY, GOVERNANCE, PROJECT, and TASK fragments into the final instruction string.
 
 ---
 
@@ -276,15 +276,31 @@ app/skills/
 ├── test/
 │   └── unit-test-patterns/
 │       └── SKILL.md
-└── planning/
-    └── task-decomposition/
-        └── SKILL.md
+├── planning/
+│   └── task-decomposition/
+│       └── SKILL.md
+└── authoring/
+    ├── agent-definition/
+    │   ├── SKILL.md               # How to author agent definition files
+    │   └── references/
+    │       ├── llm-agent.md       # Template: LlmAgent definition
+    │       └── custom-agent.md    # Template: CustomAgent definition
+    ├── skill-authoring/
+    │   ├── SKILL.md               # How to author skills (SKILL.md format, frontmatter, triggers)
+    │   └── references/
+    │       └── skill-template.md  # Template: skill file with all frontmatter fields
+    ├── workflow-authoring/
+    │   ├── SKILL.md               # How to author workflows (WORKFLOW.yaml, pipeline.py, agents/)
+    │   └── references/
+    │       └── workflow-manifest.yaml  # Template: WORKFLOW.yaml with all fields
+    └── project-conventions/
+        └── SKILL.md               # How to configure project-level overrides (agents, skills, conventions)
 ```
 
 ### Project-Local Skills (Live in the User's Repo)
 
 ```
-user-project/.app/skills/
+user-project/.agents/skills/
 ├── code/
 │   ├── api-endpoint/
 │   │   └── SKILL.md               # Overrides global with project conventions
@@ -318,7 +334,7 @@ Global skills are useful out of the box but intentionally generic. They provide 
 
 ### Project-Local Tier
 
-Lives in the user's repository at `.app/skills/`. Contains project-specific conventions:
+Lives in the user's repository at `.agents/skills/`. Contains project-specific conventions:
 
 - "Our API endpoints use FastAPI with async SQLAlchemy and return Pydantic v2 response models"
 - "Our tests use pytest with the `conftest.py` fixtures defined in `tests/conftest.py`"
@@ -355,6 +371,39 @@ The skill index is cached in Redis for fast access across worker invocations. Ca
 
 ---
 
+## Skill Cascading
+
+Skills can declare `cascades` in their frontmatter metadata to trigger loading of related reference materials. This keeps individual skills small and focused while enabling rich context through composition.
+
+```yaml
+---
+name: api-endpoint
+description: REST API endpoint conventions
+metadata:
+  triggers:
+    - deliverable_type: api_endpoint
+  cascades:
+    - reference: error-handling
+    - reference: project-conventions
+---
+```
+
+When the `api-endpoint` skill matches, the `SkillLoaderAgent` also loads the `error-handling` and `project-conventions` skills as cascaded dependencies. This avoids duplicating shared guidance across multiple skills.
+
+### Resolution
+
+The `SkillLoaderAgent` resolves cascades after primary matching:
+
+1. Match skills against the current task context (existing trigger logic)
+2. Collect `cascades` from all matched skills
+3. Load each cascaded skill by name from the skill library
+4. Recurse: if cascaded skills themselves declare cascades, resolve those too
+5. Circular cascades are prevented by tracking visited skill names during resolution
+
+Cascaded skills respect the same two-tier override rules: a project-local skill overrides a global skill with the same name, whether loaded directly or via cascade.
+
+---
+
 ## Scope Estimate
 
 The core skills implementation is approximately 300-400 lines of Python:
@@ -363,11 +412,11 @@ The core skills implementation is approximately 300-400 lines of Python:
 |---|---|---|
 | `SkillEntry` | ~30 | Pydantic model for frontmatter metadata |
 | `SkillLibrary` | ~120 | Index building, matching, loading, two-tier scan |
-| `SkillLoaderAgent` | ~40 | CustomAgent that runs matching and writes state |
+| `SkillLoaderAgent` | ~55 | CustomAgent that runs matching, cascade resolution, and writes state |
 | `Frontmatter parser` | ~30 | YAML frontmatter extraction from markdown files |
 | `Trigger matchers` | ~60 | Per-type matching logic (exact, glob, set intersection) |
-| `InstructionProvider integration` | ~40 | Filter loaded skills by `applies_to` per agent |
-| **Total** | **~320** | |
+| `InstructionAssembler integration` | ~40 | Filter loaded skills by `applies_to` per agent (SKILL fragments) |
+| **Total** | **~335** | |
 
 This is disproportionate value for the effort. Skills transform agents from generic LLM wrappers into project-aware specialists. Without skills, deliverable 47 gets the same generic instructions as deliverable 1. With skills, deliverable 47 gets the domain-specific conventions, patterns, and requirements relevant to its type — whether that's API endpoint conventions for code, citation standards for research, or brand guidelines for marketing.
 
@@ -382,6 +431,6 @@ This is disproportionate value for the effort. Skills transform agents from gene
 
 ---
 
-**Document Version:** 2.3
-**Last Updated:** 2026-02-17
+**Document Version:** 3.0
+**Last Updated:** 2026-03-07
 **Status:** Framework Validated -- Prototyping Phase
