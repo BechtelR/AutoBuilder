@@ -18,18 +18,19 @@ Parse phase number from arguments (if missing, ask). Flags:
 - `--review=single` — one review pass
 - `--review=none` — skip review, quality gate only
 
-Bootstrap (parallel reads):
+Bootstrap — read into main context (parallel reads):
 - @.dev/build-phase/phase-{N}/spec.md — full spec (deliverables, BOM components, decisions, requirements, build order)
 - @.dev/build-phase/phase-{N}/frd.md — functional requirements (FR-{N}.{nn} IDs for verification — OPTIONAL, skip if absent)
 - @.dev/build-phase/phase-{N}/model.md — architecture model (OPTIONAL — skip if not present)
 - @.dev/03-STRUCTURE.md — file placement truth
-- @.dev/02-ARCHITECTURE.md — system architecture (conformance target)
+- @.dev/02-ARCHITECTURE.md §4 only (lines 99-131) — architecture reference map for routing subagents to the right domain docs
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
-Selective reads (only what the phase touches, via INDEX.md):
-- Agents → `architecture/agents.md` | Skills → `architecture/skills.md` | Workflows → `architecture/workflows.md`
-- State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
-- Tech decisions → `04-TECH_STACK.md`
+Do NOT read into main context:
+- Full `02-ARCHITECTURE.md` — subagents read domain-specific sections as needed
+- Selective `architecture/` files — subagents read these, not the orchestrator
+- `04-TECH_STACK.md` — inject into subagents that need tech decisions
+- Source code files — subagents read what they need (see context hygiene)
 
 Skip `CLAUDE.md` and `.claude/rules/` (already in context).
 
@@ -37,6 +38,18 @@ If spec.md doesn't exist: stop and tell user to run `/spec-phase {N}` first.
 If model.md doesn't exist: note it and proceed — model is optional for simple specs.
 If frd.md doesn't exist: note it and proceed — FRD requirement verification will be skipped.
 </context>
+
+<context-hygiene>
+The main context is an ORCHESTRATOR — it holds routing knowledge, not working knowledge. Target: complete the phase with at most 1 compaction (200k window).
+
+Rules:
+1. **Never read source code in main context.** Delegate all code reading to `Explore` or implementation subagents. The orchestrator needs file paths and patterns, not file contents.
+2. **Architecture docs go to subagents.** The orchestrator holds only the §4 reference map to know which doc to inject into which subagent.
+3. **Subagent prompts are data, not output.** Do not echo the full subagent prompt in main context — summarize what was delegated.
+4. **Validation output stays in subagents.** `test-gates` runs commands and returns pass/fail + error summaries. Raw pytest/pyright output never enters main context unless fixing a failure directly.
+5. **Summaries bubble up, details stay down.** Each subagent returns: what was done, what passed, what failed (with brief error context). Not full diffs or command transcripts.
+6. **Re-reads are wasteful.** If a file was read in a subagent, don't re-read it in main context. Trust subagent results.
+</context-hygiene>
 
 <delegation>
 MUST DELEGATE work to parallel subagents to preserve context window:
@@ -56,11 +69,11 @@ STEP 1 — PLAN
 
 Gather everything needed to build. This step always runs — even with `--go`.
 
-A. **Read existing code** — for every file the spec creates or modifies, read what's already there. Understand current patterns, imports, and conventions in the target modules. Use `Explore` agents for unfamiliar areas.
+A. **Survey existing code** — launch `Explore` agent(s) to read every file the spec creates or modifies. The Explore agent returns a brief summary per file: exists/not, key patterns, imports, conventions. Do NOT read source files directly in main context.
 
 B. **Map the work** — for each deliverable, confirm:
    - Which model.md interfaces/types it implements (if model.md exists)
-   - Which existing code it extends or depends on
+   - Which existing code it extends or depends on (from Explore summary)
    - The validation command that proves it's done
 
 C. **Confirm the build order** — walk spec.md Build Order. Per batch: which deliverables, parallel or sequential, what deps must be satisfied first.
@@ -97,8 +110,8 @@ Execute the Build Order from spec.md batch-by-batch. Each batch is one cycle:
    - The deliverable's spec section (ID, files, description, BOM components, requirements, validation)
    - Relevant model.md interfaces/types for that deliverable (if model.md exists)
    - Design decisions from spec.md that apply to this deliverable
-   - Existing code in files being created/modified (from Step 1A findings)
-   - Relevant `.dev/` doc sections based on files touched (e.g., gateway → `architecture/gateway.md`, agents → `architecture/agents.md`)
+   - File paths from Step 1A survey — subagent reads the actual files itself
+   - Relevant `.dev/` domain docs — use `02-ARCHITECTURE.md` §4 reference map to identify which `architecture/` file(s) to tell the subagent to read
 
    **Skill injection** — check available skills (listed in system context with descriptions), match by frontmatter description to the deliverable's domain, and instruct subagents to invoke matched skills. Not every deliverable needs a skill — only inject when a skill's description is relevant to the work.
 
@@ -109,13 +122,13 @@ Repeat for every batch in Build Order. Do NOT skip batches or reorder.
 
 STEP 3 — QUALITY GATE
 
-ALL must pass before proceeding to review:
+Delegate to `test-gates` subagent. It runs all checks and returns pass/fail summary:
 1. `uv run ruff check .` — zero errors
 2. `uv run ruff format --check .` — formatted
 3. `uv run pyright` — zero errors (strict)
 4. `uv run pytest` — all pass (or 0 collected, 0 errors)
 
-Fix and re-run until clean. Reviewers should see mechanically clean code.
+If failures: `test-gates` returns error details. Fix in main context or delegate fixes, then re-run `test-gates` until clean. Reviewers should see mechanically clean code.
 
 STEP 4 — REVIEW GATE
 
@@ -169,57 +182,45 @@ Three independent verification layers — all required, all can fail independent
 Passing FRs does not guarantee deliverable conformance. Checking off deliverables does not guarantee contract completion.
 
 **A. Verify FRs**
-If frd.md exists: for each FR-{N}.{nn}, find the deliverable(s) that cover it (via spec.md FRD Coverage table), run those deliverables' validation commands → read output → mark `[x]` in `frd.md` only on proven success. Failures → fix and re-verify. Skip if no frd.md.
+Delegate to `test-gates` subagent: pass it the frd.md FR list and spec.md FRD Coverage table. It runs each deliverable's validation commands and returns pass/fail per FR. Mark `[x]` in `frd.md` only for confirmed PASS. Failures → fix and re-verify. Skip if no frd.md.
 
 **B. Verify Deliverables**
 Open `.dev/build-phase/phase-{N}/spec.md`. Per deliverable:
 1. `[x]` each BOM Component — only if implemented and confirmed
-2. `[x]` each Requirement — only if proven by validation command output
+2. `[x]` each Requirement — only if proven by validation command output (from Step A subagent results or direct run)
 3. Unverifiable items → leave unchecked, report to user
 
 **C. Verify Contract Items**
 Open `.dev/08-ROADMAP.md`:
-1. `[x]` each contract checkbox — run verification command from spec.md Contract Coverage table, mark only on proven success
+1. `[x]` each contract checkbox — verification evidence from Steps A/B, run additional commands only if not already covered
 2. Status: `IN PROGRESS` → `DONE`
 3. Update top-level status to next phase
 
 **D. Final Quality Gate**
-Run directly (not via subagent):
+Run directly (not via subagent) — this is the orchestrator's own verification, not delegated:
 ```
 uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
 ```
-Fix and re-run until clean.
+If clean (common case): minimal context cost, move on. If failures: delegate fixes to `test-gates` subagent, then re-run directly until clean.
 
 **E. Completion Summary**
 Print evidence table covering all three layers:
 
 | # | Item | Layer | Status | Evidence |
 |---|------|-------|--------|----------|
-| 1 | FR-{N}.{nn}: {description} | FRs | PASS/FAIL | {command + output} |
-| 2 | P{N}.D{n}: {title} requirements | Deliverables | PASS/FAIL | {command + output} |
-| 3 | {contract item} | Contract | PASS/FAIL | {command + output} |
+| 1 | FR-{N}.{nn}: {description} | FRs | PASS/FAIL | {command + result summary} |
+| 2 | P{N}.D{n}: {title} requirements | Deliverables | PASS/FAIL | {command + result summary} |
+| 3 | {contract item} | Contract | PASS/FAIL | {command + result summary} |
 
 NOT done until A-E complete and every row shows PASS.
 </process>
 
 <verification>
-Before reporting done, verify all three layers:
-1. **FRs**: every FR-{N}.{nn} checked off in frd.md with evidence (if frd.md exists)
-2. **Deliverables**: every BOM component and requirement checked off in spec.md with evidence
-3. **Contract items**: every contract checkbox marked in 08-ROADMAP.md with evidence
-4. Quality gate passes (ruff, pyright, pytest)
-5. Review report exists at `.dev/build-phase/phase-{N}/review.md` (unless `--review=none`)
-6. All review findings resolved (unless `--review=none`)
-7. Roadmap status updated to DONE
-8. Evidence table printed with all rows PASS across all three layers
+Before reporting done — all must be true (see Step 5 for execution details):
+1. Completion Protocol steps A-E all executed (not skipped)
+2. All three verification layers pass (FRs + Deliverables + Contract items) with evidence
+3. Quality gate clean (ruff, pyright, pytest)
+4. Review completed per `--review` flag, report at `.dev/build-phase/phase-{N}/review.md` (unless `--review=none`), all findings resolved
+5. Roadmap status updated to DONE
+6. Evidence table printed with all rows PASS
 </verification>
-
-<success_criteria>
-- All FR checkboxes marked in frd.md with evidence (if frd.md exists)
-- All spec deliverable BOM components and requirements checked off with evidence
-- All roadmap contract items checked off with evidence; status updated to DONE
-- Quality gate clean (ruff + pyright + pytest)
-- Review completed per `--review` flag (default: double), report at `.dev/build-phase/phase-{N}/review.md`
-- Completion Protocol A-E executed
-- Evidence table shows all PASS
-</success_criteria>

@@ -21,6 +21,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | 06 | `06-PROVIDERS.md` | External providers | LLM models, pricing, fallback chains, search providers |
 | 07 | `07-COMPONENTS.md` | Component Registry (BOM) | **Every buildable component** → phase assignment; gap detection |
 | 08 | `08-ROADMAP.md` | Phased delivery plan & status | **Current phase**, acceptance criteria, delivery order |
+| — | `.decision-log.md` | Architecture decisions log | All decisions with rationale, date, and rejected alternatives |
 
 ---
 
@@ -28,7 +29,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 
 | Directory | Purpose | Key Contents |
 |-----------|---------|--------------|
-| `.discussion/` | Design evolution & decisions | `design-changelog.md` — canonical decision record (28 decisions) |
+| `.discussion/` | Design evolution & decisions | Timestamped discussion transcripts (e.g., `260214_hierarchical-supervision.md`) |
 | `architecture/` | Domain-specific architecture reference | 14 files covering gateway, workers, events, data, engine, agents, execution, state, tools, skills, workflows, context, observability, clients |
 | `build-phase/` | Per-phase build artifacts | `.templates/` (frd, spec, model), `phase-{N}/` (frd.md, spec.md, model.md, review.md) |
 | `.knowledge/` | Multi-domain reference index | `README.md` → domain dirs; `adk/` has 13 category files + ERRATA |
@@ -52,7 +53,7 @@ Quick-reference map to truth source files. Use this to find what you need fast.
 | What tools are available? | `architecture/tools.md` |
 | How do I set up local dev? | `05-DEV_SETUP.md` |
 | What external providers do we use? | `06-PROVIDERS.md` |
-| Why was decision X made? | `.discussion/design-changelog.md` |
+| Why was decision X made? | `.decision-log.md` |
 | How does ADK feature X work? | `.knowledge/adk/README.md` → category file → WebFetch URL |
 | What are the coding standards? | `.standards.md`, `CLAUDE.md` (project root) |
 | What is the development workflow? | `.workflow.md` |
@@ -70,7 +71,7 @@ Before working with ADK code or designs, must read `.knowledge/adk/README.md` �
 
 - **03-STRUCTURE.md** is referenced by: `02-ARCHITECTURE.md`, `05-DEV_SETUP.md`, `CLAUDE.md`
 - **08-ROADMAP.md** is the status tracker — update it when phases complete
-- **04-TECH_STACK.md** justifies choices; `.discussion/design-changelog.md` records when/why they changed
+- **04-TECH_STACK.md** justifies choices; `.decision-log.md` records when/why they changed
 - **.standards.md** and root `CLAUDE.md` both govern code style — standards is the superset
 - **architecture/** files are linked from `02-ARCHITECTURE.md` §4 reference map
 - **07-COMPONENTS.md** is the BOM — derived from `architecture/` files, assigns components to roadmap phases

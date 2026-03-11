@@ -1,5 +1,5 @@
 # AutoBuilder Project Roadmap
-*Version: 2.5.0*
+*Living document — see changelog at bottom.*
 
 **Single source of truth for phase sequencing, status, and completion contracts.**
 Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-COMPONENTS.md) (the Component Registry / BOM).
@@ -8,7 +8,7 @@ Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0-10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention -- through a production-grade API gateway with async worker execution.
 
-**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5: NEXT**
+**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: NEXT**
 
 ---
 
@@ -137,37 +137,60 @@ Anti-corruption layer translating gateway commands to ADK Runner calls and ADK E
 
 ---
 
-## Phase 5: Agent Definitions `L`
+## Phase 5a: Agent Definitions & Pipeline `L-`
 
-**Goal**: All agents defined -- Director, PMs, and worker-tier LLM/custom agents -- composable via ADK primitives in a hierarchical supervision model.
+**Goal**: All agents defined, composable into a working DeliverablePipeline. Forward-dependency contracts for SkillLibrary and MemoryService.
 **Status**: PLANNED
 **Prerequisites**: Phase 4 (tools available)
 
 
 ### Scope Summary
-Supervision hierarchy: Director (LlmAgent, opus) as stateless root_agent and PM (LlmAgent, sonnet) as per-project autonomous manager driving the batch loop through tools and callbacks. Unified CEO queue (DB-backed) for approvals, escalations, and status reports with SSE push. PM loop prototype validating reliable inter-batch reasoning. Worker-tier LLM agents (plan, code, review, fix) and custom agents — both deterministic (SkillLoader, Linter, TestRunner, Formatter) and hybrid (DependencyResolver, DiagnosticsAgent — deterministic flow with internal LiteLLM calls) (Decision #56). MemoryLoaderAgent (CustomAgent) loads cross-session memory context at pipeline start (Decision #57). Context budget monitor as before_model_callback. Pipeline composition: DeliverablePipeline (SequentialAgent) with ReviewCycle (LoopAgent). InstructionAssembler for fragment-based prompt composition with typed categories (safety, identity, governance, project, task, skill); constitutional SAFETY fragment is non-overridable (Decision #55). Agent definition files (markdown + YAML frontmatter) with 3-scope file cascade (global → workflow → project); AgentRegistry scans files instead of receiving Python registrations (Decision #54). Project-scope security restrictions: `type: llm` only, `tool_role` ceiling validated against workflow manifest. State key authorization via tier prefixes (`director:`, `pm:`, `worker:`) enforced by EventPublisher ACL (Decision #58). Context recreation mechanism replacing lossy compaction — when context fills, persist to memory and recreate session with full context reassembly.
+Agent definition infrastructure: AgentRegistry scans declarative markdown files (YAML frontmatter) with 3-scope file cascade (global → workflow → project); InstructionAssembler composes 6 typed fragments (SAFETY non-overridable, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL) with source auditability. Forward-dependency contracts: SkillLibraryProtocol + NullSkillLibrary stub for Phase 6; ADK BaseMemoryService + InMemoryMemoryService for Phase 9. All agents defined: Director (LlmAgent, opus), PM (LlmAgent, sonnet), worker-tier LLM agents (planner, coder, reviewer, fixer), deterministic CustomAgents (SkillLoader with NullSkillLibrary, MemoryLoader with InMemoryMemoryService, Linter, TestRunner, Formatter), hybrid CustomAgents (DependencyResolver, DiagnosticsAgent — deterministic flow with internal LiteLLM calls) (Decision #56). Pipeline composition pattern: DeliverablePipeline (SequentialAgent) with ReviewCycle (LoopAgent). ContextBudgetMonitor (before_model_callback) with ContextRecreationRequired exception. Context recreation in degraded mode (no real MemoryService). DB tables: ceo_queue, director_queue, project_configs with migrations. Agent definition files on disk for all agents.
+
+### Completion Contract
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | InstructionAssembler composes agent instructions from typed fragments with source auditability | PR-5a |
+| | AgentRegistry scans agent definition files (.md) and builds configured agents (LlmAgent and CustomAgent) with 3-scope file cascade | PR-5b, PR-5c |
+| | SAFETY fragment present in all assembled instructions, not overridable by project-scope or state | NFR-4a |
+| | Can run a single deliverable through the full DeliverablePipeline | PR-10 |
+| | Plan agent produces structured plan; code agent implements it | PR-5 |
+| | Lint/test agents produce structured results in state | PR-11 |
+| | Review cycle loops on failure, terminates on approval or max iterations | PR-22 |
+| | Context budget `before_model_callback` reports token usage percentage | PR-15 |
+| | Context budget monitor triggers context recreation (not lossy compaction) | PR-15a |
+| | MemoryLoaderAgent executes in pipeline; returns empty context in degraded mode (MemoryService unavailable until Phase 9) | PR-15b |
+| | SkillLoaderAgent executes in pipeline via SkillLibraryProtocol; returns empty skills with NullSkillLibrary (real SkillLibrary in Phase 6) | PR-5a |
+| | Hybrid CustomAgents (DependencyResolver, DiagnosticsAgent) use LiteLLM internally with model_role routing | PR-5 |
+| | Project-scope agent definitions rejected if `type: custom` (`tool_role` ceiling validation deferred to Phase 7) | NFR-4b |
+
+---
+
+## Phase 5b: Supervision & Integration `M`
+
+**Goal**: Hierarchical supervision operational — Director delegates to PM, PM drives batch loop (sequential), CEO queue live, state key authorization enforced.
+**Status**: PLANNED
+**Prerequisites**: Phase 5a (agents and pipeline operational)
+
+
+### Scope Summary
+Supervision hierarchy: Director operates as stateless root_agent (recreated per invocation), delegates to PM via transfer_to_agent, PM escalates back. Director processes its own queue (Director Queue) during work sessions — reads pending PM escalations, resolves or forwards to CEO queue. Director personality state (user: scope) with seed config. Director "Main" project as permanent default chat session. PM loop in sequential mode — validates inter-batch reasoning with tools + callbacks; Phase 8 adds parallel execution. Deterministic safety mechanisms: checkpoint_project (after_agent_callback on DeliverablePipeline), verify_batch_completion (after_agent_callback). Director supervision callbacks (before/after_agent_callback). Hard limits cascade (CEO → Director → PM → Workers) — retry_budget and cost_ceiling enforced in Phase 5b; concurrency limit enforcement deferred to Phase 8. CEO queue gateway routes (GET /ceo/queue, PATCH /ceo/queue/{id}) with resolved approval → session state writeback. Chat gateway routes (POST/GET /chat/{session_id}/messages). Cross-session bridge (app:/user: state + Redis Streams). State key authorization via tier prefixes (director:, pm:, worker:) enforced by EventPublisher ACL (Decision #58). Context recreation end-to-end validation (persist → fresh session → reassemble in degraded mode).
 
 ### Completion Contract
 
 | Status | Contract Item | PRD |
 |--------|--------------|-----|
 | | Director agent operates as root_agent (stateless config, recreated per invocation) | PR-13 |
-| | PM agent manages a project autonomously via tools + deterministic safety mechanisms (`checkpoint_project`, `verify_batch_completion`, `run_regression_tests`), escalating only when necessary | PR-14 |
-| | PM loop prototype validates reliable inter-batch reasoning with tools + callbacks | PR-10 |
-| | Can run a single deliverable through the full DeliverablePipeline | PR-10 |
-| | Plan agent produces structured plan; code agent implements it | PR-5 |
-| | Lint/test agents produce structured results in state | PR-11 |
-| | Review cycle loops on failure, terminates on approval or max iterations | PR-22 |
-| | Context budget `before_model_callback` reports token usage percentage | PR-15 |
-| | InstructionAssembler composes agent instructions from typed fragments with source auditability | PR-5a |
-| | AgentRegistry scans agent definition files (.md) and builds configured agents (LlmAgent and CustomAgent) with 3-scope file cascade | PR-5b, PR-5c |
-| | Context budget monitor triggers context recreation (not lossy compaction) | PR-15a |
-| | Context recreation produces a functional session with equivalent agent context (persist → fresh session → reassemble end-to-end) | PR-15a |
-| | SAFETY fragment present in all assembled instructions, not overridable by project-scope or state | NFR-4a |
-| | MemoryLoaderAgent loads cross-session memory context into state at pipeline start | PR-15b |
-| | Hybrid CustomAgents (DependencyResolver, DiagnosticsAgent) use LiteLLM internally with model_role routing | PR-5 |
-| | Project-scope agent definitions rejected if `type: custom` or `tool_role` exceeds workflow ceiling | NFR-4b |
+| | PM agent manages a project autonomously via tools + deterministic callbacks (`checkpoint_project`, `verify_batch_completion`), escalating only when necessary | PR-14 |
+| | PM loop (sequential mode): PM reasons correctly between batches — queries results, decides next batch composition, maintains coherent state across batch boundaries (2+ deliverables); Phase 8 adds parallel execution | PR-10 |
+| | Director → PM delegation and PM → Director escalation via transfer_to_agent | PR-14 |
+| | Context recreation produces a functional session with equivalent agent context (persist → fresh session → reassemble end-to-end) in degraded mode: state keys + skills + instruction fragments preserved; cross-session memory unavailable (full equivalence verified in Phase 9) | PR-15a |
 | | State key writes with tier prefix rejected when author tier does not match prefix | NFR-4c |
+| | CEO queue items created, queried, and resolved via gateway routes | PR-17 |
+| | CEO queue approval resolution written back to session state | PR-20 |
+| | Chat messages routed to Director via worker and response persisted | PR-13 |
+| | Director personality seeded from config into user: scope state | PR-13 |
 
 ---
 
@@ -175,7 +198,7 @@ Supervision hierarchy: Director (LlmAgent, opus) as stateless root_agent and PM 
 
 **Goal**: Progressive knowledge loading -- agents get task-relevant context, not everything.
 **Status**: PLANNED
-**Prerequisites**: Phase 5 (SkillLoaderAgent defined)
+**Prerequisites**: Phase 5a (SkillLoaderAgent defined, SkillLibraryProtocol established)
 
 
 ### Scope Summary
@@ -197,7 +220,7 @@ Skill library adopting the Agent Skills open standard file format (`SKILL.md`) w
 
 **Goal**: Pluggable workflow architecture -- auto-code is ONLY THE FIRST MVP workflow, not a hardcoded pipeline.
 **Status**: PLANNED
-**Prerequisites**: Phase 6 (skills system operational)
+**Prerequisites**: Phase 6 (skills system operational), Phase 5b (supervision operational)
 
 
 ### Scope Summary
@@ -235,6 +258,8 @@ Specification processing: submission endpoint, spec-to-deliverable decomposition
 | | Failed deliverables don't block independent work | PR-12, PR-25 |
 | | Git worktrees provide filesystem isolation for parallel execution | PR-9 |
 | | Can intervene (pause/modify) at batch boundary via API | PR-3, PR-9 |
+| | Consecutive batch failures trigger Director suspension of project (batch failure threshold) | PR-16 |
+| | Concurrency limits enforced: max parallel pipelines capped and cascaded from project-level limits | PR-15, NFR-2 |
 
 ---
 
@@ -246,7 +271,7 @@ Specification processing: submission endpoint, spec-to-deliverable decomposition
 
 
 ### Scope Summary
-PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and semantic search. Memory loading: MemoryLoaderAgent (CustomAgent, deterministic -- loads relevant memories into session state at pipeline start) and LoadMemory tool (agent-decided on-demand retrieval). Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end).
+PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and semantic search. Memory loading: MemoryLoaderAgent (CustomAgent, deterministic -- loads relevant memories into session state at pipeline start) and LoadMemory tool (agent-decided on-demand retrieval). Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end). Context recreation full equivalence verification: validates that recreation with real MemoryService produces fully equivalent agent context (state + skills + instructions + cross-session memory), completing the degraded-mode contract from Phase 5b.
 
 ### Completion Contract
 
@@ -256,6 +281,7 @@ PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and
 | | Agents can search for patterns from prior runs | PR-28, PR-29 |
 | | Memory persists across sessions in PostgreSQL | PR-26 |
 | | Uses existing PostgreSQL database -- tsvector for keyword search, pgvector for semantic search | PR-26 |
+| | Context recreation with real MemoryService produces fully equivalent agent context (state + skills + instructions + cross-session memory) — validates full equivalence deferred from Phase 5b degraded mode | PR-15a |
 
 ---
 
@@ -375,25 +401,11 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 
 ## Open Questions
 
+Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
+
 | # | Question | Status | Target Phase |
 |---|----------|--------|--------------|
-| 1 | Deliverable file format (JSON, SQLite, other?) | Open | Phase 8 |
-| 2 | Spec parsing -- how sophisticated should deliverable decomposition be? | Open | Phase 8 |
-| 3 | Regression strategy -- random sampling or dependency-aware? | Open | Phase 8 |
-| 4 | Reuse Automaker TS libs or rewrite in Python? | Open | Phase 8 |
-| 5 | Agent role system granularity | Open | Phase 11 |
-| 6 | Context budget strategy -- per-agent limits with pruning? | Closed: Context recreation — persist to memory → fresh session → reassemble via InstructionAssembler. Replaces lossy compaction. (Decision #52) | Phase 5 |
-| 7 | Web search provider (SearXNG vs Brave vs Tavily) | Closed: Tavily primary, Brave fallback. Simple `if/elif` dispatch in `web_search`. Settings: `AUTOBUILDER_SEARCH_PROVIDER`, `AUTOBUILDER_SEARCH_API_KEY`. | Phase 4 |
-| 8 | Agent-browser integration approach for UI testing | Closed: Vercel `agent-browser` CLI (npm). Invoked via `bash_exec`. Implementation in Phase 7/13 (workflow-specific). | Phase 7 |
-| 9 | Durable execution -- native ADK resume sufficient or need Temporal? | Likely sufficient | Phase 11 |
-| 10 | Memory ingestion -- after each deliverable, each batch, or session end? | Open | Phase 9 |
-| 11 | pgvector embedding strategy for semantic memory | Closed: tsvector for keyword search; pgvector available when needed | Phase 9 |
-| 12 | Quote style -- double vs single for Python | Closed: double quotes (ruff default) | Phase 0 |
-| 13 | Auth strategy for gateway API | TBD | Phase 11 |
-| 14 | Docker configuration details | Closed: docker-compose with PostgreSQL + Redis | Phase 0 |
-| 15 | Director persistence model -- how does Director state survive worker restarts? | Closed: Stateless. Agent config recreated per invocation, all state in DB. Personality in `user:` scope. | Phase 5 |
-| 16 | PM batch operations -- `select_ready_batch` (FunctionTool), `checkpoint_project` (automatic), `run_regression_tests` (PM-defined policy) | Closed: `checkpoint_project` = `after_agent_callback` on DeliverablePipeline (persists state via `CallbackContext`); `run_regression_tests` = `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state) | Phase 5 |
-| 17 | Agent Skills standard mapping -- which frontmatter fields from agentskills.io map to our trigger system | Closed: mapping defined | Phase 6 |
+| | *None currently open* | | |
 
 ---
 
@@ -441,7 +453,8 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 | 2: Gateway + Infra | `L` | FastAPI, Redis, ARQ workers, database, config |
 | 3: ADK Engine | `L` | Anti-corruption layer, LLM Router, LiteLLM, session state |
 | 4: Core Toolset | `M` | 42 FunctionTools (8 categories), Director queue, three-tier tasks |
-| 5: Agent Definitions | `L` | Director + PM hierarchy, PM loop prototype, worker agents, pipelines |
+| 5a: Agent Definitions & Pipeline | `L-` | Agent definition files, InstructionAssembler, AgentRegistry, DeliverablePipeline, forward-dependency contracts |
+| 5b: Supervision & Integration | `M` | Director + PM hierarchy, PM loop (sequential), CEO queue, state key auth |
 | 6: Skills System | `M` | SkillLibrary, two-tier matching, initial skills |
 | 7: Workflow Composition | `M` | WorkflowRegistry, auto-code workflow, WORKFLOW.yaml |
 | 8: Spec Pipeline | `L` | PM-driven batch loop, spec decomposition, git worktrees |
@@ -459,28 +472,16 @@ Dashboard (React) ----> Gateway (FastAPI) -> Workers (ARQ + ADK)
 
 ## Changelog
 
-| Version | Date | Summary |
-|---------|------|---------|
-| 1.0.0 | 2026-02-12 | Initial roadmap -- restructured from delivery plan into phased increments with completion contracts |
-| 1.1.0 | 2026-02-12 | Renumbered all phases to sequential whole numbers (eliminated sub-phases) |
-| 1.2.0 | 2026-02-12 | Phase 0 verified COMPLETE -- all deliverables and completion contract pass |
-| 1.3.0 | 2026-02-14 | Hierarchical supervision (Director -> PM -> Workers) integrated into Phase 5, 8 |
-| 1.4.0 | 2026-02-16 | PM IS the outer loop; tool/agent terminology aligned; Agent Skills standard adopted |
-| 1.5.0 | 2026-02-16 | Resolved Q15/Q16/Q17; Phase 5 updated with stateless agents, CEO queue, tool registry, deterministic safety ops |
-| 1.5.1 | 2026-02-16 | Aligned tool/callback distinction (checkpoint + regression are not FunctionTools); added escalate_to_ceo to PM tools |
-| 1.5.2 | 2026-02-16 | Reclassified ContextBudgetAgent as `before_model_callback` (not standalone agent) to match architecture doc |
-| 1.6.0 | 2026-02-16 | Revised Decision #46: replaced file-based directory-scoped tool registry with ADK-native GlobalToolset(BaseToolset) pattern |
-| 1.6.1 | 2026-02-16 | Replaced vague "deterministic callback" terminology with exact ADK mechanisms: checkpoint_project = after_agent_callback, RegressionTestAgent = CustomAgent |
-| 1.6.2 | 2026-02-16 | Flagged unverified ADK mechanism claims as TBD: checkpoint_project and run_regression_tests behavior is decided, exact ADK wiring deferred to Phase 5 prototype |
-| 1.7.0 | 2026-02-16 | Resolved all TBD flags: checkpoint_project = `after_agent_callback` on DeliverablePipeline (persists state via CallbackContext); run_regression_tests = `RegressionTestAgent` (CustomAgent) in pipeline after each batch (reads PM regression policy from session state) |
-| 1.7.1 | 2026-02-17 | Moved GlobalToolset from Phase 5 to Phase 4; removed redundant Deterministic Safety section; fixed Phase 4 completion contract to be verifiable in Phase 4 |
-| 2.0.0 | 2026-02-17 | Roadmap v2: slim format, component checklists moved to 07-COMPONENTS.md (BOM) |
-| 2.1.0 | 2026-02-18 | Phase 4 scope expanded: 42 tools, 8 categories, Director queue, three-tier task system |
-| 2.2.0 | 2026-02-18 | Phase 4 DONE: 273 tests pass, all quality gates clean; Phase 5 is NEXT |
-| 2.4.0 | 2026-03-07 | Phase 5 scope expanded: InstructionAssembler, AgentRegistry, context recreation (Decisions #50-53); closed Q6 |
-| 2.5.0 | 2026-03-10 | Phase 5: 3-scope file cascade (was 4-scope), SAFETY fragment, hybrid agents, MemoryLoaderAgent, project-scope security, state key authorization (Decisions #55-58); Phase 6: authoring skills added |
+| Date | Summary |
+|------|---------|
+| 2026-02-12 | Initial roadmap; Phase 0 COMPLETE |
+| 2026-02-14 | Hierarchical supervision integrated |
+| 2026-02-16 | PM as outer loop; ADK mechanisms resolved; GlobalToolset; Agent Skills standard |
+| 2026-02-17 | Roadmap v2: slim format, BOM split to 07-COMPONENTS.md |
+| 2026-02-18 | Phase 4 DONE |
+| 2026-03-10 | Phase 5 scope finalized (Decisions #50-58); split into 5a + 5b; FRDs written |
+| 2026-03-11 | All open questions resolved (Decisions #59-67); migrated to `.decision-log.md` |
 
 ---
 
-*Document Version: 2.5.0*
-*Last Updated: 2026-03-10*
+*Last Updated: 2026-03-11*

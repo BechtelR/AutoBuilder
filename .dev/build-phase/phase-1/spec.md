@@ -410,7 +410,7 @@ async def _run_async_impl(self, ctx):  # type: ignore[override]
     yield Event(author=self.name, actions=EventActions(state_delta={"key": "value"}))
 ```
 
-> **ADK Quirk (confirmed in implementation)**: Direct `ctx.session.state["key"] = value` assignments inside `_run_async_impl` do NOT persist across agent boundaries. All state writes MUST use `state_delta` on a yielded `Event`. This applies to both `InMemorySessionService` and `DatabaseSessionService`. See Decision D9 (revised, design-changelog.md) and ERRATA.md #1.
+> **ADK Quirk (confirmed in implementation)**: Direct `ctx.session.state["key"] = value` assignments inside `_run_async_impl` do NOT persist across agent boundaries. All state writes MUST use `state_delta` on a yielded `Event`. This applies to both `InMemorySessionService` and `DatabaseSessionService`. See Decision D9 (revised, .decision-log.md) and ERRATA.md #1.
 
 ### Token Usage
 ```python

@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 1.6.0*
+*Version: 1.8.1*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -42,10 +42,10 @@ Source: `architecture/gateway.md`
 | G07 | `GET /deliverables` | route | 8 | gateway.md §Route Structure | `deliverables` table |
 | G08 | `GET /deliverables/{id}` | route | 8 | gateway.md §Route Structure | `deliverables` table |
 | G09 | `GET /events/stream` | endpoint | 10 | gateway.md §Route Structure | Redis Streams, SSE |
-| G10 | `POST /chat/{session_id}/messages` | route | 5 | gateway.md §Route Structure | Director agent, `runner.run_async` |
-| G11 | `GET /chat/{session_id}/messages` | route | 5 | gateway.md §Route Structure | ADK session / DB |
-| G12 | `GET /ceo/queue` | route | 5 | gateway.md §Route Structure | `ceo_queue` table |
-| G13 | `PATCH /ceo/queue/{id}` | route | 5 | gateway.md §Route Structure | `ceo_queue` table, session state writeback |
+| G10 | `POST /chat/{session_id}/messages` | route | 5b | gateway.md §Route Structure | Director agent, `runner.run_async` |
+| G11 | `GET /chat/{session_id}/messages` | route | 5b | gateway.md §Route Structure | ADK session / DB |
+| G12 | `GET /ceo/queue` | route | 5b | gateway.md §Route Structure | `ceo_queue` table |
+| G13 | `PATCH /ceo/queue/{id}` | route | 5b | gateway.md §Route Structure | `ceo_queue` table, session state writeback |
 | G14 | `GET /ceo/queue/stream` | endpoint | 10 | gateway.md §Route Structure | `ceo_queue` table, Redis Streams |
 | G15 | `GET /sessions/{id}/state` | endpoint | 11 | state.md §10 | `DatabaseSessionService` |
 | G16 | `GET /memory/search` | endpoint | 9 | state.md §10 | `PostgresMemoryService` |
@@ -73,10 +73,10 @@ Source: `architecture/data.md`, `architecture/state.md`
 | D02 | `workflows` table | db | ✓ | data.md §1 | Alembic |
 | D03 | `deliverables` table | db | ✓ | data.md §1 | Alembic |
 | D04 | `sessions` table (ADK) | db | 3 | data.md §1 | `DatabaseSessionService` |
-| D05 | `ceo_queue` table | db | 5 | data.md §1, events.md §Unified CEO Queue | Alembic |
+| D05 | `ceo_queue` table | db | 5a | data.md §1, events.md §Unified CEO Queue | Alembic |
 | D06 | `events` table (audit log) | db | 10 | data.md §1 | Audit consumer |
 | D07 | `webhook_listeners` table | db | 10 | data.md §1 | Alembic |
-| D08 | `project_configs` table | db | 5 | data.md §1, state.md §1.2 | Alembic |
+| D08 | `project_configs` table | db | 5a | data.md §1, state.md §1.2 | Alembic |
 | D09 | `skills` table | db | DROP | data.md §1 | File-based + Redis cache is sufficient per current architecture |
 | D10 | `memory` table (tsvector + pgvector) | db | 9 | state.md §5 | pgvector extension |
 | D11 | Job metadata table (ARQ tracking) | db | 3 | state.md §2.1 | Alembic, ARQ |
@@ -84,10 +84,10 @@ Source: `architecture/data.md`, `architecture/state.md`
 | D13 | `async_sessionmaker` factory | module | ✓ | state.md §2.1 | SQLAlchemy async engine |
 | D14 | Alembic migration environment | config | ✓ | data.md §1 | — |
 | D15 | Initial migration (core tables) | migration | ✓ | data.md §1 | Alembic |
-| D16 | CEO queue migration | migration | 5 | events.md §Unified CEO Queue | Alembic |
+| D16 | CEO queue migration | migration | 5a | events.md §Unified CEO Queue | Alembic |
 | D17 | Memory table migration | migration | 9 | state.md §5 | Alembic, pgvector |
 | D18 | Events + webhook_listeners migration | migration | 10 | data.md §1 | Alembic |
-| D19 | Project configs migration | migration | 5 | data.md §1 | Alembic |
+| D19 | Project configs migration | migration | 5a | data.md §1 | Alembic |
 
 ---
 
@@ -98,8 +98,8 @@ Source: `architecture/engine.md`
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
 | E01 | `App` container (`autobuilder`) | module | 3 | engine.md §5 | Director agent, plugins, configs |
-| E02 | Agent tree construction (via `AgentRegistry.build()`) | module | 5 | engine.md §5, agents.md §Agent Registry | AgentRegistry, InstructionAssembler, project IDs |
-| E03 | PM agent construction (via `AgentRegistry.build()`) | module | 5 | engine.md §5, agents.md §Agent Registry | AgentRegistry, project config |
+| E02 | Agent tree construction (via `AgentRegistry.build()`) | module | 5a | engine.md §5, agents.md §Agent Registry | AgentRegistry, InstructionAssembler, project IDs |
+| E03 | PM agent construction (via `AgentRegistry.build()`) | module | 5a | engine.md §5, agents.md §Agent Registry | AgentRegistry, project config |
 | E04 | `EventsCompactionConfig` | config | 3 | engine.md §5 | `LlmEventSummarizer` |
 | E05 | `LlmEventSummarizer` (haiku model) | module | 3 | engine.md §5 | LiteLLM, haiku model |
 | E06 | `ResumabilityConfig` | config | 3 | engine.md §5 | — |
@@ -154,17 +154,17 @@ Source: `architecture/events.md`
 | V10 | Webhook HMAC signature | mechanism | 10 | events.md §Event Listeners (Webhooks) | Webhook dispatcher |
 | V11 | Webhook retry (exponential backoff) | mechanism | 10 | events.md §Event Listeners (Webhooks) | Webhook dispatcher |
 | V12 | Event listener CRUD (register/unregister) | module | 10 | events.md §Event Listeners (Webhooks) | `webhook_listeners` table |
-| V13 | CEO queue type enum (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) | config | 5 | events.md §Unified CEO Queue | — |
-| V14 | CEO queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 5 | events.md §Unified CEO Queue | — |
-| V15 | CEO queue status enum (`PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`) | config | 5 | events.md §Unified CEO Queue | — |
+| V13 | CEO queue type enum (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) | config | 5a | events.md §Unified CEO Queue | — |
+| V14 | CEO queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 5a | events.md §Unified CEO Queue | — |
+| V15 | CEO queue status enum (`PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`) | config | 5a | events.md §Unified CEO Queue | — |
 | V17 | CEO queue Redis Stream trigger consumer | mechanism | DROP | events.md §Unified CEO Queue | `escalate_to_ceo` FunctionTool is the write path; second write path via stream consumer is over-engineering |
-| V18 | CEO resolved approval → session state writeback | mechanism | 5 | events.md §Unified CEO Queue | CEO queue, ADK session |
+| V18 | CEO resolved approval → session state writeback | mechanism | 5b | events.md §Unified CEO Queue | CEO queue, ADK session |
 | V19 | Batch completion event publishing | mechanism | 8 | events.md §Unified CEO Queue | Redis Streams |
 | V20 | Director queue type enum (`ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT`) | config | 4 | events.md §Director Queue | — |
 | V21 | Director queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 4 | events.md §Director Queue | — |
 | V22 | Director queue status enum (`PENDING`, `IN_PROGRESS`, `RESOLVED`, `FORWARDED_TO_CEO`) | config | 4 | events.md §Director Queue | — |
-| V23 | `director_queue` table | db | 5 | events.md §Director Queue | Alembic |
-| V24 | `director_queue` migration | migration | 5 | events.md §Director Queue | Alembic |
+| V23 | `director_queue` table | db | 5a | events.md §Director Queue | Alembic |
+| V24 | `director_queue` migration | migration | 5a | events.md §Director Queue | Alembic |
 
 ---
 
@@ -176,79 +176,82 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A01 | Director agent (LlmAgent, opus) | agent | 5 | agents.md §Director Agent | AgentRegistry, PM agents |
-| A02 | PM agent (LlmAgent, sonnet) | agent | 5 | agents.md §PM Agent | AgentRegistry, PM tools |
-| A03 | Director agent definition file (`director.md`) | config | 5 | agents.md §Agent Definition Files | AgentRegistry |
-| A04 | PM agent definition file (`pm.md`) | config | 5 | agents.md §Agent Definition Files | AgentRegistry |
-| A05 | Director → PM delegation (`transfer_to_agent`) | mechanism | 5 | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
-| A06 | PM → Director escalation (`transfer_to_agent`) | mechanism | 5 | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
-| A07 | Hard limits cascade (CEO → Director → PM → Workers) | mechanism | 5 | agents.md §PM Agent | `project_configs` |
-| A08 | Director personality state (`user:` scope) | config | 5 | agents.md §Director Agent | `user:` state, seed config |
-| A09 | Director personality seed config file | config | 5 | agents.md §Director Agent | — |
+| A01 | Director agent (LlmAgent, opus) | agent | 5a | agents.md §Director Agent | AgentRegistry, PM agents |
+| A02 | PM agent (LlmAgent, sonnet) | agent | 5a | agents.md §PM Agent | AgentRegistry, PM tools |
+| A03 | Director agent definition file (`director.md`) | config | 5a | agents.md §Agent Definition Files | AgentRegistry |
+| A04 | PM agent definition file (`pm.md`) | config | 5a | agents.md §Agent Definition Files | AgentRegistry |
+| A05 | Director → PM delegation (`transfer_to_agent`) | mechanism | 5b | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
+| A06 | PM → Director escalation (`transfer_to_agent`) | mechanism | 5b | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
+| A07 | Hard limits cascade (CEO → Director → PM → Workers) | mechanism | 5b | agents.md §PM Agent | `project_configs` |
+| A08 | Director personality state (`user:` scope) | config | 5b | agents.md §Director Agent | `user:` state, seed config |
+| A09 | Director personality seed config file | config | 5b | agents.md §Director Agent | — |
 | A10 | Director tool authoring + CEO approval gate | mechanism | 13+ | agents.md §Director Agent | Tool registry, CEO queue |
 | A11 | Director cross-project pattern propagation | mechanism | 14 | agents.md §Director Agent | `MemoryService` |
 | A12 | Director governance tools | tool | 13+ | agents.md §Director Agent | `GlobalToolset` |
-| A13 | Director "Main" project (permanent chat session) | mechanism | 5 | agents.md §Director Agent | Session model |
-| A14 | `before_agent_callback` (Director supervision) | callback | 5 | agents.md §PM Agent | Director agent |
-| A15 | `after_agent_callback` (Director supervision) | callback | 5 | agents.md §PM Agent | Director agent |
+| A13 | Director "Main" project (permanent chat session) | mechanism | 5b | agents.md §Director Agent | Session model |
+| A16 | Director queue consumption (reads pending escalations, resolves or forwards to CEO queue) | mechanism | 5b | agents.md §Director Agent | `director_queue` table, CEO queue |
+| A14 | `before_agent_callback` (Director supervision) | callback | 5b | agents.md §PM Agent | Director agent |
+| A15 | `after_agent_callback` (Director supervision) | callback | 5b | agents.md §PM Agent | Director agent |
 
 ### 6.2 Worker Tier — LLM Agents
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A20 | `planner` (LlmAgent, opus) | agent | 5 | agents.md §Worker-Tier LLM Agents | Read-only tools, skills |
-| A21 | `coder` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Full tools, plan output |
-| A22 | `reviewer` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Read-only tools, lint/test results |
-| A23 | `fixer` (LlmAgent, sonnet) | agent | 5 | agents.md §Worker-Tier LLM Agents | Full tools, review output |
+| A20 | `planner` (LlmAgent, opus) | agent | 5a | agents.md §Worker-Tier LLM Agents | Read-only tools, skills |
+| A21 | `coder` (LlmAgent, sonnet) | agent | 5a | agents.md §Worker-Tier LLM Agents | Full tools, plan output |
+| A22 | `reviewer` (LlmAgent, sonnet) | agent | 5a | agents.md §Worker-Tier LLM Agents | Read-only tools, lint/test results |
+| A23 | `fixer` (LlmAgent, sonnet) | agent | 5a | agents.md §Worker-Tier LLM Agents | Full tools, review output |
 
 ### 6.3 Worker Tier — Custom Agents (Deterministic & Hybrid)
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A30 | `SkillLoaderAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | SkillLibrary |
-| A31 | `LinterAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
-| A32 | `TestRunnerAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
-| A33 | `FormatterAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Filesystem |
-| A34 | `DependencyResolverAgent` (hybrid CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | Deliverable deps, LiteLLM |
-| A35 | `RegressionTestAgent` (CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | PM regression policy |
-| A36 | `DiagnosticsAgent` (hybrid CustomAgent) | agent | 5 | agents.md §Worker-Tier Custom Agents | `lint_results`, `test_results`, LiteLLM |
+| A30 | `SkillLoaderAgent` (CustomAgent) | agent | 5a | agents.md §Worker-Tier Custom Agents | SkillLibrary |
+| A31 | `LinterAgent` (CustomAgent) | agent | 5a | agents.md §Worker-Tier Custom Agents | Filesystem |
+| A32 | `TestRunnerAgent` (CustomAgent) | agent | 5a | agents.md §Worker-Tier Custom Agents | Filesystem |
+| A33 | `FormatterAgent` (CustomAgent) | agent | 5a | agents.md §Worker-Tier Custom Agents | Filesystem |
+| A34 | `DependencyResolverAgent` (hybrid CustomAgent) | agent | 5a | agents.md §Worker-Tier Custom Agents | Deliverable deps, LiteLLM |
+| A35 | `RegressionTestAgent` (CustomAgent) | agent | 5a | agents.md §Worker-Tier Custom Agents | PM regression policy |
+| A36 | `DiagnosticsAgent` (hybrid CustomAgent) | agent | 5a | agents.md §Worker-Tier Custom Agents | `lint_results`, `test_results`, LiteLLM |
+| A37 | `MemoryLoaderAgent` (CustomAgent) | agent | 5a | agents.md §Worker-Tier Custom Agents | BaseMemoryService (ADK) |
 
 ### 6.4 Callbacks & Hooks
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A40 | `verify_batch_completion` (`after_agent_callback`) | callback | 5 | agents.md §PM Agent | PM agent |
-| A41 | `checkpoint_project` (`after_agent_callback`) | callback | 5 | agents.md §PM Agent | DeliverablePipeline |
-| A43 | `before_model_callback` context injection | callback | 5 | agents.md §Worker-Tier LLM Agents | Session state |
+| A40 | `verify_batch_completion` (`after_agent_callback`) | callback | 5b | agents.md §PM Agent | PM agent |
+| A41 | `checkpoint_project` (`after_agent_callback`) | callback | 5b | agents.md §PM Agent | DeliverablePipeline |
+| A43 | `before_model_callback` context injection | callback | 5a | agents.md §Worker-Tier LLM Agents | Session state |
 | A44 | `before_model_callback` LLM Router override | callback | 3 | agents.md §LLM Router | LlmRouter |
 
 ### 6.5 Agent Communication
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A50 | `output_key` state communication | mechanism | 5 | agents.md §1. output_key | Session state |
-| A51 | `{key}` state template injection | mechanism | 5 | agents.md §2. {key} Templates | Session state |
-| A52 | `InstructionAssembler` — fragment-based instruction composition | module | 5 | agents.md §Agent Definitions | InstructionFragment, session state |
-| A53 | `InstructionFragment` dataclass | module | 5 | agents.md §Agent Definitions | — |
-| A54 | `context_from_state` helper | module | 5 | agents.md §Worker-Tier Custom Agents | Session state |
-| A55 | Agent definition files (markdown + YAML frontmatter) | config | 5 | agents.md §Agent Definition Files | — |
-| A56 | `AgentRegistry` class (scan + build from files) | module | 5 | agents.md §AgentRegistry | InstructionAssembler, GlobalToolset, LlmRouter |
-| A57 | Base instruction fragments (6 types: SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL) | config | 5 | agents.md §Agent Definitions | — |
-| A58 | System reminder injection (`before_model_callback`) | callback | 5 | agents.md §System Reminders | Session state |
-| A59 | Context recreation mechanism | mechanism | 5 | context.md §Context Recreation | InstructionAssembler, SkillLoaderAgent, MemoryService |
-| A75 | SAFETY instruction fragment (hardcoded, non-overridable) | config | 5 | agents.md §Instruction Composition | InstructionAssembler |
-| A76 | `InstructionContext` container (per-invocation assembly data) | module | 5 | agents.md §Agent Definitions | Project config, session state, loaded skills |
-| A77 | Partial override (frontmatter-only definition files inherit parent body) | mechanism | 5 | agents.md §Definition Cascade | AgentRegistry |
-| A78 | Project-scope security validation (`type:llm` only, `tool_role` ceiling) | mechanism | 5 | agents.md §Project-Scope Restrictions | AgentRegistry, `WORKFLOW.yaml` |
-| A79 | State key authorization (tier prefixes, EventPublisher ACL) | mechanism | 5 | agents.md §State Key Authorization | EventPublisher |
-| A80 | Resolution auditability (`agent_resolution_sources` session state key) | mechanism | 5 | agents.md §AgentRegistry | AgentRegistry, event stream |
+| A50 | `output_key` state communication | mechanism | 5a | agents.md §1. output_key | Session state |
+| A51 | `{key}` state template injection | mechanism | 5a | agents.md §2. {key} Templates | Session state |
+| A52 | `InstructionAssembler` — fragment-based instruction composition | module | 5a | agents.md §Agent Definitions | InstructionFragment, session state |
+| A53 | `InstructionFragment` dataclass | module | 5a | agents.md §Agent Definitions | — |
+| A54 | `context_from_state` helper | module | 5a | agents.md §Worker-Tier Custom Agents | Session state |
+| A55 | Agent definition files (markdown + YAML frontmatter) | config | 5a | agents.md §Agent Definition Files | — |
+| A56 | `AgentRegistry` class (scan + build from files) | module | 5a | agents.md §AgentRegistry | InstructionAssembler, GlobalToolset, LlmRouter |
+| A57 | Base instruction fragments (6 types: SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL) | config | 5a | agents.md §Agent Definitions | — |
+| A58 | System reminder injection (`before_model_callback`) | callback | 5b | agents.md §System Reminders | Session state |
+| A59 | Context recreation mechanism | mechanism | 5b | context.md §Context Recreation | InstructionAssembler, SkillLoaderAgent, MemoryService |
+| A75 | SAFETY instruction fragment (hardcoded, non-overridable) | config | 5a | agents.md §Instruction Composition | InstructionAssembler |
+| A76 | `InstructionContext` container (per-invocation assembly data) | module | 5a | agents.md §Agent Definitions | Project config, session state, loaded skills |
+| A77 | Partial override (frontmatter-only definition files inherit parent body) | mechanism | 5a | agents.md §Definition Cascade | AgentRegistry |
+| A78a | Project-scope type validation (`type: llm` only from project scope) | mechanism | 5a | agents.md §Project-Scope Restrictions | AgentRegistry |
+| A78b | Project-scope `tool_role` ceiling validation (against workflow manifest) | mechanism | 7 | agents.md §Project-Scope Restrictions | AgentRegistry, WORKFLOW.yaml |
+| A79 | State key authorization (tier prefixes, EventPublisher ACL) | mechanism | 5b | agents.md §State Key Authorization | EventPublisher |
+| A80 | Resolution auditability (`agent_resolution_sources` session state key) | mechanism | 5a | agents.md §AgentRegistry | AgentRegistry, event stream |
 
 ### 6.6 Pipelines & Loops
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A60 | `DeliverablePipeline` (SequentialAgent) | workflow | 5 | agents.md §How Workers Compose | All worker agents |
-| A61 | `ReviewCycle` (LoopAgent, max=3) | workflow | 5 | agents.md §How Workers Compose | review, fix, lint, test agents |
+| A60 | `DeliverablePipeline` (SequentialAgent) | workflow | 5a | agents.md §How Workers Compose | All worker agents |
+| A61 | `ReviewCycle` (LoopAgent, max=3) | workflow | 5a | agents.md §How Workers Compose | review, fix, lint, test agents |
 | A62 | Parallel batch execution (ParallelAgent) | workflow | 8 | execution.md §PM loop | `DeliverablePipeline`, git worktrees |
 | A63 | PM outer loop (batch management) | workflow | 8 | execution.md §PM loop | PM agent, `select_ready_batch` |
 
@@ -256,9 +259,9 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| A70 | Chat session model (per-message `runner.run_async`) | mechanism | 5 | execution.md §Multi-Session | Director, `DatabaseSessionService` |
+| A70 | Chat session model (per-message `runner.run_async`) | mechanism | 5b | execution.md §Multi-Session | Director, `DatabaseSessionService` |
 | A71 | Work session model (long-running ARQ job) | mechanism | 3 | execution.md §Multi-Session | ARQ, `DatabaseSessionService` |
-| A72 | Cross-session bridge (`app:`/`user:` state + memory + Redis Streams) | mechanism | 5 | execution.md §Multi-Session | Multiple subsystems |
+| A72 | Cross-session bridge (`app:`/`user:` state + Redis Streams) | mechanism | 3 | execution.md §Multi-Session | Multiple subsystems |
 | A73 | Session rewind integration | mechanism | 11 | state.md §1.5 | `DatabaseSessionService` |
 | A74 | Session migration CLI tool | tool | 11 | state.md §1.6 | `DatabaseSessionService` |
 
@@ -440,8 +443,8 @@ Source: `architecture/state.md`
 | M02 | `user:` scope handling | mechanism | 3 | state.md §1.2 | `DatabaseSessionService` |
 | M03 | `app:` scope handling | mechanism | 3 | state.md §1.2 | `DatabaseSessionService` |
 | M04 | Session (no prefix) scope handling | mechanism | 3 | state.md §1.2 | `DatabaseSessionService` |
-| M05 | State template injection (`{key}` / `{key?}`) | mechanism | 5 | state.md §1.2 | Session state |
-| M06 | Project config loader (tool or init callback) | tool | 5 | state.md §1.2 | `project_configs` table |
+| M05 | State template injection (`{key}` / `{key?}`) | mechanism | 5a | state.md §1.2 | Session state |
+| M06 | Project config loader (tool or init callback) | tool | 5a | state.md §1.2 | `project_configs` table |
 
 ### 11.2 Memory Service
 
@@ -452,7 +455,7 @@ Source: `architecture/state.md`
 | M12 | `search_memory()` (tsvector) | mechanism | 9 | state.md §5 | PostgresMemoryService |
 | M13 | Embedding model integration (LiteLLM) | module | 9 | state.md §5 | LiteLLM |
 | M14 | Embedding model config | config | 9 | state.md §5 | — |
-| M15 | `MemoryLoaderAgent` | CustomAgent | 9 | state.md §1.4, agents.md | PostgresMemoryService |
+| M15 | `MemoryLoaderAgent` | CustomAgent | 5a | state.md §1.4, agents.md | BaseMemoryService (ADK); InMemoryMemoryService in Phase 5a, PostgresMemoryService in Phase 9 |
 | M16 | `LoadMemory` tool | tool | 9 | state.md §1.4 | PostgresMemoryService |
 | M17 | Memory ingestion strategy (configurable) | mechanism | 9 | state.md §9.2 | — |
 | M18 | pgvector semantic search upgrade | mechanism | 11 | state.md §5 | pgvector, embeddings |
@@ -481,9 +484,9 @@ Source: `architecture/context.md`
 | CT01 | Context compression (sliding window summarization) | mechanism | 3 | context.md §Context Recreation | `EventsCompactionConfig` |
 | CT02 | Skill pruning (reactive context response) | mechanism | 11 | context.md §Context Budget Monitoring | Context budget monitor |
 | CT03 | Artifact storage (`save_artifact`/`load_artifact`) | mechanism | 8 | context.md §Knowledge Loading Layers | ADK artifacts API |
-| CT04 | `ContextBudgetMonitor` (`before_model_callback`) | module | 5 | context.md §Context Budget Monitoring | LiteLLM `token_counter`, LlmRequest |
-| CT05 | Context recreation pipeline (persist → seed → fresh session → reassemble) | mechanism | 5 | context.md §Context Recreation | InstructionAssembler, MemoryService, SkillLoaderAgent |
-| CT06 | `ContextRecreationRequired` exception | module | 5 | context.md §Trigger Mechanics | ContextBudgetMonitor |
+| CT04 | `ContextBudgetMonitor` (`before_model_callback`) | module | 5a | context.md §Context Budget Monitoring | LiteLLM `token_counter`, LlmRequest |
+| CT05 | Context recreation pipeline (persist → seed → fresh session → reassemble) | mechanism | 5b | context.md §Context Recreation | InstructionAssembler, MemoryService, SkillLoaderAgent |
+| CT06 | `ContextRecreationRequired` exception | module | 5a | context.md §Trigger Mechanics | ContextBudgetMonitor |
 | CT07 | Context caching config (provider-dependent prompt caching) | config | 3 | context.md §Context Caching | Engine App container |
 
 ---
@@ -518,6 +521,7 @@ Source: `architecture/execution.md`
 | X08 | Autonomous failure handling (retry/reorder/skip) | mechanism | 8 | execution.md §PM loop | PM agent |
 | X09 | Human-in-the-loop pause at batch boundary | mechanism | 8 | execution.md §PM loop | Intervention API |
 | X10 | Concurrency limits (configurable, cascaded) | config | 8 | execution.md §PM loop | `project_configs` |
+| X11 | Batch failure threshold (consecutive failures → Director suspension) | mechanism | 8 | execution.md §PM loop | PM agent, Director queue, `project_configs` |
 
 ---
 
@@ -572,19 +576,20 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Metric | Count |
 |--------|-------|
-| Total components | 321 |
+| Total components | 325 |
 | Dropped | 2 |
-| Active components | 319 |
-| Assigned (with phase) | 319 |
+| Active components | 323 |
+| Assigned (with phase) | 323 |
 | **Unassigned (gaps)** | **0** |
-| Phase 0-2 (done) | 19 |
-| Phase 3 | 36 |
+| Phase 0-2 (done) | 20 |
+| Phase 3 | 37 |
 | Phase 4 | 62 |
-| Phase 5 | 67 |
+| Phase 5a | 48 |
+| Phase 5b | 21 |
 | Phase 6 | 24 |
-| Phase 7 | 20 |
-| Phase 8 | 20 |
-| Phase 9 | 11 |
+| Phase 7 | 21 |
+| Phase 8 | 21 |
+| Phase 9 | 10 |
 | Phase 10 | 25 |
 | Phase 11 | 17 |
 | Phase 12 | 12 |
@@ -596,6 +601,9 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.8.1 | 2026-03-10 | Fix Phase 3 count 36→37 (A72 move was not reflected in statistics) |
+| 1.8.0 | 2026-03-10 | Phase 5b FRD decisions: A16 added (Director queue consumption, 5b); X11 added (batch failure threshold, 8); A72 moved 5b→3 (cross-session bridge already operational via state scopes + Redis Streams); statistics updated (Total 323→325, Active 321→323, Phase 0-2 19→20, Phase 8 20→21) |
+| 1.7.0 | 2026-03-10 | Phase 5 split into 5a (Agent Definitions & Pipeline) and 5b (Supervision & Integration); A78 split into A78a (type validation, 5a) and A78b (tool_role ceiling, 7); M15 moved from Phase 9 to 5a (degraded mode with InMemoryMemoryService); A37 added for MemoryLoaderAgent agent entry |
 | 1.6.0 | 2026-03-10 | New §12 Context section (CT01-CT07) sourced from context.md; O04-O06 migrated to CT01-CT03; A42 absorbed into CT04; sections renumbered (Observability→13, Spec Pipeline→14, CLI→15, Dashboard→16) |
 | 1.5.0 | 2026-03-10 | Add 7 missing agent components: DiagnosticsAgent (A36), SAFETY fragment (A75), InstructionContext (A76), partial override (A77), project-scope security (A78), state key authorization (A79), resolution auditability (A80); update A57 fragment types; fix v1.4.0 cascade scope count (4→3) |
 | 1.4.0 | 2026-03-09 | Agent definitions → declarative markdown files with 3-scope cascade (Decision #54); AgentDef dataclass removed |
@@ -609,5 +617,5 @@ Components removed from the registry as unnecessary or over-engineered:
 
 ---
 
-*Document Version: 1.6.0*
+*Document Version: 1.8.0*
 *Last Updated: 2026-03-10*

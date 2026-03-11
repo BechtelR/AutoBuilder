@@ -26,7 +26,7 @@ Bootstrap (parallel reads):
 Selective deep-reads (only architecture files referenced in BOM "Source" column for this phase's components):
 - Agents → `architecture/agents.md` | Skills → `architecture/skills.md` | Workflows → `architecture/workflows.md`
 - State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
-- Tech decisions → `04-TECH_STACK.md` | Design history → `.discussion/design-changelog.md`
+- Tech decisions → `04-TECH_STACK.md` | Design history → `.decision-log.md`
 
 If frd.md doesn't exist: stop and tell user to run `/shape-phase {N}` first.
 If model.md exists: ask user — overwrite or skip?

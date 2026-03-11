@@ -28,7 +28,7 @@ Selective deep-reads (only architecture files referenced in BOM "Source" column 
 - Infrastructure/gateway → `02-ARCHITECTURE.md` | Agents → `architecture/agents.md`
 - Skills → `architecture/skills.md` | Workflows → `architecture/workflows.md`
 - State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
-- Tech decisions → `04-TECH_STACK.md` | Design history → `.discussion/design-changelog.md`
+- Tech decisions → `04-TECH_STACK.md` | Design history → `.decision-log.md`
 
 Skip `CLAUDE.md` and `.claude/rules/` (already in context).
 If spec exists and no flag: ask user — overwrite or resume?

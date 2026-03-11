@@ -398,7 +398,7 @@ flowchart LR
 
 ## Notes
 
-- **Design Decision D9 (revised)**: All Phase 1 prototype state writes use `Event(actions=EventActions(state_delta={...}))` — direct `ctx.session.state[key] = value` writes do NOT persist (ADK quirk confirmed during implementation). The original decision described direct writes as a simplification; the implementation corrected this. Production agents (Phase 3+) follow the same `state_delta` pattern. See design-changelog.md Decision D9 and ERRATA.md #1.
+- **Design Decision D9 (revised)**: All Phase 1 prototype state writes use `Event(actions=EventActions(state_delta={...}))` — direct `ctx.session.state[key] = value` writes do NOT persist (ADK quirk confirmed during implementation). The original decision described direct writes as a simplification; the implementation corrected this. Production agents (Phase 3+) follow the same `state_delta` pattern. See .decision-log.md Decision D9 and ERRATA.md #1.
 
 - **BaseAgent is a Pydantic v2 model**: Custom attributes on `BaseAgent` subclasses must be declared as Pydantic model fields (`features: list[Feature] = Field(default_factory=list)`), not as `__init__` parameters. This is an ADK constraint discovered during prototype design and applies to all future `CustomAgent` implementations.
 

@@ -95,6 +95,11 @@ Canonical term is "deliverable" (not "feature"). Code examples, state keys, clas
 - ❌ `FeaturePipeline`, `current_feature_spec`, `incomplete_features_exist`
 - ✅ `DeliverablePipeline`, `current_deliverable_spec`, `incomplete_deliverables_exist`
 
+## Documentation Debt via Static References
+Never embed values that change — counts, dates, versions, totals. Each is silent debt. Link to the source or use unquantified language.
+- ❌ `67 decisions`, `14 architecture files`, `as of 2026-03-11`
+- ✅ `all decisions`, `see .decision-log.md`
+
 ## Doc-Code Constant Drift
 When a standard value changes (e.g., module line limit), grep ALL docs for the old value and batch/script replace.
 
