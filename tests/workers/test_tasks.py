@@ -231,13 +231,12 @@ class TestRunWorkflowIntegration:
 
 
 @require_infra
-@require_llm
 class TestRunDirectorTurnIntegration:
-    """Integration tests for run_director_turn with real infrastructure + LLM."""
+    """Integration tests for run_director_turn with real infrastructure."""
 
     @pytest.mark.asyncio
     async def test_director_turn_stores_response(self) -> None:
-        """Send a message to the Director and verify the response is persisted."""
+        """Verify Director turn persists a response via mocked ADK runner."""
         engine = create_async_engine(TEST_DB_URL)
         redis_settings = parse_redis_settings(TEST_REDIS_URL)
         redis: ArqRedis = await create_pool(redis_settings)
@@ -247,8 +246,9 @@ class TestRunDirectorTurnIntegration:
                 await conn.run_sync(Base.metadata.create_all)
 
             factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            session_service = create_session_service(TEST_DB_URL)
 
-            # Create chat + user message
+            # Create chat + user message in real DB
             chat_id = str(uuid.uuid4())
             message_id = str(uuid.uuid4())
             session_id = str(uuid.uuid4())
@@ -272,9 +272,7 @@ class TestRunDirectorTurnIntegration:
                 session.add(user_msg)
                 await session.commit()
 
-            # Build worker context
             settings = get_settings()
-            session_service = create_session_service(TEST_DB_URL)
             router = LlmRouter.from_settings(settings)
 
             ctx: dict[str, object] = {
@@ -284,11 +282,32 @@ class TestRunDirectorTurnIntegration:
                 "db_session_factory": factory,
             }
 
-            result = await run_director_turn(ctx, chat_id, message_id)
-            assert result["status"] == "completed"
-            assert result["chat_id"] == chat_id
+            # Mock the ADK runner to return a text response
+            mock_event = MagicMock()
+            mock_event.content = MagicMock()
+            mock_part = MagicMock()
+            mock_part.text = "Hello! I can help you with project management."
+            mock_event.content.parts = [mock_part]
 
-            # Verify Director response was persisted
+            async def mock_run_async(**kwargs: object):  # type: ignore[no-untyped-def]
+                yield mock_event
+
+            with (
+                patch("app.workers.tasks.build_chat_session_agent") as mock_build,
+                patch("app.workers.tasks.create_app_container"),
+                patch("app.workers.tasks.create_runner") as mock_runner_factory,
+                patch("app.agents.formation.ensure_formation_state", new_callable=AsyncMock),
+            ):
+                mock_build.return_value = MagicMock()
+                mock_runner = MagicMock()
+                mock_runner.run_async = mock_run_async
+                mock_runner_factory.return_value = mock_runner
+
+                result = await run_director_turn(ctx, chat_id, message_id)
+                assert result["status"] == "completed"
+                assert result["id"] == chat_id
+
+            # Verify Director response was persisted in real DB
             async with factory() as session:
                 db_result = await session.execute(
                     select(ChatMessage)
@@ -306,176 +325,241 @@ class TestRunDirectorTurnIntegration:
             await redis.aclose()
 
 
+@require_infra
 class TestRunWorkflowDeliverablePipeline:
-    """Unit tests for deliverable pipeline code path in run_workflow."""
+    """Integration tests for deliverable pipeline code path in run_workflow."""
 
     @pytest.mark.asyncio
     async def test_deliverable_pipeline_triggers_new_path(self) -> None:
         """Verify pipeline_type=deliverable triggers create_deliverable_pipeline_from_context."""
         from google.adk.agents import SequentialAgent
 
-        # Build a minimal mock pipeline (SequentialAgent with no real sub_agents)
-        mock_pipeline = SequentialAgent(name="mock_pipeline", sub_agents=[])
+        engine = create_async_engine(TEST_DB_URL)
+        redis_settings = parse_redis_settings(TEST_REDIS_URL)
+        redis: ArqRedis = await create_pool(redis_settings)
 
-        mock_session_service = MagicMock()
-        mock_router = MagicMock(spec=LlmRouter)
-        mock_router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
-        mock_redis = AsyncMock()
-        mock_redis.xadd = AsyncMock()
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
 
-        mock_factory = MagicMock()
-        mock_db_session = AsyncMock()
-        mock_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db_session)
-        mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+            factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            session_service = create_session_service(TEST_DB_URL)
 
-        # Mock workflow DB record
-        mock_workflow = MagicMock()
-        mock_workflow.params = {
-            "pipeline_type": "deliverable",
-            "prompt": "Build something",
-        }
-        mock_workflow.status = WorkflowStatus.PENDING
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none = MagicMock(return_value=mock_workflow)
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
-        mock_db_session.commit = AsyncMock()
-
-        ctx: dict[str, object] = {
-            "session_service": mock_session_service,
-            "llm_router": mock_router,
-            "redis": mock_redis,
-            "db_session_factory": mock_factory,
-        }
-
-        with (
-            patch(
-                "app.workers.tasks.create_deliverable_pipeline_from_context",
-                return_value=mock_pipeline,
-            ) as mock_create,
-            patch("app.workers.tasks.create_app_container") as mock_app,
-            patch("app.workers.tasks.create_runner") as mock_runner,
-        ):
-            # Make runner.run_async return empty async iterator
-            mock_runner_instance = MagicMock()
-
-            async def empty_iter(*args: object, **kwargs: object) -> None:  # type: ignore[misc]
-                return
-                yield  # type: ignore[misc]  # pragma: no cover
-
-            mock_runner_instance.run_async = empty_iter
-            mock_runner.return_value = mock_runner_instance
-            mock_app.return_value = MagicMock()
-
-            mock_session_obj = MagicMock()
-            mock_session_obj.id = "test-session-id"
-            mock_session_service.get_session = AsyncMock(return_value=mock_session_obj)
-
+            # Create real Workflow record
             workflow_id = str(uuid.uuid4())
-            result = await run_workflow(ctx, workflow_id)
+            async with factory() as session:
+                workflow = Workflow(
+                    id=uuid.UUID(workflow_id),
+                    workflow_type="deliverable",
+                    status=WorkflowStatus.PENDING,
+                    params={
+                        "pipeline_type": "deliverable",
+                        "prompt": "Build something",
+                    },
+                )
+                session.add(workflow)
+                await session.commit()
 
-        assert mock_create.called
-        assert result["status"] == "completed"
+            router = MagicMock(spec=LlmRouter)
+            router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
+
+            ctx: dict[str, object] = {
+                "session_service": session_service,
+                "llm_router": router,
+                "redis": redis,
+                "db_session_factory": factory,
+            }
+
+            mock_pipeline = SequentialAgent(name="mock_pipeline", sub_agents=[])
+
+            with (
+                patch(
+                    "app.workers.tasks.create_deliverable_pipeline_from_context",
+                    return_value=mock_pipeline,
+                ) as mock_create,
+                patch("app.workers.tasks.create_app_container") as mock_app,
+                patch("app.workers.tasks.create_runner") as mock_runner,
+            ):
+                mock_runner_instance = MagicMock()
+
+                async def empty_iter(*args: object, **kwargs: object) -> None:  # type: ignore[misc]
+                    return
+                    yield  # type: ignore[misc]  # pragma: no cover
+
+                mock_runner_instance.run_async = empty_iter
+                mock_runner.return_value = mock_runner_instance
+                mock_app.return_value = MagicMock()
+
+                result = await run_workflow(ctx, workflow_id)
+
+            assert mock_create.called
+            assert result["status"] == "completed"
+
+            # Verify workflow status updated in real DB
+            async with factory() as session:
+                db_result = await session.execute(
+                    select(Workflow).where(
+                        Workflow.id == workflow_id  # type: ignore[reportArgumentType]
+                    )
+                )
+                wf = db_result.scalar_one()
+                assert wf.status == WorkflowStatus.COMPLETED
+
+        finally:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+            await engine.dispose()
+            await redis.aclose()
 
     @pytest.mark.asyncio
     async def test_context_recreation_caught_not_reraised(self) -> None:
-        """Verify ContextRecreationRequired is caught and logged, not re-raised.
+        """Verify ContextRecreationRequired triggers recreation pipeline, not re-raised.
 
-        Phase 5a: log and continue. Phase 5b: trigger recreation pipeline.
+        Phase 5b: catches ContextRecreationRequired, runs recreate_context, completes.
         """
         from app.agents.context_monitor import ContextRecreationRequired
 
-        mock_session_service = MagicMock()
-        mock_router = MagicMock(spec=LlmRouter)
-        mock_router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
-        mock_redis = AsyncMock()
-        mock_redis.xadd = AsyncMock()
+        engine = create_async_engine(TEST_DB_URL)
+        redis_settings = parse_redis_settings(TEST_REDIS_URL)
+        redis: ArqRedis = await create_pool(redis_settings)
 
-        mock_factory = MagicMock()
-        mock_db_session = AsyncMock()
-        mock_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db_session)
-        mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
 
-        mock_workflow = MagicMock()
-        mock_workflow.params = {
-            "pipeline_type": "deliverable",
-            "prompt": "Build something",
-        }
-        mock_workflow.status = WorkflowStatus.PENDING
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none = MagicMock(return_value=mock_workflow)
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
-        mock_db_session.commit = AsyncMock()
+            factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            session_service = create_session_service(TEST_DB_URL)
 
-        ctx: dict[str, object] = {
-            "session_service": mock_session_service,
-            "llm_router": mock_router,
-            "redis": mock_redis,
-            "db_session_factory": mock_factory,
-        }
-
-        err = ContextRecreationRequired(usage_pct=85.0, model="test-model", threshold_pct=80.0)
-
-        with patch(
-            "app.workers.tasks.create_deliverable_pipeline_from_context",
-            side_effect=err,
-        ):
+            # Create real Workflow record
             workflow_id = str(uuid.uuid4())
-            # ContextRecreationRequired is caught and logged; workflow completes
-            result = await run_workflow(ctx, workflow_id)
-            assert result["status"] == "completed"
+            async with factory() as session:
+                workflow = Workflow(
+                    id=uuid.UUID(workflow_id),
+                    workflow_type="deliverable",
+                    status=WorkflowStatus.PENDING,
+                    params={
+                        "pipeline_type": "deliverable",
+                        "prompt": "Build something",
+                    },
+                )
+                session.add(workflow)
+                await session.commit()
+
+            router = MagicMock(spec=LlmRouter)
+            router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
+
+            ctx: dict[str, object] = {
+                "session_service": session_service,
+                "llm_router": router,
+                "redis": redis,
+                "db_session_factory": factory,
+            }
+
+            err = ContextRecreationRequired(usage_pct=85.0, model="test-model", threshold_pct=80.0)
+
+            with (
+                patch(
+                    "app.workers.tasks.create_deliverable_pipeline_from_context",
+                    side_effect=err,
+                ),
+                patch(
+                    "app.agents.context_recreation.recreate_context",
+                    new_callable=AsyncMock,
+                ) as mock_recreate,
+            ):
+                mock_recreate.return_value = MagicMock(
+                    new_session_id="new-session-id",
+                    remaining_stages=[],
+                )
+                result = await run_workflow(ctx, workflow_id)
+                assert result["status"] == "completed"
+                assert mock_recreate.called
+
+            # Verify workflow completed in real DB
+            async with factory() as session:
+                db_result = await session.execute(
+                    select(Workflow).where(
+                        Workflow.id == workflow_id  # type: ignore[reportArgumentType]
+                    )
+                )
+                wf = db_result.scalar_one()
+                assert wf.status == WorkflowStatus.COMPLETED
+
+        finally:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+            await engine.dispose()
+            await redis.aclose()
 
     @pytest.mark.asyncio
     async def test_echo_pipeline_still_works(self) -> None:
         """Verify existing echo pipeline is backward compatible (no pipeline_type)."""
-        mock_session_service = MagicMock()
-        mock_router = MagicMock(spec=LlmRouter)
-        mock_router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
-        mock_redis = AsyncMock()
-        mock_redis.xadd = AsyncMock()
+        engine = create_async_engine(TEST_DB_URL)
+        redis_settings = parse_redis_settings(TEST_REDIS_URL)
+        redis: ArqRedis = await create_pool(redis_settings)
 
-        mock_factory = MagicMock()
-        mock_db_session = AsyncMock()
-        mock_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db_session)
-        mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
 
-        # No pipeline_type in params means echo
-        mock_workflow = MagicMock()
-        mock_workflow.params = {"prompt": "Hello"}
-        mock_workflow.status = WorkflowStatus.PENDING
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none = MagicMock(return_value=mock_workflow)
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
-        mock_db_session.commit = AsyncMock()
+            factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            session_service = create_session_service(TEST_DB_URL)
 
-        ctx: dict[str, object] = {
-            "session_service": mock_session_service,
-            "llm_router": mock_router,
-            "redis": mock_redis,
-            "db_session_factory": mock_factory,
-        }
-
-        with (
-            patch("app.workers.tasks.create_echo_agent") as mock_echo,
-            patch("app.workers.tasks.create_app_container") as mock_app,
-            patch("app.workers.tasks.create_runner") as mock_runner,
-        ):
-            mock_runner_instance = MagicMock()
-
-            async def empty_iter(*args: object, **kwargs: object) -> None:  # type: ignore[misc]
-                return
-                yield  # type: ignore[misc]  # pragma: no cover
-
-            mock_runner_instance.run_async = empty_iter
-            mock_runner.return_value = mock_runner_instance
-            mock_app.return_value = MagicMock()
-
-            mock_session_obj = MagicMock()
-            mock_session_obj.id = "test-session-id"
-            mock_session_service.get_session = AsyncMock(return_value=mock_session_obj)
-
+            # Create real Workflow record (no pipeline_type = echo path)
             workflow_id = str(uuid.uuid4())
-            result = await run_workflow(ctx, workflow_id)
+            async with factory() as session:
+                workflow = Workflow(
+                    id=uuid.UUID(workflow_id),
+                    workflow_type="echo",
+                    status=WorkflowStatus.PENDING,
+                    params={"prompt": "Hello"},
+                )
+                session.add(workflow)
+                await session.commit()
 
-        # echo path should use create_echo_agent
-        assert mock_echo.called
-        assert result["status"] == "completed"
+            router = MagicMock(spec=LlmRouter)
+            router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
+
+            ctx: dict[str, object] = {
+                "session_service": session_service,
+                "llm_router": router,
+                "redis": redis,
+                "db_session_factory": factory,
+            }
+
+            with (
+                patch("app.workers.tasks.create_echo_agent") as mock_echo,
+                patch("app.workers.tasks.create_app_container") as mock_app,
+                patch("app.workers.tasks.create_runner") as mock_runner,
+            ):
+                mock_runner_instance = MagicMock()
+
+                async def empty_iter(*args: object, **kwargs: object) -> None:  # type: ignore[misc]
+                    return
+                    yield  # type: ignore[misc]  # pragma: no cover
+
+                mock_runner_instance.run_async = empty_iter
+                mock_runner.return_value = mock_runner_instance
+                mock_app.return_value = MagicMock()
+
+                result = await run_workflow(ctx, workflow_id)
+
+            # echo path should use create_echo_agent
+            assert mock_echo.called
+            assert result["status"] == "completed"
+
+            # Verify workflow completed in real DB
+            async with factory() as session:
+                db_result = await session.execute(
+                    select(Workflow).where(
+                        Workflow.id == workflow_id  # type: ignore[reportArgumentType]
+                    )
+                )
+                wf = db_result.scalar_one()
+                assert wf.status == WorkflowStatus.COMPLETED
+
+        finally:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+            await engine.dispose()
+            await redis.aclose()

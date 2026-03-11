@@ -11,9 +11,55 @@ from redis.asyncio import Redis
 from app.events.streams import stream_publish
 from app.gateway.models.events import PipelineEvent
 from app.lib.logging import get_logger
-from app.models.enums import PipelineEventType
+from app.models.constants import TIER_PREFIX_WRITE_ACCESS
+from app.models.enums import AgentTier, PipelineEventType, SupervisionEventType
 
 logger = get_logger("events.publisher")
+
+# Tier hierarchy: higher index = more privilege
+_TIER_RANK: dict[AgentTier, int] = {
+    AgentTier.WORKER: 0,
+    AgentTier.PM: 1,
+    AgentTier.DIRECTOR: 2,
+}
+
+
+def determine_agent_tier(agent_name: str) -> AgentTier:
+    """Map an agent name to its authorization tier."""
+    lower = agent_name.lower()
+    if lower == "director":
+        return AgentTier.DIRECTOR
+    if lower.startswith("pm"):
+        return AgentTier.PM
+    return AgentTier.WORKER
+
+
+def validate_state_delta(
+    state_delta: dict[str, object],
+    author_tier: AgentTier,
+) -> list[str]:
+    """Return list of keys the author_tier is not authorized to write.
+
+    Empty list means all keys are authorized.
+    """
+    unauthorized: list[str] = []
+    author_rank = _TIER_RANK[author_tier]
+
+    for key in state_delta:
+        required_tier: AgentTier | None = None
+        for prefix, tier in TIER_PREFIX_WRITE_ACCESS.items():
+            if key.startswith(prefix):
+                required_tier = tier
+                break
+
+        if required_tier is None:
+            # No recognized prefix — writable by all tiers
+            continue
+
+        if author_rank < _TIER_RANK[required_tier]:
+            unauthorized.append(key)
+
+    return unauthorized
 
 
 def _get_parts(content_obj: object) -> list[object] | None:
@@ -31,6 +77,7 @@ class EventPublisher:
     def __init__(self, redis: Redis) -> None:  # type: ignore[type-arg]
         self._redis = redis
         self._seen_agents: set[str] = set()
+        self._pending_violations: list[dict[str, object]] = []
 
     def translate(self, adk_event: object, workflow_id: str) -> PipelineEvent | None:
         """Convert an ADK Event to a gateway PipelineEvent. Returns None for unclassified."""
@@ -83,8 +130,24 @@ class EventPublisher:
 
         # State delta
         if actions is not None:
-            state_delta: object = getattr(actions, "state_delta", None)
-            if state_delta:
+            raw_delta: object = getattr(actions, "state_delta", None)
+            if raw_delta and isinstance(raw_delta, dict):
+                # State key authorization check
+                if author:
+                    tier = determine_agent_tier(author)
+                    violations = validate_state_delta(
+                        raw_delta,  # type: ignore[arg-type]
+                        tier,
+                    )
+                    if violations:
+                        self._queue_state_auth_violation(
+                            workflow_id=workflow_id,
+                            author_name=author,
+                            author_tier=tier,
+                            unauthorized_keys=violations,
+                            all_keys=list(raw_delta.keys()),  # type: ignore[reportUnknownArgumentType]
+                        )
+
                 return PipelineEvent(
                     event_type=PipelineEventType.STATE_UPDATED,
                     workflow_id=workflow_id,
@@ -147,3 +210,62 @@ class EventPublisher:
             metadata=metadata or {},
         )
         await self.publish(event)
+
+    def _queue_state_auth_violation(
+        self,
+        workflow_id: str,
+        author_name: str,
+        author_tier: AgentTier,
+        unauthorized_keys: list[str],
+        all_keys: list[str],
+    ) -> None:
+        """Log and queue a state auth violation for async publishing."""
+        logger.warning(
+            "State auth violation: agent=%s tier=%s unauthorized_keys=%s",
+            author_name,
+            author_tier,
+            unauthorized_keys,
+        )
+        self._pending_violations.append(
+            {
+                "workflow_id": workflow_id,
+                "author_name": author_name,
+                "author_tier": str(author_tier),
+                "unauthorized_keys": unauthorized_keys,
+                "all_keys": all_keys,
+            }
+        )
+
+    async def publish_state_auth_violation(
+        self,
+        workflow_id: str,
+        author_name: str,
+        author_tier: AgentTier,
+        unauthorized_keys: list[str],
+        all_keys: list[str],
+    ) -> None:
+        """Publish a state authorization violation as an ERROR event."""
+        await self.publish_lifecycle(
+            workflow_id=workflow_id,
+            event_type=PipelineEventType.ERROR,
+            metadata={
+                "violation": SupervisionEventType.STATE_AUTH_VIOLATION,
+                "author_name": author_name,
+                "author_tier": str(author_tier),
+                "unauthorized_keys": unauthorized_keys,
+                "all_keys": all_keys,
+            },
+        )
+
+    async def flush_violations(self) -> None:
+        """Publish all queued state auth violations."""
+        violations = self._pending_violations.copy()
+        self._pending_violations.clear()
+        for v in violations:
+            await self.publish_state_auth_violation(
+                workflow_id=v["workflow_id"],  # type: ignore[arg-type]
+                author_name=v["author_name"],  # type: ignore[arg-type]
+                author_tier=AgentTier(v["author_tier"]),
+                unauthorized_keys=v["unauthorized_keys"],  # type: ignore[arg-type]
+                all_keys=v["all_keys"],  # type: ignore[arg-type]
+            )

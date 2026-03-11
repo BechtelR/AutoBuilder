@@ -165,6 +165,7 @@ class CeoQueueItem(TimestampMixin, Base):
         DateTime(timezone=True), nullable=True, default=None
     )
     resolved_by: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    resolution: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
 
 class DirectorQueueItem(TimestampMixin, Base):

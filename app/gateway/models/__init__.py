@@ -1,5 +1,9 @@
 """Gateway API contract models."""
 
+from app.gateway.models.ceo_queue import (
+    CeoQueueItemResponse,
+    ResolveCeoQueueItemRequest,
+)
 from app.gateway.models.chat import (
     ChatMessageResponse,
     ChatResponse,
@@ -12,6 +16,7 @@ from app.gateway.models.health import HealthResponse, HealthStatus, ServiceStatu
 from app.gateway.models.workflows import WorkflowRunRequest, WorkflowRunResponse
 
 __all__ = [
+    "CeoQueueItemResponse",
     "ChatMessageResponse",
     "ChatResponse",
     "CreateChatRequest",
@@ -20,6 +25,7 @@ __all__ = [
     "HealthResponse",
     "HealthStatus",
     "PipelineEvent",
+    "ResolveCeoQueueItemRequest",
     "SendChatMessageRequest",
     "ServiceStatus",
     "WorkflowRunRequest",

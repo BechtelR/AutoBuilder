@@ -163,6 +163,7 @@ class ChatType(enum.StrEnum):
 
     DIRECTOR = "DIRECTOR"
     PROJECT = "PROJECT"
+    SETTINGS = "SETTINGS"
 
 
 class ChatStatus(enum.StrEnum):
@@ -223,3 +224,36 @@ class ErrorCode(enum.StrEnum):
     CONFIGURATION_ERROR = "CONFIGURATION_ERROR"
     WORKER_ERROR = "WORKER_ERROR"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+
+
+class AgentTier(enum.StrEnum):
+    """Tier-based authorization level for agent state key access."""
+
+    DIRECTOR = "DIRECTOR"
+    PM = "PM"
+    WORKER = "WORKER"
+
+
+class SupervisionEventType(enum.StrEnum):
+    """Event types for supervision and oversight."""
+
+    PM_INVOCATION = "PM_INVOCATION"
+    PM_COMPLETION = "PM_COMPLETION"
+    ESCALATION_DETECTED = "ESCALATION_DETECTED"
+    LIMIT_EXCEEDED = "LIMIT_EXCEEDED"
+    STATE_AUTH_VIOLATION = "STATE_AUTH_VIOLATION"
+
+
+class CeoQueueAction(enum.StrEnum):
+    """Action a CEO can take on a queue item."""
+
+    RESOLVE = "RESOLVE"
+    DISMISS = "DISMISS"
+
+
+class FormationStatus(enum.StrEnum):
+    """Status of the Director formation process."""
+
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETE = "COMPLETE"

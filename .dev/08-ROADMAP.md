@@ -8,7 +8,7 @@ Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0-10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention -- through a production-grade API gateway with async worker execution.
 
-**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: NEXT**
+**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: DONE | Phase 6: NEXT**
 
 ---
 
@@ -170,7 +170,7 @@ Agent definition infrastructure: AgentRegistry scans declarative markdown files 
 ## Phase 5b: Supervision & Integration `M`
 
 **Goal**: Hierarchical supervision operational — Director delegates to PM, PM drives batch loop (sequential), CEO queue live, state key authorization enforced.
-**Status**: PLANNED
+**Status**: DONE
 **Prerequisites**: Phase 5a (agents and pipeline operational)
 
 
@@ -181,16 +181,16 @@ Supervision hierarchy: Director operates as stateless root_agent (recreated per 
 
 | Status | Contract Item | PRD |
 |--------|--------------|-----|
-| | Director agent operates as root_agent (stateless config, recreated per invocation) | PR-13 |
-| | PM agent manages a project autonomously via tools + deterministic callbacks (`checkpoint_project`, `verify_batch_completion`), escalating only when necessary | PR-14 |
-| | PM loop (sequential mode): PM reasons correctly between batches — queries results, decides next batch composition, maintains coherent state across batch boundaries (2+ deliverables); Phase 8 adds parallel execution | PR-10 |
-| | Director → PM delegation and PM → Director escalation via transfer_to_agent | PR-14 |
-| | Context recreation produces a functional session with equivalent agent context (persist → fresh session → reassemble end-to-end) in degraded mode: state keys + skills + instruction fragments preserved; cross-session memory unavailable (full equivalence verified in Phase 9) | PR-15a |
-| | State key writes with tier prefix rejected when author tier does not match prefix | NFR-4c |
-| | CEO queue items created, queried, and resolved via gateway routes | PR-17 |
-| | CEO queue approval resolution written back to session state | PR-20 |
-| | Chat messages routed to Director via worker and response persisted | PR-13 |
-| | Director formation via Settings conversation produces three structured artifacts in user: scope state | PR-13 |
+| ✅ | Director agent operates as root_agent (stateless config, recreated per invocation) | PR-13 |
+| ✅ | PM agent manages a project autonomously via tools + deterministic callbacks (`checkpoint_project`, `verify_batch_completion`), escalating only when necessary | PR-14 |
+| ✅ | PM loop (sequential mode): PM reasons correctly between batches — queries results, decides next batch composition, maintains coherent state across batch boundaries (2+ deliverables); Phase 8 adds parallel execution | PR-10 |
+| ✅ | Director → PM delegation and PM → Director escalation via transfer_to_agent | PR-14 |
+| ✅ | Context recreation produces a functional session with equivalent agent context (persist → fresh session → reassemble end-to-end) in degraded mode: state keys + skills + instruction fragments preserved; cross-session memory unavailable (full equivalence verified in Phase 9) | PR-15a |
+| ✅ | State key writes with tier prefix rejected when author tier does not match prefix | NFR-4c |
+| ✅ | CEO queue items created, queried, and resolved via gateway routes | PR-17 |
+| ✅ | CEO queue approval resolution written back to session state | PR-20 |
+| ✅ | Chat messages routed to Director via worker and response persisted | PR-13 |
+| ✅ | Director formation via Settings conversation produces three structured artifacts in user: scope state | PR-13 |
 
 ---
 

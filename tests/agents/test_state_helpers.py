@@ -14,6 +14,7 @@ from app.agents.protocols import (
 from app.agents.state_helpers import (
     compose_callbacks,
     context_from_state,
+    create_system_reminder_callback,
 )
 
 
@@ -83,6 +84,50 @@ class TestNullSkillLibrary:
         content = lib.load(entry)
         assert content.entry is entry
         assert content.content == ""
+
+
+class TestSystemReminderCallback:
+    def _make_ctx(self, state: dict[str, object]) -> MagicMock:
+        ctx = MagicMock()
+        ctx.state = state
+        return ctx
+
+    def test_no_budget_returns_none(self) -> None:
+        cb = create_system_reminder_callback()
+        ctx = self._make_ctx({})
+        req = MagicMock()
+        result = cb(ctx, req)
+        assert result is None
+        # No budget data -> empty reminders
+        assert ctx.state["_system_reminders"] == ""
+
+    def test_low_budget_no_warning(self) -> None:
+        cb = create_system_reminder_callback()
+        ctx = self._make_ctx({"context_budget_used_pct": 30.0})
+        req = MagicMock()
+        result = cb(ctx, req)
+        assert result is None
+        assert ctx.state["_system_reminders"] == ""
+
+    def test_high_budget_injects(self) -> None:
+        cb = create_system_reminder_callback()
+        ctx = self._make_ctx({"context_budget_used_pct": 73.0})
+        req = MagicMock()
+        result = cb(ctx, req)
+        assert result is None
+        assert "73%" in ctx.state["_system_reminders"]
+
+    def test_clears_when_no_reminders(self) -> None:
+        cb = create_system_reminder_callback()
+        # First call with high budget
+        ctx1 = self._make_ctx({"context_budget_used_pct": 80.0})
+        cb(ctx1, MagicMock())
+        assert ctx1.state["_system_reminders"] != ""
+
+        # Second call with no budget
+        ctx2 = self._make_ctx({})
+        cb(ctx2, MagicMock())
+        assert ctx2.state["_system_reminders"] == ""
 
 
 class TestSkillMatchContext:

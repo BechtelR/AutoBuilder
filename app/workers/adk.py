@@ -27,7 +27,9 @@ if TYPE_CHECKING:
     from google.adk.models.llm_response import LlmResponse
     from google.adk.sessions.base_session_service import BaseSessionService
 
+    from app.agents._registry import AgentRegistry
     from app.agents.assembler import InstructionContext
+    from app.events.publisher import EventPublisher
     from app.router.router import LlmRouter
 
 logger = get_logger("engine")
@@ -68,34 +70,6 @@ def create_echo_agent(
         model=LiteLlm(model=model),
         instruction="You are a helpful echo agent. Respond concisely to the user's message.",
         output_key="agent_response",
-        before_model_callback=before_model_callback,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Director Agent (stub — real implementation in Phase 5)
-# ---------------------------------------------------------------------------
-
-
-def create_director_agent(
-    model: str,
-    before_model_callback: (
-        Callable[[CallbackContext, LlmRequest], LlmResponse | None] | None
-    ) = None,
-) -> LlmAgent:
-    """Create a Director agent stub.
-
-    Returns a simple echo agent until Phase 5 implements the real Director
-    with hierarchical supervision capabilities.
-    """
-    return LlmAgent(
-        name="director_agent",
-        model=LiteLlm(model=model),
-        instruction=(
-            "You are the AutoBuilder Director. You help the CEO manage projects and "
-            "coordinate work. Respond concisely and helpfully to the user's message."
-        ),
-        output_key="director_response",
         before_model_callback=before_model_callback,
     )
 
@@ -211,17 +185,96 @@ def create_pipeline_callbacks(
 ) -> Callable[[CallbackContext, LlmRequest], LlmResponse | None]:
     """Create the composed before_model_callback chain for pipeline agents.
 
-    Chain: router override -> context injection -> budget monitor.
+    Chain: router override -> context injection -> system reminders -> budget monitor.
     """
     from app.agents.context_monitor import ContextBudgetMonitor
-    from app.agents.state_helpers import compose_callbacks, create_context_injection_callback
+    from app.agents.state_helpers import (
+        compose_callbacks,
+        create_context_injection_callback,
+        create_system_reminder_callback,
+    )
     from app.router.router import create_model_override_callback
 
     router_callback = create_model_override_callback(router)
     context_callback = create_context_injection_callback()
+    reminder_callback = create_system_reminder_callback()
     budget_monitor = ContextBudgetMonitor(threshold_pct=threshold_pct)
 
-    return compose_callbacks(router_callback, context_callback, budget_monitor)
+    return compose_callbacks(router_callback, context_callback, reminder_callback, budget_monitor)
+
+
+# ---------------------------------------------------------------------------
+# Work Session / Chat Session Agent Builders
+# ---------------------------------------------------------------------------
+
+
+async def build_work_session_agents(
+    registry: AgentRegistry,
+    ctx: InstructionContext,
+    project_id: str,
+    publisher: EventPublisher,
+    *,
+    skill_library: object | None = None,
+    memory_service: object | None = None,
+    before_model_callback: (
+        Callable[[CallbackContext, LlmRequest], LlmResponse | None] | None
+    ) = None,
+) -> BaseAgent:
+    """Build Director with PM sub_agent for a work session.
+
+    Director is root_agent. PM is sub_agent with supervision callbacks.
+    DeliverablePipeline is PM's sub_agent for dispatching deliverables.
+    """
+    from google.adk.memory import InMemoryMemoryService
+
+    from app.agents.pipeline import create_deliverable_pipeline
+    from app.agents.protocols import NullSkillLibrary
+    from app.agents.supervision import (
+        create_after_pm_callback,
+        create_before_pm_callback,
+        create_checkpoint_callback,
+    )
+
+    # Build Director
+    director = registry.build("director", ctx)
+
+    # Build PM with project-specific name
+    pm = registry.build(f"PM_{project_id}", ctx, definition="pm")
+
+    # Build DeliverablePipeline as PM sub_agent
+    resolved_skill_lib = NullSkillLibrary() if skill_library is None else skill_library
+    resolved_memory = InMemoryMemoryService() if memory_service is None else memory_service
+
+    pipeline = create_deliverable_pipeline(
+        registry=registry,
+        ctx=ctx,
+        skill_library=resolved_skill_lib,  # type: ignore[arg-type]
+        memory_service=resolved_memory,  # type: ignore[arg-type]
+        before_model_callback=before_model_callback,
+    )
+
+    # Wire pipeline checkpoint callback
+    pipeline.after_agent_callback = create_checkpoint_callback(publisher)  # type: ignore[reportAttributeAccessIssue]
+
+    # Wire PM supervision callbacks
+    pm.before_agent_callback = create_before_pm_callback(publisher)  # type: ignore[reportAttributeAccessIssue]
+    pm.after_agent_callback = create_after_pm_callback(publisher)  # type: ignore[reportAttributeAccessIssue]
+
+    # PM's sub_agents: the pipeline (PM dispatches deliverables to it)
+    pm.sub_agents = [pipeline]  # type: ignore[reportAttributeAccessIssue]
+
+    # Director's sub_agents: the PM
+    director.sub_agents = [pm]  # type: ignore[reportAttributeAccessIssue]
+
+    return director
+
+
+def build_chat_session_agent(
+    registry: AgentRegistry,
+    ctx: InstructionContext,
+) -> BaseAgent:
+    """Build Director with no sub_agents for a chat session."""
+    return registry.build("director", ctx)
 
 
 # ---------------------------------------------------------------------------

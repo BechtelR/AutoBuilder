@@ -123,3 +123,6 @@ Each subclass has a hardcoded `ErrorCode`. Never pass `code=` to a subclass — 
 Direct `ctx.session.state["key"] = val` does NOT persist. Only `state_delta` on yielded Events persists. Reads work normally.
 - ❌ `ctx.session.state["key"] = val`
 - ✅ `yield Event(author=self.name, actions=EventActions(state_delta={"key": val}))`
+
+## ADK Session State: External Mutation (CRITICAL)
+`session.state` from `get_session()` is a snapshot — mutation doesn't persist. Delete + `create_session()` with merged state.

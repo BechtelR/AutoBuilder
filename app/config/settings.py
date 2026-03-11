@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     search_provider: str = "tavily"
     context_budget_threshold: int = 80
 
+    default_retry_budget: int = 10
+    default_cost_ceiling: float = 100.0
+    director_queue_interval: int = 60
+
     @field_validator("context_budget_threshold")
     @classmethod
     def _validate_threshold(cls, v: int) -> int:

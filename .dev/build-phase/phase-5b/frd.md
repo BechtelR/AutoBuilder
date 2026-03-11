@@ -31,23 +31,23 @@ The Director operates as the root agent -- stateless configuration, recreated fr
 
 **Requirements:**
 
-- [ ] **FR-5b.01**: When the system invokes the Director, it builds the Director agent from its definition file with a stateless configuration -- no in-memory state carried from prior invocations. All continuity comes from database-backed session state.
-- [ ] **FR-5b.02**: When the Director receives a project delegation, it delegates execution authority to the project's PM agent. The PM receives full execution authority for that project.
-- [ ] **FR-5b.03**: When the PM encounters a condition it cannot resolve, it returns execution authority to the Director with escalation context in session state. The Director evaluates the escalation and either resolves it locally or forwards it to the CEO queue.
-- [ ] **FR-5b.04**: When the Director processes its queue (Director Queue), it reads pending items written by PMs via the escalation tool, evaluates each, and either resolves the item (writes resolution to session state) or forwards it to the CEO queue via the CEO escalation tool. Items marked as forwarded are updated to reflect forwarding status.
-- [ ] **FR-5b.05**: When the system starts the Director for the first time for a given user, it auto-creates a Settings session (`ChatType.SETTINGS`) and the Director enters formation mode. Formation is a conversational process (~5-10 professional but warm questions) through which the Director and CEO shape three structured artifacts: Director Identity (`user:director_identity`), CEO Profile (`user:ceo_profile`), and Operating Contract (`user:operating_contract`). The Director proposes artifact values; the CEO approves or edits them in conversation. Artifacts are written to `user:` scope state and persist across all sessions. `user:formation_status` tracks progress (`PENDING` → `IN_PROGRESS` → `COMPLETE`).
-- [ ] **FR-5b.06**: When the formation artifacts already exist (`user:formation_status` == `COMPLETE`), the Director operates normally in Settings sessions -- the conversation becomes an evolution conversation where either party can propose changes to any artifact. Artifact update proposals from any session go through the CEO queue as `APPROVAL` items.
-- [ ] **FR-5b.06a**: When the CEO sends a message to the Settings session, the system routes it to the Director in formation mode (when `formation_status` != `COMPLETE`) or evolution mode (when `COMPLETE`). The Director has access to the current state of all three artifacts (or empty state if formation is pending).
-- [ ] **FR-5b.06b**: When the CEO requests a formation reset in the Settings session, the Director clears all three artifact keys and `user:formation_status`, then re-enters formation mode on the next message.
-- [ ] **FR-5b.06c**: When the Director proposes an artifact update from a non-Settings conversation, the proposal is written to the CEO queue as an `APPROVAL` type item with the proposed changes. On CEO approval, the updated artifact is written to `user:` scope state.
-- [ ] **FR-5b.07**: When the CEO initiates a chat without specifying a project, the system routes the message to the "Main" chat session -- the Director's permanent portfolio-level conversation context. If the "Main" session does not exist, it is created automatically.
-- [ ] **FR-5b.08**: When the Director delegates a project to a PM, it writes hard limits (retry budget, cost ceiling) to the project configuration. The PM reads these limits at session start and operates within them. The Director cannot set limits that exceed global limits. The PM cannot set worker constraints that exceed project limits.
-- [ ] **FR-5b.08a**: When the Director creates a new project, a project configuration entry is created with default hard limits derived from global limits. If the Director does not explicitly set limits during delegation, the defaults apply. The PM always has a valid configuration to read at session start.
-- [ ] **FR-5b.09**: When any tier exhausts a limit dimension (retry budget depleted, cost ceiling hit), the system escalates to the tier above. Retry budget exhaustion triggers escalation. Cost ceiling exhaustion triggers a hard stop and escalation.
-- [ ] **FR-5b.10**: When agent transfer from Director to PM fails (PM agent cannot be built, session creation fails), the system publishes an error event and creates a CEO queue item with the failure context. The Director does not silently drop the delegation.
-- [ ] **FR-5b.10a**: When no work session is active for a project with pending Director Queue items, an ARQ cron job (`process_director_queue`, configurable interval via `AUTOBUILDER_DIRECTOR_QUEUE_INTERVAL`, default 60s) detects pending items and enqueues a `run_director_turn` job for processing. The cron job skips projects with active work sessions (inline path handles those). The cron function itself is a lightweight DB check — no Director invocation or token cost for empty queues.
-- [ ] **FR-5b.10b**: When the Director's supervision callback fires after a PM turn (after_agent_callback), the Director checks the Director Queue inline for pending items before deciding its next action. Queue items are loaded into context alongside PM completion status. This is the fast path — zero additional latency for active work sessions.
-- [ ] **FR-5b.11**: When agent transfer from PM back to Director fails, the system publishes an error event. The PM's escalation context is preserved in session state for recovery.
+- [x]**FR-5b.01**: When the system invokes the Director, it builds the Director agent from its definition file with a stateless configuration -- no in-memory state carried from prior invocations. All continuity comes from database-backed session state.
+- [x]**FR-5b.02**: When the Director receives a project delegation, it delegates execution authority to the project's PM agent. The PM receives full execution authority for that project.
+- [x]**FR-5b.03**: When the PM encounters a condition it cannot resolve, it returns execution authority to the Director with escalation context in session state. The Director evaluates the escalation and either resolves it locally or forwards it to the CEO queue.
+- [x]**FR-5b.04**: When the Director processes its queue (Director Queue), it reads pending items written by PMs via the escalation tool, evaluates each, and either resolves the item (writes resolution to session state) or forwards it to the CEO queue via the CEO escalation tool. Items marked as forwarded are updated to reflect forwarding status.
+- [x]**FR-5b.05**: When the system starts the Director for the first time for a given user, it auto-creates a Settings session (`ChatType.SETTINGS`) and the Director enters formation mode. Formation is a conversational process (~5-10 professional but warm questions) through which the Director and CEO shape three structured artifacts: Director Identity (`user:director_identity`), CEO Profile (`user:ceo_profile`), and Operating Contract (`user:operating_contract`). The Director proposes artifact values; the CEO approves or edits them in conversation. Artifacts are written to `user:` scope state and persist across all sessions. `user:formation_status` tracks progress (`PENDING` → `IN_PROGRESS` → `COMPLETE`).
+- [x]**FR-5b.06**: When the formation artifacts already exist (`user:formation_status` == `COMPLETE`), the Director operates normally in Settings sessions -- the conversation becomes an evolution conversation where either party can propose changes to any artifact. Artifact update proposals from any session go through the CEO queue as `APPROVAL` items.
+- [x]**FR-5b.06a**: When the CEO sends a message to the Settings session, the system routes it to the Director in formation mode (when `formation_status` != `COMPLETE`) or evolution mode (when `COMPLETE`). The Director has access to the current state of all three artifacts (or empty state if formation is pending).
+- [x]**FR-5b.06b**: When the CEO requests a formation reset in the Settings session, the Director clears all three artifact keys and `user:formation_status`, then re-enters formation mode on the next message.
+- [x]**FR-5b.06c**: When the Director proposes an artifact update from a non-Settings conversation, the proposal is written to the CEO queue as an `APPROVAL` type item with the proposed changes. On CEO approval, the updated artifact is written to `user:` scope state.
+- [x]**FR-5b.07**: When the CEO initiates a chat without specifying a project, the system routes the message to the "Main" chat session -- the Director's permanent portfolio-level conversation context. If the "Main" session does not exist, it is created automatically.
+- [x]**FR-5b.08**: When the Director delegates a project to a PM, it writes hard limits (retry budget, cost ceiling) to the project configuration. The PM reads these limits at session start and operates within them. The Director cannot set limits that exceed global limits. The PM cannot set worker constraints that exceed project limits.
+- [x]**FR-5b.08a**: When the Director creates a new project, a project configuration entry is created with default hard limits derived from global limits. If the Director does not explicitly set limits during delegation, the defaults apply. The PM always has a valid configuration to read at session start.
+- [x]**FR-5b.09**: When any tier exhausts a limit dimension (retry budget depleted, cost ceiling hit), the system escalates to the tier above. Retry budget exhaustion triggers escalation. Cost ceiling exhaustion triggers a hard stop and escalation.
+- [x]**FR-5b.10**: When agent transfer from Director to PM fails (PM agent cannot be built, session creation fails), the system publishes an error event and creates a CEO queue item with the failure context. The Director does not silently drop the delegation.
+- [x]**FR-5b.10a**: When no work session is active for a project with pending Director Queue items, an ARQ cron job (`process_director_queue`, configurable interval via `AUTOBUILDER_DIRECTOR_QUEUE_INTERVAL`, default 60s) detects pending items and enqueues a `run_director_turn` job for processing. The cron job skips projects with active work sessions (inline path handles those). The cron function itself is a lightweight DB check — no Director invocation or token cost for empty queues.
+- [x]**FR-5b.10b**: When the Director's supervision callback fires after a PM turn (after_agent_callback), the Director checks the Director Queue inline for pending items before deciding its next action. Queue items are loaded into context alongside PM completion status. This is the fast path — zero additional latency for active work sessions.
+- [x]**FR-5b.11**: When agent transfer from PM back to Director fails, the system publishes an error event. The PM's escalation context is preserved in session state for recovery.
 
 ---
 
@@ -57,14 +57,14 @@ The PM manages a project autonomously with reliable inter-batch reasoning, tools
 
 **Requirements:**
 
-- [ ] **FR-5b.12**: When the PM receives a project with pre-seeded deliverables in session state, it uses the batch selection tool to identify dependency-ready deliverables and composes a batch for execution.
-- [ ] **FR-5b.13**: When the PM dispatches a batch, each deliverable in the batch executes through the DeliverablePipeline sequentially. Parallel intra-batch execution is not in scope (Phase 8).
-- [ ] **FR-5b.14**: After each deliverable completes in the pipeline, the checkpoint callback fires automatically. The callback persists the deliverable's completion status and pipeline output to durable state. This is not discretionary -- the callback fires regardless of success or failure.
-- [ ] **FR-5b.15**: After all deliverables in a batch complete, the batch verification callback fires. It validates that all deliverables reached a terminal state (completed or failed) and logs the batch result.
-- [ ] **FR-5b.16**: After a batch completes, the PM reasons about the results using its tools -- querying deliverable statuses, assessing failures, and deciding the composition of the next batch or whether to escalate. This inter-batch reasoning maintains coherence across batch boundaries.
-- [ ] **FR-5b.17**: When a deliverable fails and exhausts its retry budget, the PM marks it as failed and continues with unblocked deliverables. The failed deliverable does not block independent work.
-- [ ] **FR-5b.18**: When all deliverables are complete (or failed with no remaining unblocked work), the PM transfers control back to the Director with the project result in session state.
-- [ ] **FR-5b.19**: When the PM is unable to make progress (all remaining deliverables blocked, no retries available, no reordering possible), it escalates to the Director with context describing the blockage.
+- [x]**FR-5b.12**: When the PM receives a project with pre-seeded deliverables in session state, it uses the batch selection tool to identify dependency-ready deliverables and composes a batch for execution.
+- [x]**FR-5b.13**: When the PM dispatches a batch, each deliverable in the batch executes through the DeliverablePipeline sequentially. Parallel intra-batch execution is not in scope (Phase 8).
+- [x]**FR-5b.14**: After each deliverable completes in the pipeline, the checkpoint callback fires automatically. The callback persists the deliverable's completion status and pipeline output to durable state. This is not discretionary -- the callback fires regardless of success or failure.
+- [x]**FR-5b.15**: After all deliverables in a batch complete, the batch verification callback fires. It validates that all deliverables reached a terminal state (completed or failed) and logs the batch result.
+- [x]**FR-5b.16**: After a batch completes, the PM reasons about the results using its tools -- querying deliverable statuses, assessing failures, and deciding the composition of the next batch or whether to escalate. This inter-batch reasoning maintains coherence across batch boundaries.
+- [x]**FR-5b.17**: When a deliverable fails and exhausts its retry budget, the PM marks it as failed and continues with unblocked deliverables. The failed deliverable does not block independent work.
+- [x]**FR-5b.18**: When all deliverables are complete (or failed with no remaining unblocked work), the PM transfers control back to the Director with the project result in session state.
+- [x]**FR-5b.19**: When the PM is unable to make progress (all remaining deliverables blocked, no retries available, no reordering possible), it escalates to the Director with context describing the blockage.
 
 ---
 
@@ -74,14 +74,14 @@ The CEO queue is the single point of contact between the CEO and the system. Ite
 
 **Requirements:**
 
-- [ ] **FR-5b.20**: When the CEO queries the queue, the system returns all items matching the requested filters (type, priority, status). Items are ordered by priority (descending) then creation time (ascending).
-- [ ] **FR-5b.21**: When the CEO resolves a queue item, the system updates the item's status and records the resolution, the resolver identity, and the resolution timestamp.
-- [ ] **FR-5b.22**: When the CEO resolves an approval-type queue item, the system writes the resolution to a dedicated approval resolution key in the originating project's session state. The write targets a well-known key pattern that the PM polls during batch selection — it does not mutate arbitrary state while the PM may be mid-turn. The queue item's source project reference locates the correct session.
-- [ ] **FR-5b.23**: When the PM next selects a batch after an approval resolution, the previously blocked deliverable becomes eligible if its only blocker was the pending approval. The PM discovers the resolution through session state -- there is no active push.
-- [ ] **FR-5b.24**: When the PM has no unblocked work remaining and is waiting for an approval, the PM returns control to the Director with a suspended status indicating pending approvals. The work session's ARQ job completes. When the CEO resolves the approval, the system enqueues a new work session to resume execution.
-- [ ] **FR-5b.25**: When the CEO dismisses a queue item, the system updates the item's status to dismissed and records the dismissal. Dismissed items do not trigger writeback.
-- [ ] **FR-5b.26**: When the CEO attempts to resolve a queue item that is already resolved or dismissed, the system rejects the request with a conflict indication.
-- [ ] **FR-5b.27**: When a queue item references a session that no longer exists (project deleted, session expired), the resolution succeeds (item marked resolved) but the state writeback is skipped with a warning event.
+- [x]**FR-5b.20**: When the CEO queries the queue, the system returns all items matching the requested filters (type, priority, status). Items are ordered by priority (descending) then creation time (ascending).
+- [x]**FR-5b.21**: When the CEO resolves a queue item, the system updates the item's status and records the resolution, the resolver identity, and the resolution timestamp.
+- [x]**FR-5b.22**: When the CEO resolves an approval-type queue item, the system writes the resolution to a dedicated approval resolution key in the originating project's session state. The write targets a well-known key pattern that the PM polls during batch selection — it does not mutate arbitrary state while the PM may be mid-turn. The queue item's source project reference locates the correct session.
+- [x]**FR-5b.23**: When the PM next selects a batch after an approval resolution, the previously blocked deliverable becomes eligible if its only blocker was the pending approval. The PM discovers the resolution through session state -- there is no active push.
+- [x]**FR-5b.24**: When the PM has no unblocked work remaining and is waiting for an approval, the PM returns control to the Director with a suspended status indicating pending approvals. The work session's ARQ job completes. When the CEO resolves the approval, the system enqueues a new work session to resume execution.
+- [x]**FR-5b.25**: When the CEO dismisses a queue item, the system updates the item's status to dismissed and records the dismissal. Dismissed items do not trigger writeback.
+- [x]**FR-5b.26**: When the CEO attempts to resolve a queue item that is already resolved or dismissed, the system rejects the request with a conflict indication.
+- [x]**FR-5b.27**: When a queue item references a session that no longer exists (project deleted, session expired), the resolution succeeds (item marked resolved) but the state writeback is skipped with a warning event.
 
 ---
 
@@ -91,12 +91,12 @@ The CEO communicates with the Director through chat sessions -- sending messages
 
 **Requirements:**
 
-- [ ] **FR-5b.28**: When the CEO sends a chat message, the system persists the message, routes it to the Director agent via a worker invocation, and persists the Director's response. The response is retrievable via the message history.
-- [ ] **FR-5b.29**: When the CEO retrieves message history for a chat session, the system returns all messages in chronological order, including both CEO messages and Director responses.
-- [ ] **FR-5b.30**: When the Director handles a chat message, it has access to the chat session's conversation history, user-scoped state (Director identity, CEO profile, operating contract, preferences), and app-scoped state (project status, deliverable summaries, batch progress). This enables the Director to answer status questions using data written by active work sessions without interrupting them.
-- [ ] **FR-5b.31**: When a chat message is sent for a project that has an active work session, the Director can read work session status from shared state. The chat invocation does not block, interrupt, or modify the running work session.
-- [ ] **FR-5b.32**: When the system routes a chat message to the Director, it uses per-message invocation -- one worker call per message, not a long-running session. Each invocation builds a fresh Director agent from its definition file.
-- [ ] **FR-5b.33**: When the Director cannot process a message (agent build failure, worker unavailable), the system persists an error response in the chat message history and publishes an error event.
+- [x]**FR-5b.28**: When the CEO sends a chat message, the system persists the message, routes it to the Director agent via a worker invocation, and persists the Director's response. The response is retrievable via the message history.
+- [x]**FR-5b.29**: When the CEO retrieves message history for a chat session, the system returns all messages in chronological order, including both CEO messages and Director responses.
+- [x]**FR-5b.30**: When the Director handles a chat message, it has access to the chat session's conversation history, user-scoped state (Director identity, CEO profile, operating contract, preferences), and app-scoped state (project status, deliverable summaries, batch progress). This enables the Director to answer status questions using data written by active work sessions without interrupting them.
+- [x]**FR-5b.31**: When a chat message is sent for a project that has an active work session, the Director can read work session status from shared state. The chat invocation does not block, interrupt, or modify the running work session.
+- [x]**FR-5b.32**: When the system routes a chat message to the Director, it uses per-message invocation -- one worker call per message, not a long-running session. Each invocation builds a fresh Director agent from its definition file.
+- [x]**FR-5b.33**: When the Director cannot process a message (agent build failure, worker unavailable), the system persists an error response in the chat message history and publishes an error event.
 
 ---
 
@@ -106,14 +106,14 @@ When a long-running agent session approaches its context window limit, the syste
 
 **Requirements:**
 
-- [ ] **FR-5b.34**: When the ContextRecreationRequired exception is raised during pipeline execution, the worker catches it at the pipeline level and initiates the 4-step recreation process. The pipeline does not crash or abort.
-- [ ] **FR-5b.35**: During the persist step, the system identifies and saves important state to the memory service -- progress markers, accumulated decisions, current plan, and learnings. State keys that are already durable via the database-backed session service are not re-persisted.
-- [ ] **FR-5b.36**: During the seed step, the system copies critical state keys from the old session to the new session. Critical keys include: deliverable status, batch position, hard limits, loaded skill names, and agent output keys from all completed pipeline stages. Conversation history is intentionally not seeded -- this is the purpose of recreation.
-- [ ] **FR-5b.37**: During the fresh session step, the system creates a new session with the seeded state. The old session is preserved in the database (not deleted) but is no longer the active session for the pipeline.
-- [ ] **FR-5b.38**: During the reassemble step, the system reconstructs the agent's context: the InstructionAssembler composes instructions from fragments (SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL), the SkillLoaderAgent reloads skills, and the MemoryLoaderAgent attempts to restore cross-session context.
-- [ ] **FR-5b.39**: When the MemoryService is unavailable during reassembly (degraded mode -- the expected state in Phase 5b), the system proceeds with state + skills + instruction fragments only. A system reminder is injected noting that memory context is unavailable. The pipeline continues without cross-session memory.
-- [ ] **FR-5b.40**: After recreation completes, the system reconstructs the pipeline containing only the stages that have not yet completed. Completion status is determined from persisted deliverable state keys, not from ADK agent state (which is lost with the old session's events). No completed stages re-execute. No state is lost.
-- [ ] **FR-5b.41**: When recreation fails (session creation error, seed failure, reassembly error), the system publishes an error event with the failure context and the pipeline fails with a clear error. It does not silently continue with a corrupted session.
+- [x]**FR-5b.34**: When the ContextRecreationRequired exception is raised during pipeline execution, the worker catches it at the pipeline level and initiates the 4-step recreation process. The pipeline does not crash or abort.
+- [x]**FR-5b.35**: During the persist step, the system identifies and saves important state to the memory service -- progress markers, accumulated decisions, current plan, and learnings. State keys that are already durable via the database-backed session service are not re-persisted.
+- [x]**FR-5b.36**: During the seed step, the system copies critical state keys from the old session to the new session. Critical keys include: deliverable status, batch position, hard limits, loaded skill names, and agent output keys from all completed pipeline stages. Conversation history is intentionally not seeded -- this is the purpose of recreation.
+- [x]**FR-5b.37**: During the fresh session step, the system creates a new session with the seeded state. The old session is preserved in the database (not deleted) but is no longer the active session for the pipeline.
+- [x]**FR-5b.38**: During the reassemble step, the system reconstructs the agent's context: the InstructionAssembler composes instructions from fragments (SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL), the SkillLoaderAgent reloads skills, and the MemoryLoaderAgent attempts to restore cross-session context.
+- [x]**FR-5b.39**: When the MemoryService is unavailable during reassembly (degraded mode -- the expected state in Phase 5b), the system proceeds with state + skills + instruction fragments only. A system reminder is injected noting that memory context is unavailable. The pipeline continues without cross-session memory.
+- [x]**FR-5b.40**: After recreation completes, the system reconstructs the pipeline containing only the stages that have not yet completed. Completion status is determined from persisted deliverable state keys, not from ADK agent state (which is lost with the old session's events). No completed stages re-execute. No state is lost.
+- [x]**FR-5b.41**: When recreation fails (session creation error, seed failure, reassembly error), the system publishes an error event with the failure context and the pipeline fails with a clear error. It does not silently continue with a corrupted session.
 
 ---
 
@@ -123,11 +123,11 @@ State writes are governed by tier-based access control. Keys with tier prefixes 
 
 **Requirements:**
 
-- [ ] **FR-5b.42**: When an agent yields a state delta containing a key with a tier prefix, the system validates that the agent's tier has write permission for that prefix. Director-prefixed keys are writable only by Director-tier agents. PM-prefixed keys are writable by PM-tier and Director-tier agents. Worker-prefixed keys are writable by all tiers.
-- [ ] **FR-5b.43**: When a state delta contains a key that violates tier authorization, the system rejects the entire state delta -- no partial application. None of the keys in the delta are applied, including valid ones.
-- [ ] **FR-5b.44**: When a state delta is rejected, the system publishes an error event to the event stream. The event includes: the rejected key, the author agent's tier, the required tier, and the full list of keys in the rejected delta. The originating agent receives an error indication.
-- [ ] **FR-5b.45**: When an agent reads a state key with any tier prefix, the read succeeds regardless of the agent's tier. Reads are unrestricted. A worker reading a director-prefixed key to understand governance constraints is correct behavior.
-- [ ] **FR-5b.46**: When a state delta contains only non-prefixed keys (shared workspace), the write succeeds for any tier. Non-prefixed keys are the primary communication mechanism within a pipeline.
+- [x]**FR-5b.42**: When an agent yields a state delta containing a key with a tier prefix, the system validates that the agent's tier has write permission for that prefix. Director-prefixed keys are writable only by Director-tier agents. PM-prefixed keys are writable by PM-tier and Director-tier agents. Worker-prefixed keys are writable by all tiers.
+- [x]**FR-5b.43**: When a state delta contains a key that violates tier authorization, the system rejects the entire state delta -- no partial application. None of the keys in the delta are applied, including valid ones.
+- [x]**FR-5b.44**: When a state delta is rejected, the system publishes an error event to the event stream. The event includes: the rejected key, the author agent's tier, the required tier, and the full list of keys in the rejected delta. The originating agent receives an error indication.
+- [x]**FR-5b.45**: When an agent reads a state key with any tier prefix, the read succeeds regardless of the agent's tier. Reads are unrestricted. A worker reading a director-prefixed key to understand governance constraints is correct behavior.
+- [x]**FR-5b.46**: When a state delta contains only non-prefixed keys (shared workspace), the write succeeds for any tier. Non-prefixed keys are the primary communication mechanism within a pipeline.
 
 ---
 
@@ -137,23 +137,23 @@ The Director observes PM execution through supervision callbacks attached to PM 
 
 **Requirements:**
 
-- [ ] **FR-5b.47**: Before the PM agent executes, a supervision callback checks the project's hard limits (cost ceiling, retry budget) against current usage. If a limit is exceeded, the callback blocks PM execution and returns a response indicating the exceeded limit and required escalation.
-- [ ] **FR-5b.48**: Before the PM agent executes, the supervision callback logs a supervision event to the event stream, recording the PM invocation with project context.
-- [ ] **FR-5b.49**: After the PM agent completes a turn, a supervision callback captures the PM's completion status from session state and publishes a status event to the event stream.
-- [ ] **FR-5b.50**: After the PM agent completes a turn, the supervision callback detects escalation signals in session state (e.g., the PM wrote escalation context indicating it cannot proceed). The callback does not resolve escalations -- it makes them observable.
-- [ ] **FR-5b.51**: Before each LLM call for any agent, the system injects ephemeral system reminders into the conversation. Reminders include: current context budget usage percentage, state change notifications from other agents, and progress summaries.
-- [ ] **FR-5b.52**: When the system has no relevant reminders to inject, the before-call hook executes without modification -- it does not inject empty or placeholder content.
-- [ ] **FR-5b.53**: System reminders are transient and are not persisted to durable state. During context recreation, reminders from the old session are lost. This is by design -- reminders reflect transient conditions, not durable governance rules.
+- [x]**FR-5b.47**: Before the PM agent executes, a supervision callback checks the project's hard limits (cost ceiling, retry budget) against current usage. If a limit is exceeded, the callback blocks PM execution and returns a response indicating the exceeded limit and required escalation.
+- [x]**FR-5b.48**: Before the PM agent executes, the supervision callback logs a supervision event to the event stream, recording the PM invocation with project context.
+- [x]**FR-5b.49**: After the PM agent completes a turn, a supervision callback captures the PM's completion status from session state and publishes a status event to the event stream.
+- [x]**FR-5b.50**: After the PM agent completes a turn, the supervision callback detects escalation signals in session state (e.g., the PM wrote escalation context indicating it cannot proceed). The callback does not resolve escalations -- it makes them observable.
+- [x]**FR-5b.51**: Before each LLM call for any agent, the system injects ephemeral system reminders into the conversation. Reminders include: current context budget usage percentage, state change notifications from other agents, and progress summaries.
+- [x]**FR-5b.52**: When the system has no relevant reminders to inject, the before-call hook executes without modification -- it does not inject empty or placeholder content.
+- [x]**FR-5b.53**: System reminders are transient and are not persisted to durable state. During context recreation, reminders from the old session are lost. This is by design -- reminders reflect transient conditions, not durable governance rules.
 
 ## Non-Functional Requirements
 
-- [ ] **NFR-5b.01**: Chat message routing (CEO sends message -> Director response persisted) completes within 30 seconds under normal LLM latency. The system does not add meaningful overhead beyond LLM call time.
-- [ ] **NFR-5b.02**: CEO queue query operations complete within 200ms for up to 1000 queue items.
-- [ ] **NFR-5b.03**: State key authorization validation adds no more than 1ms overhead per state delta. The validation is a synchronous prefix check, not a database lookup.
-- [ ] **NFR-5b.04**: Context recreation completes within 10 seconds (excluding LLM calls during reassembly). The 4-step process is dominated by session creation and state seeding, not computation.
-- [ ] **NFR-5b.05**: All quality gates pass (ruff check, pyright strict, pytest) with the complete supervision system. Zero type: ignore exceptions without documented rationale.
-- [ ] **NFR-5b.06**: Supervision callbacks (before/after agent) add no more than 5ms overhead per PM invocation. Callbacks are lightweight state checks and event publishes, not LLM calls.
-- [ ] **NFR-5b.07**: All significant state transitions produce an immutable audit event in the event stream: CEO queue item creation/resolution/dismissal, chat message send/receive, state key authorization violations, context recreation initiation/completion, Director-PM delegation/escalation, and supervision callback outcomes. No state change is silent.
+- [x]**NFR-5b.01**: Chat message routing (CEO sends message -> Director response persisted) completes within 30 seconds under normal LLM latency. The system does not add meaningful overhead beyond LLM call time.
+- [x]**NFR-5b.02**: CEO queue query operations complete within 200ms for up to 1000 queue items.
+- [x]**NFR-5b.03**: State key authorization validation adds no more than 1ms overhead per state delta. The validation is a synchronous prefix check, not a database lookup.
+- [x]**NFR-5b.04**: Context recreation completes within 10 seconds (excluding LLM calls during reassembly). The 4-step process is dominated by session creation and state seeding, not computation.
+- [x]**NFR-5b.05**: All quality gates pass (ruff check, pyright strict, pytest) with the complete supervision system. Zero type: ignore exceptions without documented rationale.
+- [x]**NFR-5b.06**: Supervision callbacks (before/after agent) add no more than 5ms overhead per PM invocation. Callbacks are lightweight state checks and event publishes, not LLM calls.
+- [x]**NFR-5b.07**: All significant state transitions produce an immutable audit event in the event stream: CEO queue item creation/resolution/dismissal, chat message send/receive, state key authorization violations, context recreation initiation/completion, Director-PM delegation/escalation, and supervision callback outcomes. No state change is silent.
 
 ## Rabbit Holes
 

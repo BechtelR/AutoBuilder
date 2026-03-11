@@ -86,10 +86,40 @@ def compose_callbacks(
     return composed
 
 
+def create_system_reminder_callback() -> Callable[
+    [CallbackContext, LlmRequest], LlmResponse | None
+]:
+    """Create a before_model_callback that injects ephemeral system reminders.
+
+    Writes transient reminders to ``_system_reminders`` state key.
+    Agent definitions can reference ``{_system_reminders?}`` for injection.
+    Returns None always — never blocks the request.
+    """
+
+    def _system_reminder(
+        ctx: CallbackContext,
+        req: LlmRequest,  # noqa: ARG001
+    ) -> LlmResponse | None:
+        reminders: list[str] = []
+
+        budget_pct = ctx.state.get("context_budget_used_pct")
+        if isinstance(budget_pct, (int, float)) and budget_pct > 50:
+            reminders.append(f"Context budget: {budget_pct:.0f}% used")
+
+        if reminders:
+            ctx.state["_system_reminders"] = "\n".join(reminders)
+        else:
+            ctx.state["_system_reminders"] = ""
+
+        return None
+
+    return _system_reminder
+
+
 def create_context_injection_callback() -> Callable[
     [CallbackContext, LlmRequest], LlmResponse | None
 ]:
-    """Context injection callback. No-op in Phase 5a; wired in Phase 5b."""
+    """Context injection callback. No-op placeholder; wired in Phase 9 (memory service)."""
 
     def _inject_context(ctx: CallbackContext, req: LlmRequest) -> LlmResponse | None:  # noqa: ARG001
         return None

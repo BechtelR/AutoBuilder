@@ -18,9 +18,13 @@ from app.gateway.models.chat import (
     SendChatMessageRequest,
 )
 from app.lib import NotFoundError
+from app.models.constants import SYSTEM_USER_ID
 from app.models.enums import ChatMessageRole, ChatStatus, ChatType
 
 router = APIRouter(tags=["chat"])
+
+MAIN_SESSION_PREFIX = "main_"
+SETTINGS_SESSION_PREFIX = "settings_"
 
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 ArqPool = Annotated[ArqRedis, Depends(get_arq_pool)]
@@ -61,6 +65,39 @@ async def list_chats(
     result = await session.execute(stmt)
     chats = result.scalars().all()
     return [_chat_to_response(c) for c in chats]
+
+
+# ---------------------------------------------------------------------------
+# Well-known session auto-creation (must be before {session_id} routes)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/chat/main")
+async def get_or_create_main_session(
+    session: DbSession,
+) -> ChatResponse:
+    """Get or auto-create the Main chat session for the system user."""
+    chat = await _ensure_well_known_session(
+        session,
+        f"{MAIN_SESSION_PREFIX}{SYSTEM_USER_ID}",
+        ChatType.DIRECTOR,
+        "Main",
+    )
+    return _chat_to_response(chat)
+
+
+@router.get("/chat/settings")
+async def get_or_create_settings_session(
+    session: DbSession,
+) -> ChatResponse:
+    """Get or auto-create the Settings chat session for the system user."""
+    chat = await _ensure_well_known_session(
+        session,
+        f"{SETTINGS_SESSION_PREFIX}{SYSTEM_USER_ID}",
+        ChatType.SETTINGS,
+        "Settings",
+    )
+    return _chat_to_response(chat)
 
 
 @router.get("/chat/{session_id}")
@@ -119,7 +156,7 @@ async def get_messages(
 
 
 # ---------------------------------------------------------------------------
-# SSE placeholder — full implementation in Phase 5 with real Director agent
+# SSE placeholder — full implementation with real streaming
 # ---------------------------------------------------------------------------
 
 
@@ -130,8 +167,8 @@ async def chat_stream(
 ) -> ChatResponse:
     """Placeholder for SSE streaming of Director responses.
 
-    Returns the chat detail for now. Real SSE implementation arrives in Phase 5
-    when the Director agent is wired up.
+    Returns the chat detail for now. Real SSE implementation arrives when
+    streaming is wired up.
     """
     chat = await _get_chat_by_session_id(session, session_id)
     return _chat_to_response(chat)
@@ -140,6 +177,44 @@ async def chat_stream(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+async def _ensure_well_known_session(
+    session: AsyncSession,
+    session_id: str,
+    chat_type: ChatType,
+    title: str,
+) -> Chat:
+    """Get or create a well-known chat session (Main, Settings).
+
+    Handles concurrent creation race by catching unique constraint violations
+    and re-reading the existing row.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    result = await session.execute(select(Chat).where(Chat.session_id == session_id))
+    chat = result.scalar_one_or_none()
+    if chat is not None:
+        return chat
+
+    chat = Chat(
+        session_id=session_id,
+        type=chat_type,
+        status=ChatStatus.ACTIVE,
+        title=title,
+    )
+    session.add(chat)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        result = await session.execute(select(Chat).where(Chat.session_id == session_id))
+        existing = result.scalar_one_or_none()
+        if existing is not None:
+            return existing
+        raise
+    await session.refresh(chat)
+    return chat
 
 
 async def _get_chat_by_session_id(session: AsyncSession, session_id: str) -> Chat:

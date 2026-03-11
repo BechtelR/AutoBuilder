@@ -134,3 +134,37 @@ class TestChatEndpoints:
             json={"content": "Hello"},
         )
         assert response.status_code == 404
+
+    # -----------------------------------------------------------------------
+    # Well-known session auto-creation
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_main_session_auto_created(self, test_client: AsyncClient) -> None:
+        response = await test_client.get("/chat/main")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["type"] == "DIRECTOR"
+        assert data["title"] == "Main"
+        assert data["session_id"].startswith("main_")
+
+    @pytest.mark.asyncio
+    async def test_main_session_idempotent(self, test_client: AsyncClient) -> None:
+        r1 = await test_client.get("/chat/main")
+        r2 = await test_client.get("/chat/main")
+        assert r1.json()["id"] == r2.json()["id"]
+
+    @pytest.mark.asyncio
+    async def test_settings_session_auto_created(self, test_client: AsyncClient) -> None:
+        response = await test_client.get("/chat/settings")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["type"] == "SETTINGS"
+        assert data["title"] == "Settings"
+        assert data["session_id"].startswith("settings_")
+
+    @pytest.mark.asyncio
+    async def test_settings_session_idempotent(self, test_client: AsyncClient) -> None:
+        r1 = await test_client.get("/chat/settings")
+        r2 = await test_client.get("/chat/settings")
+        assert r1.json()["id"] == r2.json()["id"]

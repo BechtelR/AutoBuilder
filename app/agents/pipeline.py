@@ -17,6 +17,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Canonical ordered list of pipeline stage names
+PIPELINE_STAGE_NAMES: list[str] = [
+    "skill_loader",
+    "memory_loader",
+    "planner",
+    "coder",
+    "formatter",
+    "linter",
+    "tester",
+    "diagnostics",
+    "review_cycle",
+]
+
 
 def create_deliverable_pipeline(
     registry: AgentRegistry,
@@ -26,12 +39,15 @@ def create_deliverable_pipeline(
     memory_service: BaseMemoryService,
     before_model_callback: object | None = None,
     max_review_iterations: int = 3,
+    stages: list[str] | None = None,
 ) -> SequentialAgent:
-    """Construct the full DeliverablePipeline.
+    """Construct the DeliverablePipeline.
 
-    Pipeline sequence:
+    Pipeline sequence (full):
     SkillLoader -> MemoryLoader -> planner -> coder -> Formatter -> Linter
     -> TestRunner -> Diagnostics -> ReviewCycle
+
+    When ``stages`` is provided, only the named stages are included.
 
     ReviewCycle (ReviewCycleAgent — CustomAgent wrapper):
     reviewer -> fixer -> Linter (re-lint) -> TestRunner (re-test)
@@ -40,6 +56,9 @@ def create_deliverable_pipeline(
     # Import custom agents to ensure they're registered in CLASS_REGISTRY.
     # The import triggers register_custom_agent() calls in __init__.py.
     __import__("app.agents.custom")
+
+    include_all = stages is None
+    stage_set: set[str] = set(stages) if stages is not None else set[str]()
 
     # Build custom agents with their dependencies
     skill_loader: BaseAgent = registry.build(
@@ -84,20 +103,36 @@ def create_deliverable_pipeline(
         max_iterations=max_review_iterations,
     )
 
-    # Full pipeline
+    # Stage name -> built agent mapping (ordered)
+    stage_agents: dict[str, BaseAgent] = {
+        "skill_loader": skill_loader,
+        "memory_loader": memory_loader,
+        "planner": planner,
+        "coder": coder,
+        "formatter": formatter,
+        "linter": linter,
+        "tester": test_runner,
+        "diagnostics": diagnostics,
+        "review_cycle": review_cycle,
+    }
+
+    # Filter to requested stages (preserving canonical order)
+    if include_all:
+        sub_agents = list(stage_agents.values())
+        pipeline_name = "deliverable_pipeline"
+    else:
+        sub_agents = [agent for name, agent in stage_agents.items() if name in stage_set]
+        pipeline_name = "deliverable_pipeline_partial"
+        logger.info(
+            "Building partial pipeline with %d/%d stages: %s",
+            len(sub_agents),
+            len(stage_agents),
+            [n for n in stage_agents if n in stage_set],
+        )
+
     pipeline = SequentialAgent(
-        name="deliverable_pipeline",
-        sub_agents=[
-            skill_loader,
-            memory_loader,
-            planner,
-            coder,
-            formatter,
-            linter,
-            test_runner,
-            diagnostics,
-            review_cycle,
-        ],
+        name=pipeline_name,
+        sub_agents=sub_agents,
     )
 
     return pipeline

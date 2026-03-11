@@ -183,17 +183,17 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Depends on:** —
 **Description:** Add tier-based state key authorization to EventPublisher. For each event with a state_delta, validate that the author agent's tier has write permission for every key prefix. On violation, reject the entire delta atomically: publish an error event with details (rejected key, author tier, required tier) and write a corrective state delta reverting unauthorized keys. Reads remain unrestricted. Non-prefixed keys writable by all tiers.
 **BOM Components:**
-- [ ] `A79` — State key authorization (tier prefixes, EventPublisher ACL)
+- [x]`A79` — State key authorization (tier prefixes, EventPublisher ACL)
 **Requirements:**
-- [ ] `EventPublisher.validate_state_delta(event, author_tier)` returns list of unauthorized key names (empty = authorized)
-- [ ] Agent-to-tier mapping: `"director"` → director, names matching `pm*` → pm, all others → worker
-- [ ] Authorization matrix matches DD-2 (director:* = director-only, pm:* = pm+director, worker:* and non-prefixed = all, app:* = pm+director, user:* and temp:* = all)
-- [ ] On violation: entire state_delta rejected — corrective delta written removing all unauthorized keys
-- [ ] On violation: error event published with `PipelineEventType.ERROR` containing rejected keys, author, tier mismatch
-- [ ] Reads unrestricted — validation only on state_delta writes, never on state reads
-- [ ] Non-prefixed keys always pass validation for any tier
-- [ ] Validation adds ≤ 1ms overhead per state delta (synchronous prefix check, no DB lookup)
-- [ ] Zero new ADK imports (uses existing getattr ACL pattern)
+- [x]`EventPublisher.validate_state_delta(event, author_tier)` returns list of unauthorized key names (empty = authorized)
+- [x]Agent-to-tier mapping: `"director"` → director, names matching `pm*` → pm, all others → worker
+- [x]Authorization matrix matches DD-2 (director:* = director-only, pm:* = pm+director, worker:* and non-prefixed = all, app:* = pm+director, user:* and temp:* = all)
+- [x]On violation: entire state_delta rejected — corrective delta written removing all unauthorized keys
+- [x]On violation: error event published with `PipelineEventType.ERROR` containing rejected keys, author, tier mismatch
+- [x]Reads unrestricted — validation only on state_delta writes, never on state reads
+- [x]Non-prefixed keys always pass validation for any tier
+- [x]Validation adds ≤ 1ms overhead per state delta (synchronous prefix check, no DB lookup)
+- [x]Zero new ADK imports (uses existing getattr ACL pattern)
 **Validation:**
 - `uv run pyright app/events/publisher.py`
 - `uv run pytest tests/events/test_publisher.py -v`
@@ -205,23 +205,23 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Depends on:** —
 **Description:** Add gateway routes for CEO queue operations: list/filter queue items and resolve/dismiss items. Add resolution columns (`resolution`, `resolver`, `resolved_at`) to `CeoQueueItem` model via Alembic migration -- the 5a model has status but no fields to record resolution details. When an approval-type item is resolved, write the resolution to the originating project's session state so the PM can discover it. When no active work session exists, enqueue a new work session to resume. Handle edge cases: conflict on double-resolve, stale session references.
 **BOM Components:**
-- [ ] `G12` — `GET /ceo/queue` route
-- [ ] `G13` — `PATCH /ceo/queue/{id}` route
-- [ ] `V18` — CEO resolved approval → session state writeback
+- [x]`G12` — `GET /ceo/queue` route
+- [x]`G13` — `PATCH /ceo/queue/{id}` route
+- [x]`V18` — CEO resolved approval → session state writeback
 **Requirements:**
-- [ ] `GET /ceo/queue` returns queue items filtered by optional query params: `type` (CeoItemType), `priority` (EscalationPriority), `status` (CeoQueueStatus). Ordered by priority descending then created_at ascending
-- [ ] `GET /ceo/queue` completes within 200ms for up to 1000 items
-- [ ] `CeoQueueItem` model extended with nullable columns: `resolution` (str), `resolver` (str), `resolved_at` (datetime). Alembic migration adds these three columns to the existing `ceo_queue` table (sequential NNN numbering)
-- [ ] `PATCH /ceo/queue/{id}` accepts resolution payload: `status` (RESOLVED or DISMISSED), `resolution` (str), `resolver` (str)
-- [ ] On resolve: updates item status, records resolution text, resolver identity, and resolution timestamp (`resolved_at` set server-side to `datetime.now(timezone.utc)`)
-- [ ] On resolve of approval-type item: writes `approval:{queue_item_id}` key to originating project's session state via DatabaseSessionService
-- [ ] On resolve with no active work session: enqueues `run_work_session` ARQ job to resume execution
-- [ ] On dismiss: updates item status to DISMISSED, records dismissal. No writeback triggered
-- [ ] Conflict: resolving/dismissing an already-resolved/dismissed item returns HTTP 409 with ConflictError
-- [ ] Stale reference: if source session no longer exists, resolution succeeds (item marked resolved) but writeback skipped with warning event
-- [ ] All CEO queue state transitions (resolve, dismiss) publish audit events to Redis Stream with item ID, action, resolver, and project context (NFR-5b.07)
-- [ ] Pydantic request/response models in `ceo_queue.py` with proper types (no Any, no magic strings)
-- [ ] Route registered in `main.py` create_app()
+- [x]`GET /ceo/queue` returns queue items filtered by optional query params: `type` (CeoItemType), `priority` (EscalationPriority), `status` (CeoQueueStatus). Ordered by priority descending then created_at ascending
+- [x]`GET /ceo/queue` completes within 200ms for up to 1000 items
+- [x]`CeoQueueItem` model extended with nullable columns: `resolution` (str), `resolver` (str), `resolved_at` (datetime). Alembic migration adds these three columns to the existing `ceo_queue` table (sequential NNN numbering)
+- [x]`PATCH /ceo/queue/{id}` accepts resolution payload: `status` (RESOLVED or DISMISSED), `resolution` (str), `resolver` (str)
+- [x]On resolve: updates item status, records resolution text, resolver identity, and resolution timestamp (`resolved_at` set server-side to `datetime.now(timezone.utc)`)
+- [x]On resolve of approval-type item: writes `approval:{queue_item_id}` key to originating project's session state via DatabaseSessionService
+- [x]On resolve with no active work session: enqueues `run_work_session` ARQ job to resume execution
+- [x]On dismiss: updates item status to DISMISSED, records dismissal. No writeback triggered
+- [x]Conflict: resolving/dismissing an already-resolved/dismissed item returns HTTP 409 with ConflictError
+- [x]Stale reference: if source session no longer exists, resolution succeeds (item marked resolved) but writeback skipped with warning event
+- [x]All CEO queue state transitions (resolve, dismiss) publish audit events to Redis Stream with item ID, action, resolver, and project context (NFR-5b.07)
+- [x]Pydantic request/response models in `ceo_queue.py` with proper types (no Any, no magic strings)
+- [x]Route registered in `main.py` create_app()
 **Validation:**
 - `uv run alembic upgrade head` — migration applies without error
 - `uv run pyright app/gateway/routes/ceo_queue.py app/gateway/models/ceo_queue.py app/db/models.py`
@@ -234,27 +234,27 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Depends on:** —
 **Description:** Add Director formation logic: on first system access for a user, auto-create a Settings session (`ChatType.SETTINGS`) and set `user:formation_status` to `PENDING`. When the Director enters a Settings session with `formation_status != COMPLETE`, it operates in formation mode — a conversational exchange that produces three structured artifacts (`user:director_identity`, `user:ceo_profile`, `user:operating_contract`). Formation instructions are a dedicated instruction fragment, not a YAML file. Add system reminder injection callback (`before_model_callback`) that inserts ephemeral governance nudges — context budget usage, state change notifications, progress summaries — before each LLM call. No injection when no relevant reminders exist. Reminders are transient (not persisted, lost during recreation).
 **BOM Components:**
-- [ ] `A08` — Director formation artifacts (`user:` scope — three structured keys + formation status)
-- [ ] `A09` — Director formation logic (Settings conversation)
-- [ ] `A58` — System reminder injection (`before_model_callback`)
+- [x]`A08` — Director formation artifacts (`user:` scope — three structured keys + formation status)
+- [x]`A09` — Director formation logic (Settings conversation)
+- [x]`A58` — System reminder injection (`before_model_callback`)
 **Requirements:**
-- [ ] `FormationStatus` enum: `PENDING`, `IN_PROGRESS`, `COMPLETE` in `app/models/enums.py`
-- [ ] State key constants: `DIRECTOR_IDENTITY_KEY`, `CEO_PROFILE_KEY`, `OPERATING_CONTRACT_KEY`, `FORMATION_STATUS_KEY` in `app/models/constants.py`
-- [ ] `ensure_formation_state(session_service, user_id)` checks if `user:formation_status` exists. If missing, sets to `PENDING`. Returns current `FormationStatus`.
-- [ ] `write_artifact(session_service, user_id, key, value)` writes a formation artifact to `user:` scope. Updates `formation_status` to `COMPLETE` when all three artifacts exist.
-- [ ] `reset_formation(session_service, user_id)` clears all three artifact keys and resets `formation_status` to `PENDING`.
-- [ ] Formation conversation instructions defined as a formation instruction fragment in `app/agents/formation.py` — loaded by InstructionAssembler when `formation_status != COMPLETE` in Settings sessions
-- [ ] `ChatType.SETTINGS` enum value added to `app/models/enums.py`
-- [ ] Settings session auto-created on first system access (like "Main") with `type=ChatType.SETTINGS`
-- [ ] Director built with formation-mode or evolution-mode instructions based on `user:formation_status` when entering Settings session
-- [ ] Director can propose artifact updates from any session via CEO queue `APPROVAL` item
-- [ ] `system_reminder_callback(ctx, llm_request)` matches `before_model_callback` signature
-- [ ] Injects current `context_budget_used_pct` from state as a context budget warning (e.g., "Context usage: 73%")
-- [ ] Injects state change notifications from other agents when relevant state keys changed since last call
-- [ ] When no relevant reminders exist, callback returns None without modifying the request
-- [ ] System reminders are NOT persisted to durable state — they reflect transient conditions
-- [ ] System reminders are acceptable to lose during context recreation (by design)
-- [ ] Callback integrates into the `compose_callbacks` chain from Phase 5a (added after context injection, before budget monitor)
+- [x]`FormationStatus` enum: `PENDING`, `IN_PROGRESS`, `COMPLETE` in `app/models/enums.py`
+- [x]State key constants: `DIRECTOR_IDENTITY_KEY`, `CEO_PROFILE_KEY`, `OPERATING_CONTRACT_KEY`, `FORMATION_STATUS_KEY` in `app/models/constants.py`
+- [x]`ensure_formation_state(session_service, user_id)` checks if `user:formation_status` exists. If missing, sets to `PENDING`. Returns current `FormationStatus`.
+- [x]`write_artifact(session_service, user_id, key, value)` writes a formation artifact to `user:` scope. Updates `formation_status` to `COMPLETE` when all three artifacts exist.
+- [x]`reset_formation(session_service, user_id)` clears all three artifact keys and resets `formation_status` to `PENDING`.
+- [x]Formation conversation instructions defined as a formation instruction fragment in `app/agents/formation.py` — loaded by InstructionAssembler when `formation_status != COMPLETE` in Settings sessions
+- [x]`ChatType.SETTINGS` enum value added to `app/models/enums.py`
+- [x]Settings session auto-created on first system access (like "Main") with `type=ChatType.SETTINGS`
+- [x]Director built with formation-mode or evolution-mode instructions based on `user:formation_status` when entering Settings session
+- [x]Director can propose artifact updates from any session via CEO queue `APPROVAL` item
+- [x]`system_reminder_callback(ctx, llm_request)` matches `before_model_callback` signature
+- [x]Injects current `context_budget_used_pct` from state as a context budget warning (e.g., "Context usage: 73%")
+- [x]Injects state change notifications from other agents when relevant state keys changed since last call
+- [x]When no relevant reminders exist, callback returns None without modifying the request
+- [x]System reminders are NOT persisted to durable state — they reflect transient conditions
+- [x]System reminders are acceptable to lose during context recreation (by design)
+- [x]Callback integrates into the `compose_callbacks` chain from Phase 5a (added after context injection, before budget monitor)
 **Validation:**
 - `uv run pyright app/agents/formation.py app/agents/state_helpers.py`
 - `uv run pytest tests/agents/test_formation.py tests/agents/test_state_helpers.py -v`
@@ -266,22 +266,22 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Depends on:** —
 **Description:** Implement 4 supervision callbacks as standalone async functions. Director supervision: `before_pm_execution` checks project hard limits (cost ceiling, retry budget) and blocks if exceeded; `after_pm_execution` captures PM completion status, detects escalation signals, and checks Director Queue inline. Pipeline safety: `checkpoint_project` persists deliverable completion status after each pipeline run; `verify_batch_completion` validates all batch deliverables reached terminal state.
 **BOM Components:**
-- [ ] `A14` — `before_agent_callback` (Director supervision)
-- [ ] `A15` — `after_agent_callback` (Director supervision)
-- [ ] `A40` — `verify_batch_completion` (`after_agent_callback`)
-- [ ] `A41` — `checkpoint_project` (`after_agent_callback`)
+- [x]`A14` — `before_agent_callback` (Director supervision)
+- [x]`A15` — `after_agent_callback` (Director supervision)
+- [x]`A40` — `verify_batch_completion` (`after_agent_callback`)
+- [x]`A41` — `checkpoint_project` (`after_agent_callback`)
 **Requirements:**
-- [ ] `before_pm_execution(ctx)` reads project hard limits from `project_configs` via state, checks current retry count and cost against limits
-- [ ] When a limit is exceeded, `before_pm_execution` returns `Content` blocking PM execution with exceeded-limit details
-- [ ] `before_pm_execution` publishes supervision event to Redis Stream (PM invocation with project context)
-- [ ] `after_pm_execution(ctx)` reads PM completion status from session state, publishes status event to Redis Stream
-- [ ] `after_pm_execution` detects escalation signals in state (e.g., PM wrote escalation context) — makes them observable, does not resolve
-- [ ] `after_pm_execution` checks Director Queue for pending items (inline path per DD-5)
-- [ ] `checkpoint_project(ctx)` persists deliverable completion status and pipeline output to durable state after each deliverable — fires regardless of success or failure
-- [ ] `verify_batch_completion(ctx)` validates all batch deliverables reached terminal state (completed or failed), logs batch result
-- [ ] All callbacks match ADK callback signature: `async (CallbackContext) -> Content | None`
-- [ ] All callbacks add ≤ 5ms overhead per invocation (lightweight state checks + event publishes, no LLM calls)
-- [ ] All significant state transitions produce audit events in Redis Stream
+- [x]`before_pm_execution(ctx)` reads project hard limits from `project_configs` via state, checks current retry count and cost against limits
+- [x]When a limit is exceeded, `before_pm_execution` returns `Content` blocking PM execution with exceeded-limit details
+- [x]`before_pm_execution` publishes supervision event to Redis Stream (PM invocation with project context)
+- [x]`after_pm_execution(ctx)` reads PM completion status from session state, publishes status event to Redis Stream
+- [x]`after_pm_execution` detects escalation signals in state (e.g., PM wrote escalation context) — makes them observable, does not resolve
+- [x]`after_pm_execution` checks Director Queue for pending items (inline path per DD-5)
+- [x]`checkpoint_project(ctx)` persists deliverable completion status and pipeline output to durable state after each deliverable — fires regardless of success or failure
+- [x]`verify_batch_completion(ctx)` validates all batch deliverables reached terminal state (completed or failed), logs batch result
+- [x]All callbacks match ADK callback signature: `async (CallbackContext) -> Content | None`
+- [x]All callbacks add ≤ 5ms overhead per invocation (lightweight state checks + event publishes, no LLM calls)
+- [x]All significant state transitions produce audit events in Redis Stream
 **Validation:**
 - `uv run pyright app/agents/supervision.py`
 - `uv run pytest tests/agents/test_supervision.py -v`
@@ -293,25 +293,25 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Depends on:** P5b.D3, P5b.D4
 **Description:** Implement `run_work_session` task function that builds Director as root_agent with PM as sub_agent, ensures formation state, loads hard limits from project_configs, wires supervision callbacks, and starts the ADK runner. Director delegates to PM via `transfer_to_agent`. PM escalates back. Hard limits (retry_budget, cost_ceiling) cascade: Director cannot exceed global limits, PM cannot exceed project limits. Handle delegation/escalation failures with error events and CEO queue items.
 **BOM Components:**
-- [ ] `A05` — Director → PM delegation (`transfer_to_agent`)
-- [ ] `A06` — PM → Director escalation (`transfer_to_agent`)
-- [ ] `A07` — Hard limits cascade (CEO → Director → PM → Workers)
+- [x]`A05` — Director → PM delegation (`transfer_to_agent`)
+- [x]`A06` — PM → Director escalation (`transfer_to_agent`)
+- [x]`A07` — Hard limits cascade (CEO → Director → PM → Workers)
 **Requirements:**
-- [ ] `run_work_session(ctx, project_id, params)` builds Director from AgentRegistry with PM as sub_agent
-- [ ] Director built as stateless root_agent — fresh build on each invocation, no in-memory state carried
-- [ ] PM built via `AgentRegistry.build(f"PM_{project_id}", ctx, definition="pm")` with project-specific session
-- [ ] Supervision callbacks (from D4) wired onto PM sub_agent: `before_agent_callback=before_pm_execution`, `after_agent_callback=after_pm_execution`
-- [ ] Formation state ensured on first invocation for user (calls `ensure_formation_state` from D3)
-- [ ] Hard limits loaded from `project_configs` table and written to session state for PM access
-- [ ] When project has no config entry, default limits created from global defaults (new `AUTOBUILDER_DEFAULT_RETRY_BUDGET`, `AUTOBUILDER_DEFAULT_COST_CEILING` settings)
-- [ ] Director cannot set limits exceeding global limits; PM cannot set worker constraints exceeding project limits (validated at write time)
-- [ ] When retry budget depleted: escalation to tier above
-- [ ] When cost ceiling hit: hard stop + escalation to tier above
-- [ ] On delegation failure (PM build fails, session creation fails): publish error event, create CEO queue item with failure context
-- [ ] On escalation failure (PM→Director transfer fails): publish error event, PM escalation context preserved in session state
-- [ ] Successful delegation and escalation publish audit events to Redis Stream with project ID, agent names, and direction (NFR-5b.07)
-- [ ] Active work session sets Redis key `director:work_session:{project_id}` with TTL for deduplication
-- [ ] `run_work_session` registered in WorkerSettings.functions
+- [x]`run_work_session(ctx, project_id, params)` builds Director from AgentRegistry with PM as sub_agent
+- [x]Director built as stateless root_agent — fresh build on each invocation, no in-memory state carried
+- [x]PM built via `AgentRegistry.build(f"PM_{project_id}", ctx, definition="pm")` with project-specific session
+- [x]Supervision callbacks (from D4) wired onto PM sub_agent: `before_agent_callback=before_pm_execution`, `after_agent_callback=after_pm_execution`
+- [x]Formation state ensured on first invocation for user (calls `ensure_formation_state` from D3)
+- [x]Hard limits loaded from `project_configs` table and written to session state for PM access
+- [x]When project has no config entry, default limits created from global defaults (new `AUTOBUILDER_DEFAULT_RETRY_BUDGET`, `AUTOBUILDER_DEFAULT_COST_CEILING` settings)
+- [x]Director cannot set limits exceeding global limits; PM cannot set worker constraints exceeding project limits (validated at write time)
+- [x]When retry budget depleted: escalation to tier above
+- [x]When cost ceiling hit: hard stop + escalation to tier above
+- [x]On delegation failure (PM build fails, session creation fails): publish error event, create CEO queue item with failure context
+- [x]On escalation failure (PM→Director transfer fails): publish error event, PM escalation context preserved in session state
+- [x]Successful delegation and escalation publish audit events to Redis Stream with project ID, agent names, and direction (NFR-5b.07)
+- [x]Active work session sets Redis key `director:work_session:{project_id}` with TTL for deduplication
+- [x]`run_work_session` registered in WorkerSettings.functions
 **Validation:**
 - `uv run pyright app/workers/tasks.py app/workers/adk.py`
 - `uv run pytest tests/workers/ -v`
@@ -324,17 +324,17 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Description:** Wire the PM's autonomous batch loop within the work session. The PM reasons across multiple turns: selects batch via tool, dispatches each deliverable through DeliverablePipeline sequentially, receives checkpoint/verification callbacks, reasons about results, and decides the next batch or escalation. No parallel execution (Phase 8). The PM discovers approval resolutions from session state during batch selection.
 **BOM Components:** *(None unique — emergent behavior from PM agent (5a) + callbacks (D4) + delegation (D5))*
 **Requirements:**
-- [ ] PM receives project with pre-seeded deliverables in session state and uses `select_ready_batch` tool to compose batches
-- [ ] Each deliverable dispatches through DeliverablePipeline sequentially (no ParallelAgent — Phase 8)
-- [ ] `checkpoint_project` callback fires automatically after each deliverable completes — persists status and output
-- [ ] `verify_batch_completion` callback fires after all batch deliverables complete — validates terminal states
-- [ ] PM reasons between batches: queries results via `query_deliverables`, assesses failures, decides next batch composition
-- [ ] Inter-batch reasoning maintains coherence across batch boundaries (verified with 2+ deliverable test)
-- [ ] Failed deliverable marked failed, PM continues with unblocked deliverables (failed doesn't block independent work)
-- [ ] PM returns control to Director on project completion (all deliverables complete or failed with no unblocked work)
-- [ ] PM escalates to Director when unable to make progress (all blocked, no retries, no reordering possible) with context
-- [ ] PM discovers approval resolutions via `approval:*` keys in session state during `select_ready_batch`
-- [ ] When PM suspended (waiting for approvals, no unblocked work), PM returns to Director with suspended status. ARQ job completes. New work session enqueued on approval resolution (D2).
+- [x]PM receives project with pre-seeded deliverables in session state and uses `select_ready_batch` tool to compose batches
+- [x]Each deliverable dispatches through DeliverablePipeline sequentially (no ParallelAgent — Phase 8)
+- [x]`checkpoint_project` callback fires automatically after each deliverable completes — persists status and output
+- [x]`verify_batch_completion` callback fires after all batch deliverables complete — validates terminal states
+- [x]PM reasons between batches: queries results via `query_deliverables`, assesses failures, decides next batch composition
+- [x]Inter-batch reasoning maintains coherence across batch boundaries (verified with 2+ deliverable test)
+- [x]Failed deliverable marked failed, PM continues with unblocked deliverables (failed doesn't block independent work)
+- [x]PM returns control to Director on project completion (all deliverables complete or failed with no unblocked work)
+- [x]PM escalates to Director when unable to make progress (all blocked, no retries, no reordering possible) with context
+- [x]PM discovers approval resolutions via `approval:*` keys in session state during `select_ready_batch`
+- [x]When PM suspended (waiting for approvals, no unblocked work), PM returns to Director with suspended status. ARQ job completes. New work session enqueued on approval resolution (D2).
 **Validation:**
 - `uv run pytest tests/workers/test_pm_loop.py -v`
 
@@ -345,17 +345,17 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Depends on:** P5b.D5
 **Description:** Implement dual-path Director Queue processing. Inline path: the `after_pm_execution` callback (D4) already checks the queue after PM turns. Cron path: add `process_director_queue` ARQ cron job that scans for pending items in projects without active work sessions and enqueues `run_director_turn` jobs. Add `AUTOBUILDER_DIRECTOR_QUEUE_INTERVAL` setting.
 **BOM Components:**
-- [ ] `A16` — Director queue consumption (reads pending escalations, resolves or forwards to CEO queue)
+- [x]`A16` — Director queue consumption (reads pending escalations, resolves or forwards to CEO queue)
 **Requirements:**
-- [ ] `process_director_queue` cron function: queries `director_queue` for pending items, groups by project, skips projects with active work sessions (Redis key check)
-- [ ] For each project with pending items and no active session: enqueues `run_director_turn` job
-- [ ] Cron function is lightweight DB query — zero Director invocation or token cost for empty queues
-- [ ] Cron interval configurable via `AUTOBUILDER_DIRECTOR_QUEUE_INTERVAL` setting (default: 60 seconds)
-- [ ] Cron registered in `WorkerSettings.cron_jobs`
-- [ ] Director processes queue items during work sessions via inline path (after_pm_execution callback in D4) and during idle periods via cron path
-- [ ] Director evaluates each item: resolves locally (writes resolution to state) or forwards to CEO queue via `escalate_to_ceo`
-- [ ] Items forwarded to CEO queue updated to `FORWARDED_TO_CEO` status
-- [ ] New setting added to `app/config/settings.py`: `director_queue_interval: int = 60`
+- [x]`process_director_queue` cron function: queries `director_queue` for pending items, groups by project, skips projects with active work sessions (Redis key check)
+- [x]For each project with pending items and no active session: enqueues `run_director_turn` job
+- [x]Cron function is lightweight DB query — zero Director invocation or token cost for empty queues
+- [x]Cron interval configurable via `AUTOBUILDER_DIRECTOR_QUEUE_INTERVAL` setting (default: 60 seconds)
+- [x]Cron registered in `WorkerSettings.cron_jobs`
+- [x]Director processes queue items during work sessions via inline path (after_pm_execution callback in D4) and during idle periods via cron path
+- [x]Director evaluates each item: resolves locally (writes resolution to state) or forwards to CEO queue via `escalate_to_ceo`
+- [x]Items forwarded to CEO queue updated to `FORWARDED_TO_CEO` status
+- [x]New setting added to `app/config/settings.py`: `director_queue_interval: int = 60`
 **Validation:**
 - `uv run pyright app/workers/tasks.py app/workers/settings.py app/config/settings.py`
 - `uv run pytest tests/workers/test_director_queue.py -v`
@@ -367,27 +367,27 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Depends on:** P5b.D5
 **Description:** Wire the real Director agent into existing chat routes. Modify `run_director_turn` to build Director from AgentRegistry (replacing the echo stub), with per-message invocation model — one worker call per message, fresh Director build each time. Director has access to chat session history, `user:` scope state (formation artifacts), and `app:` scope state (project status). Add auto-creation of "Main" chat session and Settings session when CEO sends first message. Settings session routes Director into formation or evolution mode based on `user:formation_status`. Chat invocations do not block or modify active work sessions.
 **BOM Components:**
-- [ ] `G10` — `POST /chat/{session_id}/messages` route
-- [ ] `G11` — `GET /chat/{session_id}/messages` route
-- [ ] `A70` — Chat session model (per-message `runner.run_async`)
-- [ ] `A13` — Director "Main" project (permanent chat session)
+- [x]`G10` — `POST /chat/{session_id}/messages` route
+- [x]`G11` — `GET /chat/{session_id}/messages` route
+- [x]`A70` — Chat session model (per-message `runner.run_async`)
+- [x]`A13` — Director "Main" project (permanent chat session)
 **Requirements:**
-- [ ] `run_director_turn` builds Director from `AgentRegistry.build("director", ctx)` replacing echo stub
-- [ ] Director built with no sub_agents for chat context (no PM delegation in chat)
-- [ ] Per-message invocation: one `runner.run_async` call per user message, fresh Director each time
-- [ ] Director accesses chat session conversation history via ADK session events
-- [ ] Director accesses `user:` scope state (formation artifacts: director_identity, ceo_profile, operating_contract) and `app:` scope state (project status, deliverable summaries)
-- [ ] Chat invocation does not block, interrupt, or modify running work sessions
-- [ ] When CEO sends message without specifying a project, system routes to "Main" chat session
-- [ ] If "Main" session does not exist for the user, it is created automatically with `type=ChatType.DIRECTOR`
-- [ ] Settings session (`ChatType.SETTINGS`) auto-created on first system access for a user (like "Main")
-- [ ] When CEO sends message to Settings session, Director built with formation-mode instructions (when `user:formation_status != COMPLETE`) or evolution-mode instructions (when `COMPLETE`)
-- [ ] Settings session is user-scoped (not project-scoped) and always available
-- [ ] Chat message send and Director response publish audit events to Redis Stream (NFR-5b.07)
-- [ ] On Director processing failure (agent build error, worker unavailable): error response persisted in chat message history, error event published
-- [ ] Chat message routing completes within 30 seconds under normal LLM latency
-- [ ] `run_director_turn` registered in `WorkerSettings.functions` (in `settings.py`)
-- [ ] `POST /chat/{session_id}/messages` and `GET /chat/{session_id}/messages` routes already exist — verify they work correctly with real Director (may need minor adjustments)
+- [x]`run_director_turn` builds Director from `AgentRegistry.build("director", ctx)` replacing echo stub
+- [x]Director built with no sub_agents for chat context (no PM delegation in chat)
+- [x]Per-message invocation: one `runner.run_async` call per user message, fresh Director each time
+- [x]Director accesses chat session conversation history via ADK session events
+- [x]Director accesses `user:` scope state (formation artifacts: director_identity, ceo_profile, operating_contract) and `app:` scope state (project status, deliverable summaries)
+- [x]Chat invocation does not block, interrupt, or modify running work sessions
+- [x]When CEO sends message without specifying a project, system routes to "Main" chat session
+- [x]If "Main" session does not exist for the user, it is created automatically with `type=ChatType.DIRECTOR`
+- [x]Settings session (`ChatType.SETTINGS`) auto-created on first system access for a user (like "Main")
+- [x]When CEO sends message to Settings session, Director built with formation-mode instructions (when `user:formation_status != COMPLETE`) or evolution-mode instructions (when `COMPLETE`)
+- [x]Settings session is user-scoped (not project-scoped) and always available
+- [x]Chat message send and Director response publish audit events to Redis Stream (NFR-5b.07)
+- [x]On Director processing failure (agent build error, worker unavailable): error response persisted in chat message history, error event published
+- [x]Chat message routing completes within 30 seconds under normal LLM latency
+- [x]`run_director_turn` registered in `WorkerSettings.functions` (in `settings.py`)
+- [x]`POST /chat/{session_id}/messages` and `GET /chat/{session_id}/messages` routes already exist — verify they work correctly with real Director (may need minor adjustments)
 **Validation:**
 - `uv run pyright app/gateway/routes/chat.py app/workers/tasks.py app/workers/settings.py`
 - `uv run pytest tests/gateway/test_chat.py tests/workers/test_director_turn.py -v`
@@ -399,23 +399,23 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 **Depends on:** P5b.D4, P5b.D6
 **Description:** Implement the 4-step context recreation pipeline triggered when ContextRecreationRequired is raised during pipeline execution. Step 1 (persist): save important state to memory service. Step 2 (seed): copy critical state keys to new session. Step 3 (fresh session): create new ADK session with seeded state. Step 4 (reassemble): reconstruct agent context via InstructionAssembler, SkillLoaderAgent, and MemoryLoaderAgent. Rebuild pipeline with only remaining stages. Degraded mode: proceed without cross-session memory (Phase 9).
 **BOM Components:**
-- [ ] `A59` — Context recreation mechanism
-- [ ] `CT05` — Context recreation pipeline (persist → seed → fresh session → reassemble)
+- [x]`A59` — Context recreation mechanism
+- [x]`CT05` — Context recreation pipeline (persist → seed → fresh session → reassemble)
 **Requirements:**
-- [ ] `recreate_context(session_service, old_session, pipeline_context)` orchestrates the 4-step process
-- [ ] When ContextRecreationRequired raised during pipeline execution, worker catches it at pipeline level and initiates recreation
-- [ ] **Persist step**: saves progress markers, accumulated decisions, current plan, learnings to memory service. State keys already durable via DatabaseSessionService are not re-persisted
-- [ ] **Seed step**: copies critical keys from old session to new session: deliverable status, batch position, hard limits, loaded_skill_names, agent output_keys from completed stages. Conversation history intentionally NOT seeded
-- [ ] **Fresh session step**: creates new ADK session with seeded state. Old session preserved in DB (not deleted), no longer active
-- [ ] **Reassemble step**: InstructionAssembler recomposes instructions from fragments (SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL). SkillLoaderAgent reloads skills. MemoryLoaderAgent attempts memory restore
-- [ ] When MemoryService unavailable (degraded mode — expected in Phase 5b): proceeds with state + skills + instruction fragments only. System reminder injected noting memory context unavailable
-- [ ] After recreation: pipeline rebuilt containing only remaining (not-yet-completed) stages. Completion determined from persisted deliverable state keys, not ADK events
-- [ ] No completed stages re-execute. No state is lost
-- [ ] On recreation failure (session creation error, seed failure, reassembly error): error event published, pipeline fails with clear error. No silent continuation with corrupted session
-- [ ] Context recreation initiation and completion (success or failure) publish audit events to Redis Stream with session IDs, stage reached, and outcome (NFR-5b.07)
-- [ ] Context recreation completes within 10 seconds (excluding LLM calls during reassembly)
-- [ ] `rebuild_reduced_pipeline(registry, completed_stages, ctx)` constructs a DeliverablePipeline with only remaining stages
-- [ ] `app/agents/pipeline.py` modified to support partial pipeline construction (accepts list of stages to include)
+- [x]`recreate_context(session_service, old_session, pipeline_context)` orchestrates the 4-step process
+- [x]When ContextRecreationRequired raised during pipeline execution, worker catches it at pipeline level and initiates recreation
+- [x]**Persist step**: saves progress markers, accumulated decisions, current plan, learnings to memory service. State keys already durable via DatabaseSessionService are not re-persisted
+- [x]**Seed step**: copies critical keys from old session to new session: deliverable status, batch position, hard limits, loaded_skill_names, agent output_keys from completed stages. Conversation history intentionally NOT seeded
+- [x]**Fresh session step**: creates new ADK session with seeded state. Old session preserved in DB (not deleted), no longer active
+- [x]**Reassemble step**: InstructionAssembler recomposes instructions from fragments (SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL). SkillLoaderAgent reloads skills. MemoryLoaderAgent attempts memory restore
+- [x]When MemoryService unavailable (degraded mode — expected in Phase 5b): proceeds with state + skills + instruction fragments only. System reminder injected noting memory context unavailable
+- [x]After recreation: pipeline rebuilt containing only remaining (not-yet-completed) stages. Completion determined from persisted deliverable state keys, not ADK events
+- [x]No completed stages re-execute. No state is lost
+- [x]On recreation failure (session creation error, seed failure, reassembly error): error event published, pipeline fails with clear error. No silent continuation with corrupted session
+- [x]Context recreation initiation and completion (success or failure) publish audit events to Redis Stream with session IDs, stage reached, and outcome (NFR-5b.07)
+- [x]Context recreation completes within 10 seconds (excluding LLM calls during reassembly)
+- [x]`rebuild_reduced_pipeline(registry, completed_stages, ctx)` constructs a DeliverablePipeline with only remaining stages
+- [x]`app/agents/pipeline.py` modified to support partial pipeline construction (accepts list of stages to include)
 **Validation:**
 - `uv run pyright app/agents/context_recreation.py app/agents/pipeline.py`
 - `uv run pytest tests/agents/test_context_recreation.py -v`
