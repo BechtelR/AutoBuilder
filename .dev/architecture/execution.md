@@ -2,7 +2,7 @@
 
 # The Autonomous Execution Loop
 
-The execution loop operates at two levels within the hierarchy, across multiple sessions in two categories (chat and work):
+The execution loop operates at two levels within the hierarchy, across multiple sessions in three categories (settings, chat, and work):
 
 ## Multi-Session Architecture
 
@@ -10,10 +10,11 @@ The Director operates via **multiple ADK sessions** -- same agent definition, di
 
 | Session Type | Invocation Model | Purpose |
 |-------------|-----------------|---------|
+| **Settings session** | Per-message (`runner.run_async` per user message) | Director formation and relationship evolution. One permanent session per user, auto-created on first access. |
 | **Chat session** | Per-message (`runner.run_async` per user message) | CEO interaction -- questions, directives, status checks. Multiple chats per project; "Main" is the permanent project chat. |
 | **Work session** | Long-running ARQ job | Background autonomous execution -- PM delegation, monitoring, intervention. One active work session per project. |
 
-**Cross-session bridge**: Chat and work sessions share context via `app:` state (project-scoped), `user:` state (CEO preferences/Director personality), `MemoryService` (searchable cross-session archive), and Redis Streams (real-time event observation). A chat session can inspect and influence a running work session without interrupting it.
+**Cross-session bridge**: Chat, settings, and work sessions share context via `app:` state (project-scoped), `user:` state (Director identity, CEO profile, operating contract), `MemoryService` (searchable cross-session archive), and Redis Streams (real-time event observation). A chat session can inspect and influence a running work session without interrupting it.
 
 ## Director-Level Loop
 

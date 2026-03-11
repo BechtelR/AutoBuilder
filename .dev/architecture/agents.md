@@ -49,8 +49,8 @@ Note: The worker-level examples below use auto-code agents (plan/code/lint/test/
 ```
 CEO (dev user / human)
   └── Director (LlmAgent, opus) — root_agent, stateless config, state in DB
-        │     personality: {user:director_personality} (per-CEO, evolvable)
-        │     sessions: chat sessions (CEO interaction) + work sessions (per-project oversight)
+        │     formation: {user:director_identity} + {user:ceo_profile} + {user:operating_contract}
+        │     sessions: settings (formation) + chat (CEO interaction) + work (per-project oversight)
         │     delegation: transfer_to_agent → PM
         ├── PM: Project Alpha (LlmAgent, sonnet) — per-project, IS the outer loop
         │     ├── tools: select_ready_batch, escalate_to_director, update_deliverable, query_deliverables, reorder_deliverables, manage_dependencies (FunctionTools)
@@ -466,9 +466,38 @@ The Director is the `root_agent` of the ADK `App`. It is **stateless config** --
 | **Sub-agents** | PM agents (one per active project), cross-project utility agents |
 | **Delegation** | `transfer_to_agent` to hand off projects to PMs |
 
-### Director Personality
+### Director Identity & Formation
 
-Director personality is stored in `user:` scope state -- different CEO logins get different personalities. Seeded from a config file on first login, then evolvable via `state_delta` as the Director learns CEO preferences over time. System prompt templates reference `{user:director_personality}` for CEO-adapted behavior.
+The Director's personality emerges from a dedicated **Settings conversation** between the CEO and Director. Three structured artifacts in `user:` scope define the working relationship. Different CEO logins get different artifacts -- the Director adapts to each user.
+
+| Artifact | State Key | Content | Mutability |
+|----------|-----------|---------|------------|
+| **Director Identity** | `user:director_identity` | Name (optional), personality traits, communication style, working metaphor, decision approach, team management philosophy | CEO edits via Settings conversation or any chat; Director proposes changes via CEO queue |
+| **CEO Profile** | `user:ceo_profile` | Name, working style, communication preferences, domain expertise, collaboration patterns, autonomy comfort, decision-making style, strengths to leverage | Formation conversation; Director proposes updates (approved via CEO queue) |
+| **Operating Contract** | `user:operating_contract` | Proactivity level, escalation sensitivity, decision-making autonomy, feedback style, notification preferences, working hours, when to push back, when to just execute | Formation conversation; user settings; Director proposes adjustments |
+
+**Formation flow:**
+
+1. First system access → Settings session auto-created (like "Main")
+2. Director detects empty artifacts (`user:formation_status` == `PENDING`) → enters formation mode
+3. Conversational exchange (~5-10 professional but warm questions) exploring CEO preferences, desired Director personality, working style, collaboration norms
+4. Director proposes structured artifact values → CEO approves/edits in conversation
+5. Artifacts written to `user:` scope → available across all sessions and projects; `formation_status` set to `COMPLETE`
+
+**Instruction template integration:** Each artifact maps to a natural InstructionAssembler fragment type:
+- `{user:director_identity}` → IDENTITY fragment (who the Director is for this user)
+- `{user:ceo_profile}` → PROJECT fragment (user context available to all project work)
+- `{user:operating_contract}` → GOVERNANCE fragment (behavioral parameters)
+
+The Director's agent definition file provides the **static base** (role, capabilities, behavioral framework -- same for every user). The formation artifacts **augment** that base with per-user personalization via template injection.
+
+**Formation state:** `user:formation_status` tracks progress: `PENDING` → `IN_PROGRESS` → `COMPLETE`. When not `COMPLETE`, the Director enters formation mode in Settings sessions. When `COMPLETE`, the Settings session becomes an evolution conversation where either party can propose changes.
+
+**Artifact update proposals:** The Director can propose artifact updates from **any** conversation (not just Settings). Proposals go through the CEO queue as `APPROVAL` type items. The CEO resolves in the queue or navigates to the Settings session to discuss further.
+
+**Reset:** CEO can request formation reset in the Settings session. Director clears the three artifact keys and `user:formation_status`, then re-enters formation mode on the next message.
+
+**Storage:** Database only -- artifacts persist in `user:` scope state via DatabaseSessionService (PostgreSQL). No file export/import. Consistent with "all persistence through gateway API" constraint.
 
 ### Session Model
 
@@ -476,10 +505,11 @@ The Director operates via **multiple sessions**:
 
 | Session Type | Purpose | Lifecycle |
 |-------------|---------|-----------|
+| **Settings session** | Director formation and relationship evolution | One per user, permanent, auto-created on first access |
 | **Chat session** | CEO interaction (conversation, commands, status queries) | Created per conversation, multiple per project |
 | **Work session** | Background project oversight (monitoring, intervention) | One per project, long-lived |
 
-A "Main" project acts as the permanent default -- the Director's home context. Multiple chat sessions can exist per project.
+A "Main" project acts as the permanent default -- the Director's home context. Multiple chat sessions can exist per project. The Settings session is user-scoped (not project-scoped) and always available.
 
 ### Capabilities
 
@@ -514,7 +544,8 @@ A "Main" project acts as the permanent default -- the Director's home context. M
 director_agent = LlmAgent(
     name="Director",
     model="anthropic/claude-opus-4-6",
-    instruction="Cross-project governance agent. {user:director_personality} "
+    instruction="Cross-project governance agent. {user:director_identity} "
+                "{user:ceo_profile} {user:operating_contract} "
                 "Manage PMs via transfer_to_agent, allocate resources, "
                 "enforce hard limits, intervene when patterns go wrong.",
     tools=[

@@ -183,8 +183,8 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 | A05 | Director → PM delegation (`transfer_to_agent`) | mechanism | 5b | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
 | A06 | PM → Director escalation (`transfer_to_agent`) | mechanism | 5b | agents.md §PM Agent, §Agent Communication via Session State | ADK primitives |
 | A07 | Hard limits cascade (CEO → Director → PM → Workers) | mechanism | 5b | agents.md §PM Agent | `project_configs` |
-| A08 | Director personality state (`user:` scope) | config | 5b | agents.md §Director Agent | `user:` state, seed config |
-| A09 | Director personality seed config file | config | 5b | agents.md §Director Agent | — |
+| A08 | Director formation artifacts (`user:` scope — three structured keys + formation status) | config | 5b | agents.md §Director Agent | `user:` state, Settings conversation |
+| A09 | Director formation logic (Settings conversation) | module | 5b | agents.md §Director Agent | A08 |
 | A10 | Director tool authoring + CEO approval gate | mechanism | 13+ | agents.md §Director Agent | Tool registry, CEO queue |
 | A11 | Director cross-project pattern propagation | mechanism | 14 | agents.md §Director Agent | `MemoryService` |
 | A12 | Director governance tools | tool | 13+ | agents.md §Director Agent | `GlobalToolset` |

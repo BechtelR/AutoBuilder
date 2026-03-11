@@ -11,7 +11,7 @@ ADK runs inside workers, behind the anti-corruption layer. This section document
 | ADK Primitive | Role in AutoBuilder |
 |---------------|-------------------|
 | `App(root_agent=director)` | Top-level container; Director (rebuilt per invocation) is root_agent |
-| `LlmAgent` (Director) | **Stateless config object**, recreated per invocation. Cross-project governance, CEO liaison, strategic decisions (opus). Personality in `user:` scope. |
+| `LlmAgent` (Director) | **Stateless config object**, recreated per invocation. Cross-project governance, CEO liaison, strategic decisions (opus). Formation artifacts (`user:director_identity`, `user:ceo_profile`, `user:operating_contract`) in `user:` scope. |
 | `LlmAgent` (PM) | **Stateless config object**, recreated per invocation. Per-project autonomous management, IS the outer batch loop, quality oversight (sonnet). |
 | `LlmAgent` (Worker) | Planning, coding, reviewing -- probabilistic steps requiring LLM judgment |
 | `CustomAgent` (BaseAgent) | Linter, test runner, formatter, skill loader -- deterministic pipeline steps |

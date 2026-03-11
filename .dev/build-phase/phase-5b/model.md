@@ -30,8 +30,9 @@ flowchart TB
         end
 
         subgraph DIRECTOR_CFG["Director Configuration"]
-            Personality["Director Personality\nuser: scope state\nSeed config file"]
+            Formation["Director Formation\nuser: scope artifacts\nSettings conversation"]
             MainSession["Main Chat Session\nPermanent portfolio context"]
+            SettingsSession["Settings Session\nFormation & evolution"]
         end
 
         subgraph CONTEXT["Context Management"]
@@ -64,7 +65,8 @@ flowchart TB
     StateKeyAuth -->|publish violation| Redis
     Recreation -->|create session| SessionSvc
     SysReminders -->|before_model_callback| Delegation
-    Personality -->|read/write| SessionSvc
+    Formation -->|read/write| SessionSvc
+    SettingsSession -->|session| SessionSvc
     MainSession -->|session| SessionSvc
     HardLimits -->|read config| DB
 ```
@@ -80,8 +82,8 @@ flowchart TB
 | Director → PM delegation | A05 | `architecture/agents.md` | PM Agent, Agent Communication via Session State |
 | PM → Director escalation | A06 | `architecture/agents.md` | PM Agent, Agent Communication via Session State |
 | Hard limits cascade | A07 | `architecture/agents.md` | PM Agent |
-| Director personality state | A08 | `architecture/agents.md` | Director Agent |
-| Director personality seed config | A09 | `architecture/agents.md` | Director Agent |
+| Director formation artifacts (user: scope) | A08 | `architecture/agents.md` | Director Agent |
+| Director formation logic (Settings conversation) | A09 | `architecture/agents.md` | Director Agent |
 | Director "Main" chat session | A13 | `architecture/agents.md` | Director Agent |
 | `before_agent_callback` (supervision) | A14 | `architecture/agents.md` | PM Agent |
 | `after_agent_callback` (supervision) | A15 | `architecture/agents.md` | PM Agent |
@@ -244,23 +246,38 @@ class CeoQueueServiceProtocol(Protocol):
         ...
 ```
 
-### Director Personality
+### Director Formation
 
 ```python
-from pathlib import Path
+class DirectorFormationProtocol(Protocol):
+    """Manages Director formation artifacts and Settings session."""
 
-
-class DirectorPersonalityProtocol(Protocol):
-    """Seeds and retrieves Director personality state."""
-
-    async def ensure_personality(
+    async def ensure_formation_state(
         self,
         session_service: BaseSessionService,
         user_id: str,
-        seed_config_path: Path,
-    ) -> str:
-        """Load personality from user: scope. If missing, seed from config file.
-        Returns personality string for template injection."""
+    ) -> FormationStatus:
+        """Check formation status. If missing, set to PENDING.
+        Returns current formation status."""
+        ...
+
+    async def write_artifact(
+        self,
+        session_service: BaseSessionService,
+        user_id: str,
+        key: str,  # one of DIRECTOR_IDENTITY_KEY, CEO_PROFILE_KEY, OPERATING_CONTRACT_KEY
+        value: str,
+    ) -> None:
+        """Write a formation artifact to user: scope.
+        Updates formation_status to COMPLETE when all three artifacts exist."""
+        ...
+
+    async def reset_formation(
+        self,
+        session_service: BaseSessionService,
+        user_id: str,
+    ) -> None:
+        """Clear all three artifact keys and reset formation_status to PENDING."""
         ...
 ```
 
@@ -304,6 +321,13 @@ class AgentTier(str, enum.Enum):
     DIRECTOR = "DIRECTOR"
     PM = "PM"
     WORKER = "WORKER"
+
+
+class FormationStatus(str, enum.Enum):
+    """Director formation conversation state."""
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETE = "COMPLETE"
 
 
 class SupervisionEventType(str, enum.Enum):
@@ -408,10 +432,12 @@ class BatchResult:
 
 
 @dataclass(frozen=True)
-class DirectorPersonalityConfig:
-    """Seed config for Director personality."""
-    personality: str  # Personality description/traits
-    preferences: dict[str, str]  # CEO communication preferences
+class DirectorFormationArtifacts:
+    """Structured formation artifacts from Director-CEO Settings conversation."""
+    director_identity: str | None   # user:director_identity
+    ceo_profile: str | None         # user:ceo_profile
+    operating_contract: str | None  # user:operating_contract
+    formation_status: FormationStatus
 ```
 
 ### State Key Constants
@@ -424,8 +450,12 @@ class DirectorPersonalityConfig:
 DIRECTOR_GOVERNANCE_KEY = "director:governance_override"     # director: prefix
 DIRECTOR_QUEUE_PROCESSED_KEY = "director:last_queue_check"   # director: prefix
 
-# ADK user: scope keys (scoped by ADK's session service, not tier-prefix ACL)
-DIRECTOR_PERSONALITY_KEY = "user:director_personality"       # user: scope — ADK-enforced, not tier-prefixed
+# ADK user: scope keys — formation artifacts
+# Scoped by ADK's session service, not tier-prefix ACL
+DIRECTOR_IDENTITY_KEY = "user:director_identity"             # user: scope — Director personality
+CEO_PROFILE_KEY = "user:ceo_profile"                         # user: scope — CEO working style/preferences
+OPERATING_CONTRACT_KEY = "user:operating_contract"           # user: scope — Autonomy/escalation/feedback norms
+FORMATION_STATUS_KEY = "user:formation_status"               # user: scope — PENDING | IN_PROGRESS | COMPLETE
 
 # PM-tier keys (writable by PM + Director)
 PM_BATCH_POSITION_KEY = "pm:batch_position"                  # pm: prefix
@@ -458,7 +488,7 @@ sequenceDiagram
     Gateway-->>CEO: 202 Accepted
 
     ARQ->>Worker: dequeue job
-    Worker->>Worker: ensure_personality(user_id, seed_config)
+    Worker->>Worker: ensure_formation_state(user_id)
     Worker->>Worker: build_agent_tree(registry, project_ids, ctx)
     Worker->>SessionSvc: get_or_create session
     Worker->>Director: runner.run_async(user_message)
@@ -645,7 +675,7 @@ This is a synchronous check (~1ms), not a database lookup. The prefix→tier map
 
 | Component | Interface | How This Phase Uses It |
 |-----------|-----------|----------------------|
-| `DatabaseSessionService` (Phase 3) | ADK session API | All state persistence: personality, deliverable status, batch position, approval writeback |
+| `DatabaseSessionService` (Phase 3) | ADK session API | All state persistence: formation artifacts, deliverable status, batch position, approval writeback |
 | `EventPublisher` (Phase 3) | `publish()`, `publish_lifecycle()` | Supervision events, state authorization violations, CEO queue lifecycle events |
 | `AgentRegistry` (Phase 5a) | `build()`, `scan()` | Build Director + PM agents from definition files with callbacks attached |
 | `InstructionAssembler` (Phase 5a) | `assemble()` | Reassemble instructions during context recreation |
@@ -686,7 +716,7 @@ This is a synchronous check (~1ms), not a database lookup. The prefix→tier map
 
 - **Supervision callback overhead**: FR-5b.47 before_agent_callback and FR-5b.49 after_agent_callback must add <5ms. They read project config from session state (already in memory) and publish a Redis Stream event. No DB queries, no LLM calls.
 
-- **Director personality idempotency**: `ensure_personality()` checks `user:director_personality` in session state. If present, returns it. If missing, reads seed config file, writes to `user:` scope, returns it. Never overwrites existing personality (FR-5b.06).
+- **Director formation idempotency**: `ensure_formation_state()` checks `user:formation_status` in session state. If present, returns it. If missing, sets to `PENDING`. Formation artifacts are written only through the Settings conversation. `write_artifact()` checks if all three exist and transitions to `COMPLETE` automatically (FR-5b.05, FR-5b.06).
 
 - **Main session auto-creation**: When CEO chats without specifying a project, the system routes to the "Main" session. If it doesn't exist, it's created with a well-known session ID pattern (e.g., `main_{user_id}`).
 

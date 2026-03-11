@@ -11,7 +11,7 @@ Make the supervision hierarchy operational and connect the CEO to the system. Be
 |------|-------------|--------------|
 | CEO (End User) | The human user who interacts as ultimate authority -- chats with Director, resolves escalations, observes project status | Chat message sent -> Director response received and persisted; CEO queue item viewed -> resolved -> suspended execution path resumes |
 | System (Supervision Runtime) | The AutoBuilder runtime that manages agent hierarchy, enforces governance limits, handles context lifecycle, and bridges chat/work sessions | Director created per invocation -> delegates to PM -> PM executes autonomously -> escalation flows correctly; context budget exceeded -> recreation succeeds -> agent resumes with equivalent context (excluding cross-session memory) |
-| Developer (Operator) | The person who seeds Director personality, configures project limits, and inspects diagnostic/supervision state | Personality config seeded -> Director exhibits personality in CEO interactions; hard limits in project config -> enforced at every tier via supervision callbacks |
+| Developer (Operator) | The person who completes Director formation, configures project limits, and inspects diagnostic/supervision state | Formation conversation completed -> Director exhibits personality in CEO interactions; hard limits in project config -> enforced at every tier via supervision callbacks |
 
 ## Appetite
 
@@ -27,7 +27,7 @@ M size: ~3-5 days. 21 BOM components. Most are thin wiring -- gateway routes, ca
 
 ### CAP-1: Hierarchical Delegation & Governance
 
-The Director operates as the root agent -- stateless configuration, recreated fresh on each invocation. It delegates projects to PMs via agent transfer and receives escalations back. The Director processes its own queue (Director Queue) on a regular interval, resolving PM escalations or forwarding them to the CEO queue. Hard limits cascade from CEO through Director to PM to Workers, enforced at each tier. The Director's personality is seeded from a configuration file into cross-session state and evolves over time. A permanent "Main" chat session provides the CEO's portfolio-level conversation context.
+The Director operates as the root agent -- stateless configuration, recreated fresh on each invocation. It delegates projects to PMs via agent transfer and receives escalations back. The Director processes its own queue (Director Queue) on a regular interval, resolving PM escalations or forwarding them to the CEO queue. Hard limits cascade from CEO through Director to PM to Workers, enforced at each tier. The Director's identity and working relationship with the CEO are established through a dedicated Settings conversation that produces three structured artifacts in cross-session state: Director Identity (`user:director_identity`), CEO Profile (`user:ceo_profile`), and Operating Contract (`user:operating_contract`). These artifacts evolve over time through continued Settings conversations or CEO queue-approved proposals. A permanent "Main" chat session provides the CEO's portfolio-level conversation context.
 
 **Requirements:**
 
@@ -35,8 +35,11 @@ The Director operates as the root agent -- stateless configuration, recreated fr
 - [ ] **FR-5b.02**: When the Director receives a project delegation, it delegates execution authority to the project's PM agent. The PM receives full execution authority for that project.
 - [ ] **FR-5b.03**: When the PM encounters a condition it cannot resolve, it returns execution authority to the Director with escalation context in session state. The Director evaluates the escalation and either resolves it locally or forwards it to the CEO queue.
 - [ ] **FR-5b.04**: When the Director processes its queue (Director Queue), it reads pending items written by PMs via the escalation tool, evaluates each, and either resolves the item (writes resolution to session state) or forwards it to the CEO queue via the CEO escalation tool. Items marked as forwarded are updated to reflect forwarding status.
-- [ ] **FR-5b.05**: When the system starts the Director for the first time for a given user, it seeds the Director's personality from a configuration file into the user-scoped state. The personality persists across all sessions for that user and is available via state template injection in the Director's instructions.
-- [ ] **FR-5b.06**: When the personality has already been seeded (user-scoped state exists), the system does not re-seed from the configuration file. The existing personality is preserved, allowing it to evolve through interactions.
+- [ ] **FR-5b.05**: When the system starts the Director for the first time for a given user, it auto-creates a Settings session (`ChatType.SETTINGS`) and the Director enters formation mode. Formation is a conversational process (~5-10 professional but warm questions) through which the Director and CEO shape three structured artifacts: Director Identity (`user:director_identity`), CEO Profile (`user:ceo_profile`), and Operating Contract (`user:operating_contract`). The Director proposes artifact values; the CEO approves or edits them in conversation. Artifacts are written to `user:` scope state and persist across all sessions. `user:formation_status` tracks progress (`PENDING` → `IN_PROGRESS` → `COMPLETE`).
+- [ ] **FR-5b.06**: When the formation artifacts already exist (`user:formation_status` == `COMPLETE`), the Director operates normally in Settings sessions -- the conversation becomes an evolution conversation where either party can propose changes to any artifact. Artifact update proposals from any session go through the CEO queue as `APPROVAL` items.
+- [ ] **FR-5b.06a**: When the CEO sends a message to the Settings session, the system routes it to the Director in formation mode (when `formation_status` != `COMPLETE`) or evolution mode (when `COMPLETE`). The Director has access to the current state of all three artifacts (or empty state if formation is pending).
+- [ ] **FR-5b.06b**: When the CEO requests a formation reset in the Settings session, the Director clears all three artifact keys and `user:formation_status`, then re-enters formation mode on the next message.
+- [ ] **FR-5b.06c**: When the Director proposes an artifact update from a non-Settings conversation, the proposal is written to the CEO queue as an `APPROVAL` type item with the proposed changes. On CEO approval, the updated artifact is written to `user:` scope state.
 - [ ] **FR-5b.07**: When the CEO initiates a chat without specifying a project, the system routes the message to the "Main" chat session -- the Director's permanent portfolio-level conversation context. If the "Main" session does not exist, it is created automatically.
 - [ ] **FR-5b.08**: When the Director delegates a project to a PM, it writes hard limits (retry budget, cost ceiling) to the project configuration. The PM reads these limits at session start and operates within them. The Director cannot set limits that exceed global limits. The PM cannot set worker constraints that exceed project limits.
 - [ ] **FR-5b.08a**: When the Director creates a new project, a project configuration entry is created with default hard limits derived from global limits. If the Director does not explicitly set limits during delegation, the defaults apply. The PM always has a valid configuration to read at session start.
@@ -90,7 +93,7 @@ The CEO communicates with the Director through chat sessions -- sending messages
 
 - [ ] **FR-5b.28**: When the CEO sends a chat message, the system persists the message, routes it to the Director agent via a worker invocation, and persists the Director's response. The response is retrievable via the message history.
 - [ ] **FR-5b.29**: When the CEO retrieves message history for a chat session, the system returns all messages in chronological order, including both CEO messages and Director responses.
-- [ ] **FR-5b.30**: When the Director handles a chat message, it has access to the chat session's conversation history, user-scoped state (personality, preferences), and app-scoped state (project status, deliverable summaries, batch progress). This enables the Director to answer status questions using data written by active work sessions without interrupting them.
+- [ ] **FR-5b.30**: When the Director handles a chat message, it has access to the chat session's conversation history, user-scoped state (Director identity, CEO profile, operating contract, preferences), and app-scoped state (project status, deliverable summaries, batch progress). This enables the Director to answer status questions using data written by active work sessions without interrupting them.
 - [ ] **FR-5b.31**: When a chat message is sent for a project that has an active work session, the Director can read work session status from shared state. The chat invocation does not block, interrupt, or modify the running work session.
 - [ ] **FR-5b.32**: When the system routes a chat message to the Director, it uses per-message invocation -- one worker call per message, not a long-running session. Each invocation builds a fresh Director agent from its definition file.
 - [ ] **FR-5b.33**: When the Director cannot process a message (agent build failure, worker unavailable), the system persists an error response in the chat message history and publishes an error event.
@@ -191,7 +194,7 @@ The Director observes PM execution through supervision callbacks attached to PM 
 |-----------------|-----------------|--------|
 | FR-5b.01, FR-5b.02, FR-5b.03, FR-5b.10, FR-5b.11 | PR-13: Director as executive partner | Supervision |
 | FR-5b.04, FR-5b.10a, FR-5b.10b | PR-18: Director Queue for PM escalations | Supervision |
-| FR-5b.05, FR-5b.06 | PR-13: Director as executive partner — personality enables the Director's distinct identity and conversational continuity | Personality |
+| FR-5b.05, FR-5b.06, FR-5b.06a, FR-5b.06b, FR-5b.06c | PR-13: Director as executive partner — formation artifacts enable the Director's distinct identity, user knowledge, and conversational continuity | Formation |
 | FR-5b.07 | PR-13: Primary Director session for portfolio-level conversation | Chat |
 | FR-5b.08, FR-5b.08a, FR-5b.09 | PR-15: Bounded authority -- retry budget, decision scope, cost ceiling; limits cascade | Governance |
 | FR-5b.12, FR-5b.13, FR-5b.14, FR-5b.15, FR-5b.16 | PR-10: PM execution loop -- select batch, dispatch, collect, repeat; PR-14: PM owns delivery loop | PM Loop |
@@ -224,7 +227,7 @@ The Director observes PM execution through supervision callbacks attached to PM 
 | 7 | CEO queue items created, queried, and resolved via gateway routes | CAP-3: FR-5b.20, FR-5b.21, FR-5b.25 |
 | 8 | CEO queue approval resolution written back to session state | CAP-3: FR-5b.22, FR-5b.23 |
 | 9 | Chat messages routed to Director via worker and response persisted | CAP-4: FR-5b.28, FR-5b.29, FR-5b.32 |
-| 10 | Director personality seeded from config into user: scope state | CAP-1: FR-5b.05, FR-5b.06 |
+| 10 | Director formation via Settings conversation produces three structured artifacts in user: scope state | CAP-1: FR-5b.05, FR-5b.06, FR-5b.06a, FR-5b.06b, FR-5b.06c |
 
 ---
 

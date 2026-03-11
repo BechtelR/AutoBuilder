@@ -154,7 +154,7 @@ The system monitors token usage before each LLM call and signals when context ca
 - **No tool_role ceiling validation**: Project-scope type:llm restriction is enforced. tool_role ceiling validation (against workflow manifest) requires WORKFLOW.yaml which is Phase 7.
 - **No batch execution**: DeliverablePipeline handles a single deliverable. Parallel batch execution via ParallelAgent and PM-driven batch loop are Phase 8.
 - **No system reminders**: Ephemeral nudges via before_model_callback (A58) are Phase 5b.
-- **No Director personality seeding**: Director personality state in user: scope is Phase 5b.
+- **No Director formation**: Director formation artifacts in user: scope are Phase 5b.
 
 ## Traceability
 

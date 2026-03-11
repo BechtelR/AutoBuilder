@@ -175,7 +175,7 @@ Agent definition infrastructure: AgentRegistry scans declarative markdown files 
 
 
 ### Scope Summary
-Supervision hierarchy: Director operates as stateless root_agent (recreated per invocation), delegates to PM via transfer_to_agent, PM escalates back. Director processes its own queue (Director Queue) during work sessions — reads pending PM escalations, resolves or forwards to CEO queue. Director personality state (user: scope) with seed config. Director "Main" project as permanent default chat session. PM loop in sequential mode — validates inter-batch reasoning with tools + callbacks; Phase 8 adds parallel execution. Deterministic safety mechanisms: checkpoint_project (after_agent_callback on DeliverablePipeline), verify_batch_completion (after_agent_callback). Director supervision callbacks (before/after_agent_callback). Hard limits cascade (CEO → Director → PM → Workers) — retry_budget and cost_ceiling enforced in Phase 5b; concurrency limit enforcement deferred to Phase 8. CEO queue gateway routes (GET /ceo/queue, PATCH /ceo/queue/{id}) with resolved approval → session state writeback. Chat gateway routes (POST/GET /chat/{session_id}/messages). Cross-session bridge (app:/user: state + Redis Streams). State key authorization via tier prefixes (director:, pm:, worker:) enforced by EventPublisher ACL (Decision #58). Context recreation end-to-end validation (persist → fresh session → reassemble in degraded mode).
+Supervision hierarchy: Director operates as stateless root_agent (recreated per invocation), delegates to PM via transfer_to_agent, PM escalates back. Director processes its own queue (Director Queue) during work sessions — reads pending PM escalations, resolves or forwards to CEO queue. Director formation via Settings conversation — three structured artifacts in user: scope. Director "Main" project as permanent default chat session. PM loop in sequential mode — validates inter-batch reasoning with tools + callbacks; Phase 8 adds parallel execution. Deterministic safety mechanisms: checkpoint_project (after_agent_callback on DeliverablePipeline), verify_batch_completion (after_agent_callback). Director supervision callbacks (before/after_agent_callback). Hard limits cascade (CEO → Director → PM → Workers) — retry_budget and cost_ceiling enforced in Phase 5b; concurrency limit enforcement deferred to Phase 8. CEO queue gateway routes (GET /ceo/queue, PATCH /ceo/queue/{id}) with resolved approval → session state writeback. Chat gateway routes (POST/GET /chat/{session_id}/messages). Cross-session bridge (app:/user: state + Redis Streams). State key authorization via tier prefixes (director:, pm:, worker:) enforced by EventPublisher ACL (Decision #58). Context recreation end-to-end validation (persist → fresh session → reassemble in degraded mode).
 
 ### Completion Contract
 
@@ -190,7 +190,7 @@ Supervision hierarchy: Director operates as stateless root_agent (recreated per 
 | | CEO queue items created, queried, and resolved via gateway routes | PR-17 |
 | | CEO queue approval resolution written back to session state | PR-20 |
 | | Chat messages routed to Director via worker and response persisted | PR-13 |
-| | Director personality seeded from config into user: scope state | PR-13 |
+| | Director formation via Settings conversation produces three structured artifacts in user: scope state | PR-13 |
 
 ---
 

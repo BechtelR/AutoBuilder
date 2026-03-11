@@ -7,7 +7,7 @@ Phase 5b wires the supervision hierarchy and makes AutoBuilder an interactive, s
 
 1. **State key authorization** — Tier-based write access enforced on every state delta. Director-prefixed keys writable only by Director-tier; PM-prefixed by PM+ tier; worker-prefixed and non-prefixed by all. Atomic rejection on violation with audit event.
 2. **CEO queue operations** — Gateway routes for queue query, resolution, and dismissal. Approval resolution writes back to session state so the PM discovers it during batch selection and resumes suspended paths.
-3. **Director personality & system reminders** — Personality seeded from config file into `user:` scope on first invocation, never re-seeded. Ephemeral system reminders injected via `before_model_callback` for token budget warnings and state change notifications.
+3. **Director formation & system reminders** — Three structured artifacts (`user:director_identity`, `user:ceo_profile`, `user:operating_contract`) formed through a dedicated Settings conversation. Ephemeral system reminders injected via `before_model_callback` for token budget warnings and state change notifications.
 4. **Supervision callbacks** — Director observes PM execution through `before_agent_callback` (limit checks) and `after_agent_callback` (status capture, escalation detection). Pipeline callbacks: `checkpoint_project` (after each deliverable) and `verify_batch_completion` (after batch).
 5. **Director-PM delegation** — Director as stateless root_agent delegates to PM via `transfer_to_agent`. PM escalates back. Hard limits cascade from CEO → Director → PM → Workers.
 6. **PM autonomous loop** — Sequential batch execution: select → dispatch → checkpoint → verify → reason → repeat. Failed deliverables don't block independent work. PM returns or escalates when done.
@@ -102,22 +102,31 @@ Per Decision #67:
 
 **Deduplication**: Active work sessions set a Redis key `director:work_session:{project_id}` with TTL. The cron job skips projects with this key present.
 
-### DD-6: Personality Seed Configuration
+### DD-6: Director Formation via Settings Conversation (Decision #68)
 
-The Director personality seed is a YAML file at `app/config/director_personality.yaml` containing initial personality traits. Format:
+The Director's personality and working relationship with the CEO are established through a dedicated Settings conversation. Three structured artifacts define the relationship.
 
-```yaml
-# Director personality seed — written to user:director_personality on first invocation
-name: "Director"
-traits:
-  communication_style: "direct and pragmatic"
-  decision_approach: "data-driven with strong opinions"
-  risk_tolerance: "moderate — prefer tested approaches with calculated innovation"
-  team_management: "trust but verify — delegate authority, validate outcomes"
-greeting: "How can I help you build something great today?"
-```
+**State keys:**
+- `user:director_identity` — Director name (optional), personality traits, communication style, working metaphor, decision approach, team management philosophy
+- `user:ceo_profile` — CEO name, working style, communication preferences, domain expertise, collaboration patterns, autonomy comfort, decision-making style, strengths to leverage
+- `user:operating_contract` — Proactivity level, escalation sensitivity, decision-making autonomy, feedback style, notification preferences, working hours, when to push back, when to just execute
+- `user:formation_status` — `PENDING` | `IN_PROGRESS` | `COMPLETE`
 
-On first Director invocation for a user, the seeding function reads this file and writes its contents to `user:director_personality` state. Subsequent invocations skip seeding (key already exists). The personality is referenced in the Director's instruction body via `{user:director_personality}`.
+**Settings session:** A new `ChatType.SETTINGS` value. One Settings session per user, auto-created on first system access (like "Main"). Uses per-message invocation model (same as chat). Director built with formation-mode instructions when `formation_status != COMPLETE`.
+
+**Formation trigger:** When `user:formation_status` is missing or `PENDING`, the Director enters formation mode in the Settings session. Formation is a conversational exchange of ~5-10 professional but warm questions. The Director proposes structured artifact values; the CEO approves/edits in conversation. When all three artifacts are written, `formation_status` is set to `COMPLETE`.
+
+**Instruction template integration:**
+- `{user:director_identity}` → IDENTITY fragment (who the Director is for this user)
+- `{user:ceo_profile}` → PROJECT fragment (user context available to all project work)
+- `{user:operating_contract}` → GOVERNANCE fragment (behavioral parameters)
+- `{user:director_identity?}` optional template — empty when key absent, formation instruction block engages
+
+**Artifact update from any session:** Director proposes update via CEO queue `APPROVAL` item. On approval, artifact written to `user:` scope. Settings session always available for direct editing.
+
+**Reset:** CEO requests reset in Settings session → Director clears three artifact keys + `formation_status` → re-enters formation on next message.
+
+**Storage:** Database only — artifacts persist in `user:` scope state via DatabaseSessionService (PostgreSQL). No file export/import.
 
 ### DD-7: Context Recreation File Placement
 
@@ -151,17 +160,17 @@ async def verify_batch_completion(ctx: CallbackContext) -> Content | None:
 
 All callbacks are async, receive `CallbackContext`, and return `Content | None`. They read/write state via `ctx.state` (callback state writes DO persist, unlike direct `ctx.session.state` writes in `_run_async_impl`). Verify this in `.dev/.knowledge/adk/` during implementation.
 
-### DD-9: Work Session vs Chat Session Agent Construction
+### DD-9: Work Session vs Chat Session vs Settings Session Agent Construction
 
-| Concern | Work Session (`run_work_session`) | Chat Session (`run_director_turn`) |
-|---|---|---|
-| Root agent | Director | Director |
-| Sub agents | PM for the project | None |
-| Supervision callbacks | Yes (before/after PM) | No |
-| Session type | Long-running (ARQ job, multiple turns) | Per-message (one turn per message) |
-| Personality | Seeded if first time | Seeded if first time |
-| Hard limits | Loaded from project_configs | N/A |
-| Director Queue | Inline check after PM turns | Not checked |
+| Concern | Work Session (`run_work_session`) | Chat Session (`run_director_turn`) | Settings Session (`run_director_turn`) |
+|---|---|---|---|
+| Root agent | Director | Director | Director |
+| Sub agents | PM for the project | None | None |
+| Supervision callbacks | Yes (before/after PM) | No | No |
+| Session type | Long-running (ARQ job, multiple turns) | Per-message (one turn per message) | Per-message (one turn per message) |
+| Formation artifacts | Used for behavior | Used for behavior | Formation or evolution mode based on `formation_status` |
+| Hard limits | Loaded from project_configs | N/A | N/A |
+| Director Queue | Inline check after PM turns | Not checked | Not checked |
 
 Both use `AgentRegistry.build("director", ctx)` but with different sub_agent configurations.
 
@@ -220,19 +229,25 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 
 ---
 
-### P5b.D3: Director Personality & System Reminders
-**Files:** `app/agents/state_helpers.py`, `app/config/director_personality.yaml`
+### P5b.D3: Director Formation & System Reminders
+**Files:** `app/agents/formation.py` (new), `app/agents/state_helpers.py`
 **Depends on:** —
-**Description:** Add personality seeding logic: on first Director invocation for a user, read seed config from YAML file and write to `user:director_personality` state. Skip if already seeded. Add system reminder injection callback (`before_model_callback`) that inserts ephemeral governance nudges — context budget usage, state change notifications, progress summaries — before each LLM call. No injection when no relevant reminders exist. Reminders are transient (not persisted, lost during recreation).
+**Description:** Add Director formation logic: on first system access for a user, auto-create a Settings session (`ChatType.SETTINGS`) and set `user:formation_status` to `PENDING`. When the Director enters a Settings session with `formation_status != COMPLETE`, it operates in formation mode — a conversational exchange that produces three structured artifacts (`user:director_identity`, `user:ceo_profile`, `user:operating_contract`). Formation instructions are a dedicated instruction fragment, not a YAML file. Add system reminder injection callback (`before_model_callback`) that inserts ephemeral governance nudges — context budget usage, state change notifications, progress summaries — before each LLM call. No injection when no relevant reminders exist. Reminders are transient (not persisted, lost during recreation).
 **BOM Components:**
-- [ ] `A08` — Director personality state (`user:` scope)
-- [ ] `A09` — Director personality seed config file
+- [ ] `A08` — Director formation artifacts (`user:` scope — three structured keys + formation status)
+- [ ] `A09` — Director formation logic (Settings conversation)
 - [ ] `A58` — System reminder injection (`before_model_callback`)
 **Requirements:**
-- [ ] `seed_personality(session_service, user_id, config_path)` reads YAML seed file and writes to `user:director_personality` state
-- [ ] Seeding only occurs when `user:director_personality` key does not exist in session state
-- [ ] When personality already exists, seeding is skipped (personality evolves through interactions)
-- [ ] Seed config file at `app/config/director_personality.yaml` with personality traits (communication style, decision approach, etc.)
+- [ ] `FormationStatus` enum: `PENDING`, `IN_PROGRESS`, `COMPLETE` in `app/models/enums.py`
+- [ ] State key constants: `DIRECTOR_IDENTITY_KEY`, `CEO_PROFILE_KEY`, `OPERATING_CONTRACT_KEY`, `FORMATION_STATUS_KEY` in `app/models/constants.py`
+- [ ] `ensure_formation_state(session_service, user_id)` checks if `user:formation_status` exists. If missing, sets to `PENDING`. Returns current `FormationStatus`.
+- [ ] `write_artifact(session_service, user_id, key, value)` writes a formation artifact to `user:` scope. Updates `formation_status` to `COMPLETE` when all three artifacts exist.
+- [ ] `reset_formation(session_service, user_id)` clears all three artifact keys and resets `formation_status` to `PENDING`.
+- [ ] Formation conversation instructions defined as a formation instruction fragment in `app/agents/formation.py` — loaded by InstructionAssembler when `formation_status != COMPLETE` in Settings sessions
+- [ ] `ChatType.SETTINGS` enum value added to `app/models/enums.py`
+- [ ] Settings session auto-created on first system access (like "Main") with `type=ChatType.SETTINGS`
+- [ ] Director built with formation-mode or evolution-mode instructions based on `user:formation_status` when entering Settings session
+- [ ] Director can propose artifact updates from any session via CEO queue `APPROVAL` item
 - [ ] `system_reminder_callback(ctx, llm_request)` matches `before_model_callback` signature
 - [ ] Injects current `context_budget_used_pct` from state as a context budget warning (e.g., "Context usage: 73%")
 - [ ] Injects state change notifications from other agents when relevant state keys changed since last call
@@ -241,8 +256,8 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 - [ ] System reminders are acceptable to lose during context recreation (by design)
 - [ ] Callback integrates into the `compose_callbacks` chain from Phase 5a (added after context injection, before budget monitor)
 **Validation:**
-- `uv run pyright app/agents/state_helpers.py`
-- `uv run pytest tests/agents/test_state_helpers.py -v`
+- `uv run pyright app/agents/formation.py app/agents/state_helpers.py`
+- `uv run pytest tests/agents/test_formation.py tests/agents/test_state_helpers.py -v`
 
 ---
 
@@ -276,7 +291,7 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 ### P5b.D5: Director-PM Delegation & Hard Limits
 **Files:** `app/workers/tasks.py`, `app/workers/adk.py`
 **Depends on:** P5b.D3, P5b.D4
-**Description:** Implement `run_work_session` task function that builds Director as root_agent with PM as sub_agent, seeds personality if needed, loads hard limits from project_configs, wires supervision callbacks, and starts the ADK runner. Director delegates to PM via `transfer_to_agent`. PM escalates back. Hard limits (retry_budget, cost_ceiling) cascade: Director cannot exceed global limits, PM cannot exceed project limits. Handle delegation/escalation failures with error events and CEO queue items.
+**Description:** Implement `run_work_session` task function that builds Director as root_agent with PM as sub_agent, ensures formation state, loads hard limits from project_configs, wires supervision callbacks, and starts the ADK runner. Director delegates to PM via `transfer_to_agent`. PM escalates back. Hard limits (retry_budget, cost_ceiling) cascade: Director cannot exceed global limits, PM cannot exceed project limits. Handle delegation/escalation failures with error events and CEO queue items.
 **BOM Components:**
 - [ ] `A05` — Director → PM delegation (`transfer_to_agent`)
 - [ ] `A06` — PM → Director escalation (`transfer_to_agent`)
@@ -286,7 +301,7 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 - [ ] Director built as stateless root_agent — fresh build on each invocation, no in-memory state carried
 - [ ] PM built via `AgentRegistry.build(f"PM_{project_id}", ctx, definition="pm")` with project-specific session
 - [ ] Supervision callbacks (from D4) wired onto PM sub_agent: `before_agent_callback=before_pm_execution`, `after_agent_callback=after_pm_execution`
-- [ ] Personality seeded on first invocation for user (calls `seed_personality` from D3)
+- [ ] Formation state ensured on first invocation for user (calls `ensure_formation_state` from D3)
 - [ ] Hard limits loaded from `project_configs` table and written to session state for PM access
 - [ ] When project has no config entry, default limits created from global defaults (new `AUTOBUILDER_DEFAULT_RETRY_BUDGET`, `AUTOBUILDER_DEFAULT_COST_CEILING` settings)
 - [ ] Director cannot set limits exceeding global limits; PM cannot set worker constraints exceeding project limits (validated at write time)
@@ -350,7 +365,7 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 ### P5b.D8: Chat Integration & Director "Main"
 **Files:** `app/gateway/routes/chat.py`, `app/workers/tasks.py`, `app/workers/settings.py`
 **Depends on:** P5b.D5
-**Description:** Wire the real Director agent into existing chat routes. Modify `run_director_turn` to build Director from AgentRegistry (replacing the echo stub), with per-message invocation model — one worker call per message, fresh Director build each time. Director has access to chat session history, `user:` scope state (personality), and `app:` scope state (project status). Add auto-creation of "Main" chat session when CEO sends message without specifying a project. Chat invocations do not block or modify active work sessions.
+**Description:** Wire the real Director agent into existing chat routes. Modify `run_director_turn` to build Director from AgentRegistry (replacing the echo stub), with per-message invocation model — one worker call per message, fresh Director build each time. Director has access to chat session history, `user:` scope state (formation artifacts), and `app:` scope state (project status). Add auto-creation of "Main" chat session and Settings session when CEO sends first message. Settings session routes Director into formation or evolution mode based on `user:formation_status`. Chat invocations do not block or modify active work sessions.
 **BOM Components:**
 - [ ] `G10` — `POST /chat/{session_id}/messages` route
 - [ ] `G11` — `GET /chat/{session_id}/messages` route
@@ -361,10 +376,13 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 - [ ] Director built with no sub_agents for chat context (no PM delegation in chat)
 - [ ] Per-message invocation: one `runner.run_async` call per user message, fresh Director each time
 - [ ] Director accesses chat session conversation history via ADK session events
-- [ ] Director accesses `user:` scope state (personality, preferences) and `app:` scope state (project status, deliverable summaries)
+- [ ] Director accesses `user:` scope state (formation artifacts: director_identity, ceo_profile, operating_contract) and `app:` scope state (project status, deliverable summaries)
 - [ ] Chat invocation does not block, interrupt, or modify running work sessions
 - [ ] When CEO sends message without specifying a project, system routes to "Main" chat session
 - [ ] If "Main" session does not exist for the user, it is created automatically with `type=ChatType.DIRECTOR`
+- [ ] Settings session (`ChatType.SETTINGS`) auto-created on first system access for a user (like "Main")
+- [ ] When CEO sends message to Settings session, Director built with formation-mode instructions (when `user:formation_status != COMPLETE`) or evolution-mode instructions (when `COMPLETE`)
+- [ ] Settings session is user-scoped (not project-scoped) and always available
 - [ ] Chat message send and Director response publish audit events to Redis Stream (NFR-5b.07)
 - [ ] On Director processing failure (agent build error, worker unavailable): error response persisted in chat message history, error event published
 - [ ] Chat message routing completes within 30 seconds under normal LLM latency
@@ -411,7 +429,7 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 Batch 1 (parallel): P5b.D1, P5b.D2, P5b.D3, P5b.D4
   D1: State key authorization — app/events/publisher.py
   D2: CEO queue routes — app/gateway/routes/ceo_queue.py, models/ceo_queue.py, db/models.py, main.py
-  D3: Director personality + system reminders — app/agents/state_helpers.py, config/director_personality.yaml
+  D3: Director formation + system reminders — app/agents/formation.py, app/agents/state_helpers.py
   D4: Supervision callbacks — app/agents/supervision.py
 
 Batch 2 (sequential): P5b.D5
@@ -438,6 +456,9 @@ Batch 4 (sequential): P5b.D9
 | *(same)* | FR-5b.04 | P5b.D7 |
 | *(same)* | FR-5b.05 | P5b.D3 |
 | *(same)* | FR-5b.06 | P5b.D3 |
+| *(same)* | FR-5b.06a | P5b.D3, P5b.D8 |
+| *(same)* | FR-5b.06b | P5b.D3 |
+| *(same)* | FR-5b.06c | P5b.D3 |
 | *(same)* | FR-5b.07 | P5b.D8 |
 | *(same)* | FR-5b.08 | P5b.D5 |
 | *(same)* | FR-5b.08a | P5b.D5 |
@@ -489,7 +510,7 @@ Batch 4 (sequential): P5b.D9
 | *(same)* | FR-5b.52 | P5b.D3 |
 | *(same)* | FR-5b.53 | P5b.D3 |
 
-*53 FRD requirements, 53 mapped. Zero uncovered.*
+*59 FRD requirements, 59 mapped. Zero uncovered.*
 
 ### BOM Coverage
 
@@ -499,8 +520,8 @@ Batch 4 (sequential): P5b.D9
 | G12 | `GET /ceo/queue` route | P5b.D2 |
 | G13 | `PATCH /ceo/queue/{id}` route | P5b.D2 |
 | V18 | CEO resolved approval → session state writeback | P5b.D2 |
-| A08 | Director personality state (`user:` scope) | P5b.D3 |
-| A09 | Director personality seed config file | P5b.D3 |
+| A08 | Director formation artifacts (`user:` scope) | P5b.D3 |
+| A09 | Director formation logic (Settings conversation) | P5b.D3 |
 | A58 | System reminder injection (`before_model_callback`) | P5b.D3 |
 | A14 | `before_agent_callback` (Director supervision) | P5b.D4 |
 | A15 | `after_agent_callback` (Director supervision) | P5b.D4 |
@@ -532,7 +553,7 @@ Batch 4 (sequential): P5b.D9
 | 7 | CEO queue items created, queried, and resolved via gateway routes | P5b.D2 | `pytest tests/gateway/test_ceo_queue.py` |
 | 8 | CEO queue approval resolution written back to session state | P5b.D2 | `pytest tests/gateway/test_ceo_queue.py -k approval_writeback` |
 | 9 | Chat messages routed to Director via worker and response persisted | P5b.D8 | `pytest tests/gateway/test_chat.py -k director_response` |
-| 10 | Director personality seeded from config into user: scope state | P5b.D3 | `pytest tests/agents/test_state_helpers.py -k personality` |
+| 10 | Director formation via Settings conversation produces three structured artifacts in user: scope state | P5b.D3 | `pytest tests/agents/test_formation.py` |
 
 *10 contract items, 10 covered. Zero uncovered.*
 

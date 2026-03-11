@@ -23,7 +23,7 @@ Key-value scratchpad within a session, with four prefix-scoped tiers:
 | Prefix | Scope | Lifetime | AutoBuilder Use |
 |--------|-------|----------|----------------|
 | *(none)* | This session only | Persists with session (via `DatabaseSessionService`) | Current batch, deliverable statuses, loaded skills, validation/verification results, intermediate pipeline data |
-| `user:` | All sessions for this user (within same app) | Persistent | Director personality, user preferences, model selections, intervention settings, notification preferences |
+| `user:` | All sessions for this user (within same app) | Persistent | Director identity, CEO profile, operating contract, formation status, model selections, intervention settings, notification preferences |
 | `app:` | All users and sessions for this app | Persistent | Skill index, workflow registry, shared templates, runtime agent coordination |
 | `temp:` | Current invocation only | Discarded after invocation completes | Intermediate LLM outputs, scratch calculations, data passed between tool calls within one invocation |
 
@@ -33,11 +33,11 @@ Key characteristics:
 - **Serializable values only.** Strings, numbers, booleans, simple lists/dicts. No complex objects.
 - **Template injection.** State values are injectable into agent instructions via `{key}` templating: `"Implement the deliverable: {current_deliverable_spec}"` auto-resolves from `session.state['current_deliverable_spec']`. Use `{key?}` for optional keys that may not exist.
 
-> **Director personality:** The Director's personality profile lives in `user:` scope. Different CEO logins get different Director personalities. Seeded from a config file on first login, then evolvable via `state_delta` over time. This means personality follows the user across all sessions and projects.
+> **Director identity & formation:** The Director's identity, CEO profile, and operating contract live in `user:` scope as three structured artifacts (`user:director_identity`, `user:ceo_profile`, `user:operating_contract`). On first access, a Settings conversation between CEO and Director produces these artifacts through natural dialogue (~5-10 questions). They persist across all sessions and projects. The Settings session remains permanently available for evolving the relationship. Artifact updates from any session go through the CEO queue for approval. Database-only storage -- no file export.
 
 > **Project config as DB entity:** Project-specific configuration (conventions, architecture decisions, tech stack settings) is a **database entity** (project table with CRUD, permissions, versioning) -- NOT stored in `app:` state. Agents load project config at session start via a tool or init callback. ADK state scopes remain exclusively for runtime agent communication. This keeps `app:` scope lightweight and avoids persisting large structured data in the key-value state system.
 
-> **Multi-session model:** Director operates via multiple concurrent sessions: **chat sessions** for interactive CEO conversation and **work sessions** (one per project) for background autonomous oversight. Same agent definition, different session IDs. ADK `Runner.run_async()` supports concurrent calls with different session IDs natively. The `user:` scoped Director personality is shared across all of these sessions automatically.
+> **Multi-session model:** Director operates via multiple concurrent sessions: **settings session** (formation/evolution, one per user), **chat sessions** for interactive CEO conversation, and **work sessions** (one per project) for background autonomous oversight. Same agent definition, different session IDs. ADK `Runner.run_async()` supports concurrent calls with different session IDs natively. The `user:` scoped formation artifacts are shared across all of these sessions automatically.
 
 ### 1.3 State Scope per Tier
 
@@ -48,7 +48,7 @@ The 6-level memory architecture applies at each tier's scope:
 | Invocation (`temp:`) | Current decision cycle (chat or work session) | Current batch management cycle | Current deliverable execution |
 | Pipeline (`session`) | Chat: conversation state. Work: cross-project governance state. | Project execution state | Deliverable pipeline state |
 | Project (DB entity + Skills) | All `project_configs` (DB). Global conventions. | Project config (DB). Project conventions, skills. | Deliverable-specific skills |
-| User (`user:`) | CEO preferences, Director personality | Inherits from Director | Inherits from PM |
+| User (`user:`) | CEO profile, Director identity, operating contract | Inherits from Director | Inherits from PM |
 | Cross-session (`MemoryService`) | Historical decisions, pattern library | Project history, past batch outcomes | Past deliverable patterns |
 | Business (Skills) | Global skills, governance rules | Project skills, workflow skills | Task-specific skills |
 
@@ -218,7 +218,7 @@ Mapping the original "multi-level memory" requirement (Problem #7 from plan-shap
 | **Invocation context** | `temp:` state | Scratch data for current tool chain | Auto-available, discarded after |
 | **Pipeline context** | Session state (no prefix) | Deliverable spec, plan, execution output, validation results, verification results | Written by agents via `state_delta`, read via `{key}` templates |
 | **Project conventions** | Database entity (project table) + Skills | Standards, architecture decisions, workflow patterns, tech stack settings | Loaded at session start via tool/init callback; Skills via SkillLoaderAgent |
-| **Director personality + user preferences** | `user:` state | Director personality profile, model preferences, notification settings, review strictness | Auto-merged into session at load; personality seeded from config on first login |
+| **Director identity + CEO profile + operating contract** | `user:` state | Director identity, CEO profile, operating contract, formation status, model preferences, notification settings, review strictness | Auto-merged into session at load; artifacts formed via Settings conversation on first access, then evolvable |
 | **Project learnings** | `MemoryService` (project-scoped) | Conventions, architectural decisions, and resolved escalations from this project's prior phases and stages. Written on phase or stage approval. | `MemoryLoaderAgent` (deterministic) or `LoadMemory` tool (on-demand) |
 | **Workflow expertise** | `MemoryService` (workflow-type-scoped) | Domain expertise accumulated across all projects of this workflow type: recurring failure patterns, quality signals, edge cases. Written at project completion after Director approval. Immediately available to subsequent projects of the same type. | `MemoryLoaderAgent` (deterministic) or `LoadMemory` tool (on-demand) |
 | **Business knowledge** | Skills files (global + project-local) | Domain rules, compliance requirements, workflow conventions | SkillLoaderAgent (deterministic matching) |
@@ -237,7 +237,7 @@ Client request --> Gateway (enqueue job) --> Redis (ARQ queue) --> Worker picks 
 Worker execution:
   Session loads via DatabaseSessionService (database)
     --> app:* state available (skill index, workflow registry, runtime coordination)
-    --> user:* state available (Director personality, preferences, settings)
+    --> user:* state available (Director identity, CEO profile, operating contract, preferences, settings)
     --> Project config loaded from DB via tool/init callback
     --> session state available (deliverable list, batch status from last run)
     |
@@ -338,7 +338,7 @@ Call `memory_service.add_session_to_memory(session)` at workflow-defined checkpo
 
 ### 9.3 Rewind Limitations
 
-Session rewind restores session-level state and artifacts but NOT `app:` or `user:` state. Since AutoBuilder's project conventions live in the database (project config entity) and skills, and Director personality lives in `user:` state, a rewind does not accidentally erase global learnings or personality. This is the right behavior for our use case.
+Session rewind restores session-level state and artifacts but NOT `app:` or `user:` state. Since AutoBuilder's project conventions live in the database (project config entity) and skills, and Director formation artifacts live in `user:` state, a rewind does not accidentally erase global learnings or formation artifacts. This is the right behavior for our use case.
 
 External filesystem state is not managed by rewind. AutoBuilder handles this via git worktree isolation -- each parallel deliverable executes in its own worktree, so rewind within a deliverable pipeline does not affect other deliverables.
 
