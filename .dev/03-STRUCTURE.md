@@ -90,7 +90,10 @@ AutoBuilder/
 │   │   ├── task.py                 # 6 tools (todo_read/write/list, task_create/update/query)
 │   │   └── management.py           # 12 tools (PM: 6 + Director: 6)
 │   │
-│   ├── skills/                     # Global skill files (Markdown + YAML frontmatter)
+│   ├── skills/                     # Skill system: infrastructure + global skill files
+│   │   ├── library.py              # SkillLibrary class (index, match, cache management)
+│   │   ├── parser.py               # Frontmatter parser (YAML from SKILL.md) + validation
+│   │   ├── matchers.py             # Trigger matcher implementations (5 types + description fallback)
 │   │   ├── code/                   # Code-generation skills (api-endpoint, data-model, database-migration)
 │   │   ├── review/                 # Code-review skills (security-review, performance-review)
 │   │   ├── test/                   # Test-writing skills (unit-test-patterns)
@@ -98,7 +101,7 @@ AutoBuilder/
 │   │   ├── research/               # Research skills (source-evaluation, citation-standards)
 │   │   └── authoring/              # Authoring skills for system artifacts
 │   │       ├── agent-definition/   # How to write agent definition files (SKILL.md + references/)
-│   │       ├── skill-authoring/    # How to write skills (SKILL.md + references/)
+│   │       ├── skill-authoring/    # How to write skills (SKILL.md + references/skill-template.md)
 │   │       ├── workflow-authoring/ # How to compose workflows (SKILL.md + references/)
 │   │       └── project-conventions/ # How to configure project-level overrides (SKILL.md)
 │   │
@@ -227,7 +230,7 @@ AutoBuilder/
 | `app/agents/` | Agent definitions (.md) + infrastructure (AgentRegistry, InstructionAssembler, pipeline factory, context monitor) |
 | `app/agents/custom/` | CustomAgent Python implementations (deterministic and hybrid) |
 | `app/tools/` | 42 FunctionTool wrappers (8 modules) + `GlobalToolset(BaseToolset)` for per-role vending |
-| `app/skills/` | Markdown skill files with YAML frontmatter |
+| `app/skills/` | Skill system infrastructure (`library.py`, `parser.py`, `matchers.py`) + global skill files (Markdown + YAML frontmatter) |
 | `app/workflows/` | Pluggable workflow definitions (each a self-contained directory) |
 | `app/router/` | LLM model routing (task type to provider/model) |
 | `app/memory/` | Cross-session searchable memory (PostgreSQL tsvector + pgvector) |
@@ -249,5 +252,20 @@ AutoBuilder/
 
 ---
 
-*Document Version: 1.8*
+## Project-Local Namespace (User Repository)
+
+User repositories can override global agents and skills via the `.agents/` directory at the project root:
+
+```
+<user-project>/
+└── .agents/
+    ├── agents/          # Project-scope agent definition overrides (type: llm only)
+    └── skills/          # Project-local SKILL.md files (override globals by name, additive if unique)
+```
+
+This is the third scope in the 3-scope agent definition cascade (global → workflow → project) and the second tier in the two-tier skill override system (global → project-local).
+
+---
+
+*Document Version: 1.9*
 *Last Updated: 2026-03-11*

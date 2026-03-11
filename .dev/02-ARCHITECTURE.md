@@ -125,7 +125,7 @@ Detailed architecture documentation is organized by domain in the `architecture/
 | Domain | File | Summary |
 |--------|------|---------|
 | Context | [context.md](./architecture/context.md) | Context assembly lifecycle, budgeting, recreation, knowledge loading |
-| Skills | [skills.md](./architecture/skills.md) | Skill-based knowledge injection, progressive disclosure, trigger matching |
+| Skills | [skills.md](./architecture/skills.md) | Skill-based knowledge injection, three-layer deterministic loading, trigger matching, supervision-tier resolution |
 | Workflows | [workflows.md](./architecture/workflows.md) | Pluggable workflow system, manifests, registry, composition |
 | Observability | [observability.md](./architecture/observability.md) | OpenTelemetry + Langfuse, tracing, logging, event stream |
 
@@ -177,6 +177,7 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | PR-31 | Skills (Agent Skills standard) | [skills.md](./architecture/skills.md) §Skill File Format |
 | PR-32 | Skill activation (trigger matching) | [skills.md](./architecture/skills.md) §Trigger Matching |
 | PR-33 | Third-party skill install | [skills.md](./architecture/skills.md) §Two-Tier Library |
+| PR-33a | Autonomous skill creation | [skills.md](./architecture/skills.md) §Two-Tier Library |
 | PR-34 | Persistent replayable event stream | [events.md](./architecture/events.md) §Redis Streams, [gateway.md](./architecture/gateway.md) §Route Structure |
 | PR-35 | Token/cost tracking | [observability.md](./architecture/observability.md) §1, [engine.md](./architecture/engine.md) §5 |
 | PR-35a | Agent definition resolution audit | [agents.md](./architecture/agents.md) §AgentRegistry, [observability.md](./architecture/observability.md) §1 |
@@ -218,8 +219,9 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | — | Constitutional SAFETY fragment | Non-overridable safety constraints hardcoded in InstructionAssembler; distinct from overridable GOVERNANCE | [agents.md](./architecture/agents.md) |
 | — | Hybrid CustomAgent model | CustomAgents span deterministic to hybrid (internal LiteLLM calls); `type` is always `llm` or `custom` | [agents.md](./architecture/agents.md) |
 | — | Agent security model | Project-scope restricted to `type: llm` + tool_role ceiling; state key authorization via tier prefixes | [agents.md](./architecture/agents.md) |
+| — | Deterministic skill loading | Three-layer model: role-bound (always trigger), context-matched (deliverable triggers), explicit override. No LLM in matching. Applies to all tiers — Director/PM at build time, workers at pipeline runtime. | [skills.md](./architecture/skills.md) |
 
 ---
 
-*Document Version: 2.4*
-*Last Updated: 2026-03-10*
+*Document Version: 2.5*
+*Last Updated: 2026-03-11*

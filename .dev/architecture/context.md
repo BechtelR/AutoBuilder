@@ -106,21 +106,24 @@ Pipeline start
   │     └── Inserts IDENTITY + GOVERNANCE from definition file body
   │     └── Injects PROJECT fragment from database entity
   │     └── Injects TASK fragment from session state
-  │     └── Filters and injects SKILL fragments by applies_to
+  │     └── Filters and injects SKILL fragments by applies_to per agent role
   │     └── Escapes literal curly braces in SKILL/PROJECT content
   │     └── Result: assembled instruction string with {key} placeholders
   │
-  ├── 3. SkillLoaderAgent (deterministic CustomAgent, runs first in pipeline)
-  │     └── Matches skills against current task context (trigger matching)
+  ├── 3. SkillLoaderAgent (deterministic CustomAgent, workers only)
+  │     └── Matches skills against current deliverable context (trigger matching)
   │     └── Resolves cascaded skill dependencies
-  │     └── Writes loaded_skills, loaded_skill_names to session state
+  │     └── Writes loaded_skills (with applies_to metadata), loaded_skill_names to state
+  │     └── (Director/PM receive skills at build time via SkillLibrary.match())
   │
   ├── 4. MemoryLoaderAgent (deterministic CustomAgent, runs second)
   │     └── Searches MemoryService for relevant cross-session context
   │     └── Writes memory_context to session state
   │
   ├── 5. ADK resolves {key} templates from session state
-  │     └── {loaded_skills}, {memory_context}, {current_deliverable_spec}, etc.
+  │     └── {memory_context}, {current_deliverable_spec}, etc.
+  │     └── (Skills are NOT injected via {loaded_skills} template -- they are composed
+  │          directly into instructions as SKILL fragments by the assembler in step 2)
   │
   ├── 6. before_model_callback fires (right before each LLM call)
   │     └── ContextBudgetMonitor: token-counts LlmRequest, writes usage % to state
@@ -170,11 +173,11 @@ No built-in RAG or vector store. For AutoBuilder, knowledge is deterministic loo
 
 Two deterministic `CustomAgent` implementations guarantee context loading as pipeline steps, not LLM-discretionary tool calls.
 
-### SkillLoaderAgent
+### SkillLoaderAgent (Workers Only)
 
-Runs as the first step in every pipeline. Matches skills against the current task context using deterministic pattern matching (exact string, glob, set intersection -- no LLM call). Writes loaded skill content to session state for downstream agents.
+Runs as the first step in every `DeliverablePipeline` (worker tier only). Matches skills against the current deliverable context using deterministic pattern matching (exact string, glob, set intersection -- no LLM call). Writes loaded skill content with `applies_to` metadata to session state so the `InstructionAssembler` can filter per-agent at assembly time.
 
-See [skills.md](./skills.md) for full skill format, trigger matching, progressive disclosure, and two-tier library architecture.
+Director and PM receive skills at agent build time via direct `SkillLibrary.match()` calls, not via `SkillLoaderAgent`. See [skills.md](./skills.md) for full skill format, trigger matching, supervision-tier resolution, and two-tier library architecture.
 
 ### MemoryLoaderAgent (Decision #57)
 
@@ -302,5 +305,5 @@ This is also why agent communication flows through session state (`output_key`, 
 
 ---
 
-*Document Version: 1.1*
-*Last Updated: 2026-03-10*
+*Document Version: 1.3*
+*Last Updated: 2026-03-11*

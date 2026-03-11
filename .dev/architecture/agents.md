@@ -271,12 +271,12 @@ Resolution happens in two phases. At **build time**, `AgentRegistry.build()` res
 BUILD TIME (registry.build)                    RUNTIME (ADK per LLM call)
 ─────────────────────────                      ────────────────────────────
 Agent Definition File                          Session State
-  ├── model_role  → LlmRouter → model string     ├── {loaded_skills}    ← SkillLoaderAgent
-  ├── tool_role   → GlobalToolset → tool list     ├── {memory_context}   ← MemoryLoaderAgent
-  └── body        → InstructionAssembler          ├── {current_deliverable_spec} ← PM
-                     ├── + PROJECT (DB)            └── {key} templates resolved
-                     ├── + TASK (state)                 into final LLM prompt
-                     ├── + SKILL (loaded)
+  ├── model_role  → LlmRouter → model string     ├── {memory_context}   ← MemoryLoaderAgent
+  ├── tool_role   → GlobalToolset → tool list     ├── {current_deliverable_spec} ← PM
+  └── body        → InstructionAssembler          └── {key} templates resolved
+                     ├── + PROJECT (DB)                 into final LLM prompt
+                     ├── + TASK (state)
+                     ├── + SKILL (loaded, filtered by applies_to)
                      └── → instruction string
                           (contains {key} placeholders)
 ```
@@ -289,7 +289,7 @@ Agent Definition File                          Session State
 
 These are implementation details -- the agent definition doesn't know or care how they work. It just declares role strings.
 
-`InstructionContext` is a lightweight container carrying the runtime data needed for assembly: project configuration (from DB), current deliverable spec (from session state), and loaded skills. It is created per invocation and passed through to all resolution systems.
+`InstructionContext` is a lightweight container carrying the runtime data needed for assembly: project configuration (from DB), current deliverable spec (from session state), and loaded skills. It is created per invocation and passed through to all resolution systems. **Director and PM require separate `InstructionContext` instances** with independently resolved skill sets -- they must not share a single context, even when built in the same `build_work_session_agents()` call. Each tier's role-bound skills are resolved via `SkillLibrary.match()` with a tier-specific `SkillMatchContext`.
 
 ### Instruction Composition
 
@@ -327,6 +327,8 @@ Each fragment carries a `source` field for auditability -- you can trace exactly
 
 **Skill fragment vs state template:** The SKILL fragments composed by the assembler are role-filtered (via `applies_to`) and baked into the instruction at build time. The `{loaded_skills}` state template is NOT used for LLM agents -- it exists for CustomAgents that need programmatic access to loaded skill content. LLM agents receive skills exclusively through the assembler's SKILL fragments, avoiding duplication.
 
+**`applies_to` filtering:** The `InstructionAssembler` filters loaded skills per-agent at assembly time using the `applies_to` metadata carried alongside skill content. For workers, `loaded_skills` in session state is a mapping of skill name to `{"content": ..., "applies_to": ...}` (written by `SkillLoaderAgent`). For Director/PM, skills are already in the `InstructionContext` from build-time resolution. In both cases, the assembler performs the same per-agent filtering: if a skill specifies `applies_to: [coder, reviewer]`, only those agents receive it. Skills without `applies_to` go to all agents.
+
 **Constitutional safety layer:** The SAFETY fragment is hardcoded in the InstructionAssembler and cannot be overridden by any scope -- not by project-scope definition files, not by Director session state, not by skill content. It contains core safety constraints: no data exfiltration, respect tool boundaries, follow escalation protocol. This is distinct from the GOVERNANCE fragment in definition files, which carries agent-specific behavioral rules and CAN be overridden via the cascade. SAFETY is the floor; GOVERNANCE is the ceiling.
 
 **Director influence:** The Director controls agent behavior per-project by writing governance and project fragments to session state. It doesn't rewrite prompts -- it shapes the fragments that the assembler composes.
@@ -342,9 +344,9 @@ Each fragment carries a `source` field for auditability -- you can trace exactly
 
 #### What the Assembler Produces vs What ADK Resolves
 
-The assembled instruction string contains `{key}` state template placeholders (e.g., `{loaded_skills}`, `{memory_context}`, `{current_deliverable_spec}`). The assembler does NOT resolve these -- ADK resolves them at runtime from session state, just before each LLM call. This means state can be populated *after* the agent is built but *before* it runs.
+The assembled instruction string contains `{key}` state template placeholders (e.g., `{memory_context}`, `{current_deliverable_spec}`). The assembler does NOT resolve these -- ADK resolves them at runtime from session state, just before each LLM call. This means state can be populated *after* the agent is built but *before* it runs. Note: skills are NOT injected via `{loaded_skills}` template -- they are composed directly into the instruction string as SKILL fragments by the assembler (see Skill fragment vs state template note above).
 
-The assembler escapes literal curly braces in SKILL and PROJECT fragments (`{` -> `{{`, `}` -> `}}`) before composing the instruction string. Only explicitly declared state template references (e.g., `{loaded_skills}`, `{memory_context}`) remain unescaped for ADK resolution. This prevents coding standards or skill content containing curly-brace syntax (common in Python, Rust, Go) from being misinterpreted as state templates.
+The assembler escapes literal curly braces in SKILL and PROJECT fragments (`{` -> `{{`, `}` -> `}}`) before composing the instruction string. Only explicitly declared state template references (e.g., `{memory_context}`, `{current_deliverable_spec}`) remain unescaped for ADK resolution. This prevents coding standards or skill content containing curly-brace syntax (common in Python, Rust, Go) from being misinterpreted as state templates.
 
 The pipeline populates state in execution order before LLM agents read it:
 
@@ -520,7 +522,7 @@ A "Main" project acts as the permanent default -- the Director's home context. M
 - **Intelligent escalation** -- decides when to pause for CEO input (rare, due to accumulated memory)
 - **Cross-project pattern propagation** -- learnings from one project inform others
 - **Tool authoring** -- Director can create new tools; CEO approval required by default
-- **Tools and skills** -- governance tools, resource management FunctionTools, governance policies and global convention skills
+- **Tools and skills** -- governance tools, resource management FunctionTools, governance policies and global convention skills. Director receives role-bound skills at **build time** via `SkillLibrary.match()` with `agent_role="director"` -- not at pipeline runtime. Skills with `always` trigger + `applies_to: [director]` are part of the Director's operational identity across all session types.
 
 ### Director Tools
 
@@ -579,6 +581,10 @@ PMs are per-project autonomous managers. They use LLM reasoning (not programmati
 | **Regression** | `run_regression_tests` -- `RegressionTestAgent` (CustomAgent) wired into pipeline after each batch; reads PM regression policy from session state, runs tests when policy says to, no-ops otherwise; always present (not skippable), policy-aware |
 | **Sub-agents** | `DeliverablePipeline` instances (workers) |
 | **Parent** | Director (via `transfer_to_agent` delegation). PM transfers back to Director on batch completion or escalation. |
+
+### PM Skills
+
+The PM receives role-bound skills at **build time** via `SkillLibrary.match()` with `agent_role="pm"` -- not at pipeline runtime via `SkillLoaderAgent`. Skills with `always` trigger + `applies_to: [pm]` load for every PM invocation. The PM's `InstructionContext` is separate from the Director's -- each tier gets independently resolved skills even when built in the same work session (see [Skills: Supervision-Tier Skill Resolution](./skills.md#supervision-tier-skill-resolution)).
 
 ### Why LlmAgent, Not CustomAgent
 
@@ -689,19 +695,19 @@ Worker-tier LLM Agents handle execution tasks that require reasoning, creativity
 | Property | Value |
 |----------|-------|
 | **Role** | Decompose a deliverable specification into a structured implementation plan |
-| **Input** | `{current_deliverable_spec}`, `{loaded_skills}`, `{memory_context}`, `{app:coding_standards}` |
+| **Input** | `{current_deliverable_spec}`, `{memory_context}`, `{app:coding_standards}` + SKILL fragments (via assembler) |
 | **Output** | `output_key: "implementation_plan"` |
 | **Model** | `anthropic/claude-opus-4-6` (planning benefits from strongest reasoning) |
 | **Tool Access** | Read-only -- filesystem read, directory list, search. No write tools. |
 
-The plan agent reads the deliverable specification, loaded skills, cross-session memory context, and project coding standards from session state. It produces a structured implementation plan that the code agent consumes. It never writes code or modifies files.
+The plan agent reads the deliverable specification, cross-session memory context, and project coding standards from session state. Skills are injected as SKILL fragments by the InstructionAssembler (filtered by `applies_to`). It produces a structured implementation plan that the code agent consumes. It never writes code or modifies files.
 
 ### coder (auto-code example)
 
 | Property | Value |
 |----------|-------|
 | **Role** | Implement code according to the plan, using project conventions from skills |
-| **Input** | `{implementation_plan}`, `{loaded_skills}`, `{app:coding_standards}` |
+| **Input** | `{implementation_plan}`, `{app:coding_standards}` + SKILL fragments (via assembler) |
 | **Output** | `output_key: "code_output"` |
 | **Model** | `anthropic/claude-sonnet-4-6` (standard complexity) or `anthropic/claude-opus-4-6` (complex architecture) |
 | **Tool Access** | Full -- filesystem read/write/edit, bash execution, git operations |
@@ -713,7 +719,7 @@ The code agent consumes the structured plan and writes implementation code. Mode
 | Property | Value |
 |----------|-------|
 | **Role** | Evaluate code quality against project standards, lint results, test results, and diagnostics |
-| **Input** | `{code_output}`, `{lint_results}`, `{test_results}`, `{diagnostics_analysis}`, `{loaded_skills}` |
+| **Input** | `{code_output}`, `{lint_results}`, `{test_results}`, `{diagnostics_analysis}` + SKILL fragments (via assembler) |
 | **Output** | `output_key: "review_result"` |
 | **Model** | `anthropic/claude-sonnet-4-6` |
 | **Tool Access** | Read-only -- filesystem read, directory list, search. No write tools. |
@@ -742,11 +748,13 @@ The `SkillLoaderAgent` is shared across all workflows at worker level. Other Cus
 
 Like all agents, Custom Agents execute inside worker processes. Their subprocess calls (linter, test runner, formatter) and any internal LiteLLM calls have access to the worker's filesystem and environment.
 
-### SkillLoaderAgent (deterministic)
+### SkillLoaderAgent (deterministic, workers only)
 
-**Purpose:** Resolve and load relevant skills into session state as the first step in every deliverable pipeline.
+**Purpose:** Resolve and load relevant skills into session state as the first step in every `DeliverablePipeline`.
 
-Matches skills against current deliverable context using deterministic pattern matching (no LLM call). Writes matched skill content to state so all subsequent agents in the pipeline can access it.
+Matches skills against current deliverable context using deterministic pattern matching (no LLM call). Writes matched skill content (with `applies_to` metadata) to state so the `InstructionAssembler` can filter per-agent at assembly time.
+
+`SkillLoaderAgent` runs **only in worker-tier pipelines**. Director and PM receive their skills at agent build time via direct `SkillLibrary.match()` calls -- see [Skills: Supervision-Tier Skill Resolution](./skills.md#supervision-tier-skill-resolution).
 
 ```python
 class SkillLoaderAgent(BaseAgent):
@@ -756,7 +764,10 @@ class SkillLoaderAgent(BaseAgent):
         yield Event(
             author=self.name,
             actions=EventActions(state_delta={
-                "loaded_skills": {s.entry.name: s.content for s in loaded},
+                "loaded_skills": {
+                    s.entry.name: {"content": s.content, "applies_to": s.entry.applies_to}
+                    for s in loaded
+                },
                 "loaded_skill_names": [s.entry.name for s in loaded],
             })
         )
@@ -1021,12 +1032,14 @@ planner = LlmAgent(
 
     Project coding standards: {app:coding_standards}
 
-    Available skills for this task:
-    {loaded_skills}
+    Cross-session context:
+    {memory_context}
     """,
     output_key="implementation_plan",
 )
 ```
+
+Note: Skills are NOT injected via `{loaded_skills}` template for LLM agents. Skills are composed into the instruction string by `InstructionAssembler` as SKILL fragments, filtered per-agent via `applies_to`. See [§Instruction Composition](#instruction-composition).
 
 Use `{key?}` for optional keys that may not exist in state.
 
@@ -1092,11 +1105,11 @@ SkillLoaderAgent --> state["loaded_skills"], state["loaded_skill_names"]
 MemoryLoaderAgent --> state["memory_context"]
   |
   v
-planner reads: {current_deliverable_spec}, {loaded_skills}, {memory_context}, {app:coding_standards}
+planner reads: {current_deliverable_spec}, {memory_context}, {app:coding_standards} + SKILL fragments (via assembler)
 planner writes: state["implementation_plan"]
   |
   v
-coder reads: {implementation_plan}, {loaded_skills}, {app:coding_standards}
+coder reads: {implementation_plan}, {app:coding_standards} + SKILL fragments (via assembler)
 coder writes: state["code_output"]
   |
   v
@@ -1108,7 +1121,7 @@ DiagnosticsAgent reads: {lint_results}, {test_results}
 DiagnosticsAgent writes: state["diagnostics_analysis"]
   |
   v
-reviewer reads: {code_output}, {lint_results}, {test_results}, {diagnostics_analysis}, {loaded_skills}
+reviewer reads: {code_output}, {lint_results}, {test_results}, {diagnostics_analysis} + SKILL fragments (via assembler)
 reviewer writes: state["review_result"]
   |
   v
@@ -1152,6 +1165,6 @@ The four state-based mechanisms are distinct: `output_key` writes data, `{key}` 
 
 ---
 
-**Document Version:** 5.2
-**Last Updated:** 2026-03-10
-**Status:** Framework Validated -- Prototyping Phase
+**Document Version:** 5.4
+**Last Updated:** 2026-03-11
+**Status:** Framework Validated -- Phase 6 FRD Findings Propagated

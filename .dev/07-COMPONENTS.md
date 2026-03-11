@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 1.8.1*
+*Version: 1.9.0*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -379,10 +379,12 @@ Source: `architecture/skills.md`
 | S09 | Description keyword fallback (interop) | mechanism | 6 | skills.md §Trigger Matching | — |
 | S10 | Two-tier scan (global + project-local override) | mechanism | 6 | skills.md §Two-Tier Library | — |
 | S11 | Three-tier merge (+ workflow-specific) | mechanism | 7 | workflows.md §auto-code: The First Workflow | SkillLibrary, WorkflowRegistry |
-| S12 | `InstructionAssembler` skill injection | mechanism | 6 | skills.md §ADK Integration, agents.md §Agent Definitions | InstructionAssembler, session state |
+| S12 | `InstructionAssembler` skill injection with `applies_to` filtering | mechanism | 6 | skills.md §ADK Integration, agents.md §Agent Definitions | InstructionAssembler, session state, SkillEntry `applies_to` |
 | S13 | Skill index Redis cache | mechanism | 6 | skills.md §Two-Tier Library | Redis |
 | S14 | Skill cache invalidation (file change + gateway API) | mechanism | 6 | skills.md §Two-Tier Library | Redis, gateway |
 | S15 | Skill cascade resolution | mechanism | 6 | skills.md §Skill Cascading | SkillLoaderAgent |
+| S16 | Supervision-tier skill resolution (Director/PM build-time matching) | mechanism | 6 | FRD §CAP-10 | SkillLibrary, InstructionAssembler, AgentRegistry |
+| S17 | Skill validation function (callable by agents and indexer) | module | 6 | FRD §CAP-11 | SkillEntry, frontmatter parser |
 
 ### 9.2 Skill Files
 
@@ -399,8 +401,12 @@ Source: `architecture/skills.md`
 | S28 | Skill: `planning/task-decomposition` | skill | 6 | skills.md §Directory Layout | — |
 | S29 | Skill: `research/source-evaluation` | skill | 13 | skills.md §Directory Layout | — |
 | S30 | Skill: `research/citation-standards` | skill | 13 | skills.md §Directory Layout | — |
+| S33 | Skill: `authoring/skill-authoring` (+ `references/skill-template.md`) | skill | 6 | FRD §CAP-9 (FR-6.41, FR-6.44, FR-6.45) | — |
+| S34 | Skill: `authoring/agent-definition` | skill | 6 | FRD §CAP-9 (FR-6.41) | — |
+| S35 | Skill: `authoring/workflow-authoring` | skill | 6 | FRD §CAP-9 (FR-6.41) | — |
+| S36 | Skill: `authoring/project-conventions` | skill | 6 | FRD §CAP-9 (FR-6.41) | — |
 | S31 | Auto-code skill: `test-generation` | skill | 7 | workflows.md §auto-code: The First Workflow | — |
-| S32 | Director/PM governance skills | skill | 13+ | agents.md §Director Agent | — |
+| S32 | Director/PM role-bound skills (governance, oversight, management) | skill | 6 | FRD §CAP-10 | SkillLibrary (`always` trigger + `applies_to`) |
 
 ---
 
@@ -576,24 +582,24 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Metric | Count |
 |--------|-------|
-| Total components | 325 |
+| Total components | 331 |
 | Dropped | 2 |
-| Active components | 323 |
-| Assigned (with phase) | 323 |
+| Active components | 329 |
+| Assigned (with phase) | 329 |
 | **Unassigned (gaps)** | **0** |
-| Phase 0-2 (done) | 20 |
+| Phase 0-2 (done) | 19 |
 | Phase 3 | 37 |
 | Phase 4 | 62 |
 | Phase 5a | 48 |
 | Phase 5b | 21 |
-| Phase 6 | 24 |
+| Phase 6 | 31 |
 | Phase 7 | 21 |
 | Phase 8 | 21 |
 | Phase 9 | 10 |
 | Phase 10 | 25 |
 | Phase 11 | 17 |
 | Phase 12 | 12 |
-| Phase 13 / 13+ / 14 | 6 |
+| Phase 13 / 13+ / 14 | 5 |
 
 ---
 
@@ -601,6 +607,7 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.9.0 | 2026-03-11 | Phase 6 FRD back-propagation: S16-S17 added (supervision-tier resolution, skill validation); S33-S36 added (4 authoring skills); S32 moved 13+→6 (Director/PM role-bound skills); S12 updated (adds `applies_to` filtering); statistics updated (Total 325→331, Active 323→329, Phase 6 24→31, Phase 13+/14 6→5) |
 | 1.8.1 | 2026-03-10 | Fix Phase 3 count 36→37 (A72 move was not reflected in statistics) |
 | 1.8.0 | 2026-03-10 | Phase 5b FRD decisions: A16 added (Director queue consumption, 5b); X11 added (batch failure threshold, 8); A72 moved 5b→3 (cross-session bridge already operational via state scopes + Redis Streams); statistics updated (Total 323→325, Active 321→323, Phase 0-2 19→20, Phase 8 20→21) |
 | 1.7.0 | 2026-03-10 | Phase 5 split into 5a (Agent Definitions & Pipeline) and 5b (Supervision & Integration); A78 split into A78a (type validation, 5a) and A78b (tool_role ceiling, 7); M15 moved from Phase 9 to 5a (degraded mode with InMemoryMemoryService); A37 added for MemoryLoaderAgent agent entry |
@@ -617,5 +624,5 @@ Components removed from the registry as unnecessary or over-engineered:
 
 ---
 
-*Document Version: 1.8.0*
-*Last Updated: 2026-03-10*
+*Document Version: 1.9.0*
+*Last Updated: 2026-03-11*

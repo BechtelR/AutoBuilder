@@ -104,7 +104,7 @@ Never embed values that change — counts, dates, versions, totals. Each is sile
 When a standard value changes (e.g., module line limit), grep ALL docs for the old value and batch/script replace.
 
 ## Decision Cascade Propagation
-When updating a primary architecture doc, grep ALL satellite docs for changed constructs (counts, stage lists, decision numbers). They silently go stale.
+When updating a primary architecture doc, grep ALL satellite docs for changed constructs (counts, stage lists, decision numbers, data flow paths, state key usage patterns). They silently go stale.
 
 ## Pydantic `strict=True` on API Models
 Never use `strict=True` on gateway models. FastAPI uses `model_validate()` (dict), not `model_validate_json()` — strict rejects `str→enum`/`str→datetime` coercion, breaking any model with those fields.

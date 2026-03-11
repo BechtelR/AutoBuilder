@@ -11,12 +11,15 @@
 
 1. [The Problem](#the-problem)
 2. [Design Principles](#design-principles)
-3. [Skill File Format](#skill-file-format)
-4. [Trigger Matching](#trigger-matching)
-5. [ADK Integration](#adk-integration)
-6. [Directory Layout](#directory-layout)
-7. [Two-Tier Library](#two-tier-library)
-8. [Scope Estimate](#scope-estimate)
+3. [Three-Layer Deterministic Model](#three-layer-deterministic-model)
+4. [Skill File Format](#skill-file-format)
+5. [Trigger Matching](#trigger-matching)
+6. [Supervision-Tier Skill Resolution](#supervision-tier-skill-resolution)
+7. [ADK Integration](#adk-integration)
+8. [Directory Layout](#directory-layout)
+9. [Two-Tier Library](#two-tier-library)
+10. [Autonomous Skill Creation](#autonomous-skill-creation)
+11. [Scope Estimate](#scope-estimate)
 
 ---
 
@@ -28,7 +31,7 @@ The naive approach is "give the agent all the context." This fails at scale: an 
 
 The solution is **progressive disclosure**: agents see a lightweight index of available skills and load full content only when relevant to the current task. The skill system is the mechanism for this.
 
-Skills are a Phase 1 component because agents without skills are generic. Skills produce workflow-appropriate and project-appropriate output from day one.
+Skills are an early-priority component because agents without skills are generic. Skills produce workflow-appropriate and project-appropriate output from day one.
 
 ---
 
@@ -61,6 +64,25 @@ Skill matching is deterministic pattern matching: exact string comparison, glob 
 ### 7. Agent Skills Open Standard
 
 The skill file format follows the [Agent Skills open standard](https://agentskills.io/specification) for interoperability. Our matching engine and deterministic loading via `SkillLoaderAgent` are custom -- ADK's experimental `SkillToolset` uses LLM-discretionary loading which does not meet our requirements for guaranteed knowledge injection. We adopt the standard's file format and progressive disclosure model while keeping full control over the runtime.
+
+---
+
+## Three-Layer Deterministic Model
+
+Skill loading across all agent tiers follows a three-layer deterministic model. No tier assigns skill lists to another tier. The work itself -- role, deliverable metadata, or explicit override -- determines the skills. Deterministically, every time.
+
+| Layer | Name | Trigger Mechanism | Scope | Description |
+|-------|------|-------------------|-------|-------------|
+| **1** | Role-bound | `always` trigger + `applies_to` | All tiers | Structural skills that always load for a given agent role. Director always gets governance skills. PM always gets management skills. Planner always gets decomposition skills. Configured in skill frontmatter, not assigned per-task. |
+| **2** | Context-matched | Trigger-matched against deliverable metadata (type, tags, files) | Workers only | Automatic via `SkillLoaderAgent` at pipeline runtime. Not applicable to Director/PM (they don't process deliverables). Five trigger types: `deliverable_type`, `file_pattern`, `tag_match`, `explicit`, `always`. |
+| **3** | Explicit override | `requested_skills` in session state, matched via the `explicit` trigger | All tiers (rare) | For edge cases where the supervisor knows something metadata doesn't capture. Additive -- does not replace Layer 1 or 2 results. |
+
+### When Matching Runs
+
+The same `SkillLibrary.match()` engine handles all tiers. The difference is **when** matching runs:
+
+- **Build time** (Director, PM): Skills are resolved when the agent is constructed. Matched skills are static for the session, baked into instructions at agent build time via `InstructionAssembler`. See [Supervision-Tier Skill Resolution](#supervision-tier-skill-resolution).
+- **Pipeline runtime** (Workers): Skills are resolved by `SkillLoaderAgent` as the first pipeline step. Matched skills vary per deliverable context. See [ADK Integration](#adk-integration).
 
 ---
 
@@ -132,7 +154,9 @@ Every endpoint requires:
 | `name` | string | Yes | Unique identifier. Project-local skills with the same name as a global skill override it. |
 | `description` | string | Yes | Human-readable summary. Included in skill index for debugging. Also used as keyword fallback for trigger matching when `metadata.triggers` is absent (see [Interoperability](#interoperability)). |
 
-**Extension fields** (under `metadata`, AutoBuilder-specific):
+**Extension fields** (AutoBuilder-specific):
+
+> **OPEN ITEM:** The Agent Skills spec defines `metadata` as a string-to-string map. AutoBuilder's extension fields (`triggers`, `tags`, `applies_to`, `priority`, `cascades`) are complex types (lists, objects, integers) that violate this constraint. The current design places them under `metadata` for namespacing, but the preferred approach (per Phase 6 FRD) is to promote them to top-level YAML keys alongside `name`/`description`. Top-level placement keeps `metadata` spec-compliant for true string-value annotations while other parsers simply ignore unknown top-level keys. Decision to be resolved during Phase 6 build.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -140,6 +164,7 @@ Every endpoint requires:
 | `metadata.tags` | list of strings | No | Additional matching keywords for `tag_match` trigger type. |
 | `metadata.applies_to` | list of strings | No | Which agents receive this skill's content. If omitted, applies to all agents. |
 | `metadata.priority` | integer | No | Higher priority skills load first when multiple skills match. Default: 0. |
+| `metadata.cascades` | list of objects | No | Skills to load alongside this skill when it matches. See [Skill Cascading](#skill-cascading). |
 
 ---
 
@@ -180,31 +205,69 @@ Project-local skills with the same `name` as a global skill replace the global s
 
 ---
 
+## Supervision-Tier Skill Resolution
+
+Director and PM operate outside the `DeliverablePipeline` -- they run in chat sessions and work sessions where no `SkillLoaderAgent` executes. Yet they need skills just as deterministically as workers do.
+
+The same `SkillLibrary.match()` engine handles all tiers. The difference is **when** matching runs: at build time for Director/PM (skills are static for the session, baked into instructions), at pipeline runtime for workers (skills vary per deliverable). No separate mechanism -- same matching engine, same trigger system, different call site.
+
+### How It Works
+
+When the Director or PM agent is constructed (in `build_chat_session_agent()`, `build_work_session_agents()`, or `run_director_turn()`), the build code calls `skill_library.match()` with a tier-specific context (agent role, no deliverable metadata). Matched skills are passed into the agent's `InstructionContext` and baked into the assembled instructions at construction time.
+
+```python
+# Director build-time skill resolution
+director_skill_ctx = SkillMatchContext(agent_role="director")
+director_skills = skill_library.match(director_skill_ctx)
+director_ctx = InstructionContext(loaded_skills=director_skills, ...)
+
+# PM build-time skill resolution (separate context)
+pm_skill_ctx = SkillMatchContext(agent_role="pm")
+pm_skills = skill_library.match(pm_skill_ctx)
+pm_ctx = InstructionContext(loaded_skills=pm_skills, ...)
+```
+
+### Key Constraints
+
+- **Director and PM get separate `InstructionContext` instances.** They do not share a single skill context. Each tier's role-bound skills are independently resolved.
+- **Role-bound skills with `always` trigger + `applies_to: [director]`** load every time the Director is invoked -- whether for a chat session, work session, or Director queue processing. The skill is part of the Director's operational identity.
+- **Skills with `always` trigger and no `applies_to` field** load for ALL agents across all tiers -- Director, PM, and every worker. This is the mechanism for project-wide conventions that apply universally.
+
+---
+
 ## ADK Integration
 
-Skills are available to all agent tiers — Director loads governance skills, PMs load project management skills, and workers load task-specific skills. Skills integrate into pipelines via `SkillLoaderAgent`, a deterministic `CustomAgent` that runs as the first step before any LLM agent. The entire skill loading process runs inside worker processes as part of the ADK pipeline.
+Skills integrate into the agent system at two call sites: build-time resolution for Director/PM (see above) and pipeline-runtime resolution for workers via `SkillLoaderAgent`. The entire skill loading process runs inside worker processes.
 
-### SkillLoaderAgent Implementation
+### SkillLoaderAgent (Workers Only)
+
+`SkillLoaderAgent` is a deterministic `CustomAgent` that runs as the first step in every `DeliverablePipeline`, before any LLM agent. It resolves skills against the current deliverable's context -- not the Director's or PM's context.
 
 ```python
 class SkillLoaderAgent(BaseAgent):
-    """Deterministic agent that resolves and loads relevant skills into state."""
+    """Deterministic agent that resolves and loads relevant skills into state.
+    Runs only in DeliverablePipeline (worker tier). Director/PM receive
+    skills at build time via direct SkillLibrary.match() calls."""
 
     async def _run_async_impl(self, ctx):
-        # Build matching context from current session state
+        # Build matching context from current deliverable state
         match_context = context_from_state(ctx)
 
         # Deterministic matching — no LLM call
         matched = skill_library.match(match_context)
 
-        # Load full content for matched skills
+        # Load full content for matched skills (with applies_to metadata)
         loaded = [skill_library.load(entry) for entry in matched]
 
         # Write to state — available to all subsequent agents
+        # Content carries applies_to metadata for per-agent filtering
         yield Event(
             author=self.name,
             actions=EventActions(state_delta={
-                "loaded_skills": {s.entry.name: s.content for s in loaded},
+                "loaded_skills": {
+                    s.entry.name: {"content": s.content, "applies_to": s.entry.applies_to}
+                    for s in loaded
+                },
                 "loaded_skill_names": [s.entry.name for s in loaded],
             })
         )
@@ -222,28 +285,11 @@ class SkillLoaderAgent(BaseAgent):
 
 ### How Agents Consume Skills
 
-Downstream LLM agents read skills from state via template injection in their instructions:
+The `metadata.applies_to` field in skill frontmatter controls which agents receive the skill. The `InstructionAssembler` (Decision #50) filters loaded skills during `assemble()` to only include those relevant to the current agent. Filtering happens at assembly time using the `applies_to` metadata stored alongside content in session state. Skills without an `applies_to` field are delivered to all agents. Skills are ordered by priority in the assembled instructions.
 
-```python
-coder = LlmAgent(
-    name="coder",
-    instruction="""
-    Implement the deliverable according to the plan.
+For workers, the assembler reads `loaded_skills` from session state (written by `SkillLoaderAgent`) and filters per-agent. For Director/PM, skills are already in the `InstructionContext` from build-time resolution and are filtered identically by the assembler.
 
-    Implementation plan:
-    {implementation_plan}
-
-    Project conventions and patterns to follow:
-    {loaded_skills}
-
-    Project coding standards:
-    {app:coding_standards}
-    """,
-    output_key="code_output",
-)
-```
-
-The `metadata.applies_to` field in skill frontmatter controls which agents receive the skill. If a skill specifies `metadata.applies_to: [coder, reviewer]`, the `InstructionAssembler` (Decision #50) filters loaded skills during `assemble()` to only include those relevant to the current agent. The assembler composes SKILL-type fragments from loaded skills alongside IDENTITY, GOVERNANCE, PROJECT, and TASK fragments into the final instruction string.
+The assembler composes SKILL-type fragments from loaded skills alongside IDENTITY, GOVERNANCE, PROJECT, and TASK fragments into the final instruction string.
 
 ---
 
@@ -404,19 +450,47 @@ Cascaded skills respect the same two-tier override rules: a project-local skill 
 
 ---
 
+## Autonomous Skill Creation
+
+Agents (Director, PM, or workers) can create new SKILL.md files during execution, guided by the `skill-authoring` skill. This enables the system to encode learned patterns as reusable knowledge without human intervention.
+
+### How It Works
+
+1. An agent writes a SKILL.md file to the project-local skills directory (`.agents/skills/`) via standard file tools
+2. The system validates the file's frontmatter against the same rules used during indexing (required `name` and `description` fields, valid YAML)
+3. On the next cache rebuild or explicit invalidation, the new skill is indexed and available to all subsequent pipeline executions
+4. Project-local override rules apply normally -- a new skill with the same `name` as a global skill replaces it for that project
+
+### Validation
+
+The frontmatter validation logic is available as a callable function that agents or tools can invoke before writing. This allows pre-validation without requiring a cache rebuild to discover errors.
+
+### The Skill-Authoring Skill
+
+The `skill-authoring` global skill teaches agents how to produce valid SKILL.md files. It covers frontmatter structure, trigger design, progressive disclosure principles (body under 3000 words, detailed content in `references/`), and includes a `references/skill-template.md` with all supported frontmatter fields annotated.
+
+### Constraints
+
+- **No self-updating skills.** Skills cannot edit their own SKILL.md based on performance feedback (deferred to Phase 7+).
+- **No `scripts/` execution.** Skills can include scripts in their directory for reference, but automatic execution is deferred.
+- **No marketplace.** The file format is the interop layer. Drop SKILL.md files in the project directory.
+
+---
+
 ## Scope Estimate
 
-The core skills implementation is approximately 300-400 lines of Python:
+The core skills implementation is approximately 320-400 lines of Python:
 
 | Component | Estimated Lines | Responsibility |
 |---|---|---|
-| `SkillEntry` | ~30 | Pydantic model for frontmatter metadata |
-| `SkillLibrary` | ~120 | Index building, matching, loading, two-tier scan |
-| `SkillLoaderAgent` | ~55 | CustomAgent that runs matching, cascade resolution, and writes state |
-| `Frontmatter parser` | ~30 | YAML frontmatter extraction from markdown files |
-| `Trigger matchers` | ~60 | Per-type matching logic (exact, glob, set intersection) |
-| `InstructionAssembler integration` | ~40 | Filter loaded skills by `applies_to` per agent (SKILL fragments) |
-| **Total** | **~335** | |
+| `SkillEntry` | ~40 | Pydantic model for frontmatter metadata (expanded: triggers, tags, priority, cascades, path) |
+| `SkillLibrary` | ~130 | Index building, matching, loading, two-tier scan, Redis caching |
+| `SkillLoaderAgent` | ~55 | CustomAgent that runs matching, cascade resolution, and writes state (workers only) |
+| `Frontmatter parser` | ~35 | YAML frontmatter extraction from markdown files, validation function |
+| `Trigger matchers` | ~60 | Per-type matching logic (exact, glob, set intersection, description keyword fallback) |
+| `InstructionAssembler integration` | ~50 | Filter loaded skills by `applies_to` per agent (SKILL fragments), curly brace escaping |
+| `Build-time resolution` | ~20 | Director/PM skill matching at agent construction (call sites in build functions) |
+| **Total** | **~390** | |
 
 This is disproportionate value for the effort. Skills transform agents from generic LLM wrappers into project-aware specialists. Without skills, deliverable 47 gets the same generic instructions as deliverable 1. With skills, deliverable 47 gets the domain-specific conventions, patterns, and requirements relevant to its type — whether that's API endpoint conventions for code, citation standards for research, or brand guidelines for marketing.
 
@@ -431,6 +505,6 @@ This is disproportionate value for the effort. Skills transform agents from gene
 
 ---
 
-**Document Version:** 3.0
-**Last Updated:** 2026-03-07
-**Status:** Framework Validated -- Prototyping Phase
+**Document Version:** 4.0
+**Last Updated:** 2026-03-11
+**Status:** Framework Validated -- Phase 6 FRD Findings Propagated

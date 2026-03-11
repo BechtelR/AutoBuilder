@@ -202,7 +202,7 @@ Supervision hierarchy: Director operates as stateless root_agent (recreated per 
 
 
 ### Scope Summary
-Skill library adopting the Agent Skills open standard file format (`SKILL.md`) with deterministic loading runtime. Two-tier architecture: global skills (`app/skills/`) and project-local skills (`.agents/skills/` in user repo) with override semantics. Trigger matchers (deliverable_type, file_pattern, tag_match, explicit, always) with OR-logic. InstructionAssembler integration injecting filtered skills per agent. Initial skill set covering API endpoints, data models, migrations, security review, unit tests, and task decomposition. Authoring skills for system artifacts: agent-definition, skill-authoring, workflow-authoring, project-conventions. Redis-cached skill index.
+Skill library adopting the Agent Skills open standard file format (`SKILL.md`) with deterministic loading runtime. Three-layer deterministic skill loading model: (1) role-bound skills via `always` trigger + `applies_to` field, (2) context-matched skills via trigger matching against deliverable metadata, (3) explicit override via `requested_skills` in session state. Two-tier architecture: global skills (`app/skills/`) and project-local skills (`.agents/skills/` in user repo) with override semantics. Five trigger matchers (deliverable_type, file_pattern, tag_match, explicit, always) with OR-logic and cascade resolution. Supervision-tier skill resolution: Director and PM receive skills at agent build time via the same matching engine (role-bound + explicit), not at pipeline runtime. `applies_to` filtering in InstructionAssembler so each agent receives only relevant skills. Autonomous skill creation: agents create new skills via file tools, validated and indexed on cache rebuild. Initial skill library: 7 domain skills (API endpoints, data models, migrations, security review, performance review, unit tests, task decomposition) + 4 authoring skills (skill-authoring, agent-definition, workflow-authoring, project-conventions) = 11 shipped skills. Redis-cached skill index with atomic invalidation. 11 capabilities, 55 functional requirements, 6 NFRs.
 
 ### Completion Contract
 
@@ -212,7 +212,10 @@ Skill library adopting the Agent Skills open standard file format (`SKILL.md`) w
 | | Skills appear in unified event stream | PR-34 |
 | | `loaded_skill_names` in state shows exactly which skills loaded | PR-32 |
 | | Project-local skills override globals with same name | PR-33 |
-| | ~320 lines total implementation | — |
+| | Director and PM receive independently resolved skills at build time (not pipeline runtime) | PR-13, PR-14 |
+| | `applies_to` filtering delivers per-agent skill content in assembled instructions | PR-5a |
+| | Agents can create valid skill files; new skills indexed on cache rebuild | PR-33 |
+| | ~320 lines core implementation (skill content and tests additional) | — |
 
 ---
 
@@ -455,7 +458,7 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 4: Core Toolset | `M` | 42 FunctionTools (8 categories), Director queue, three-tier tasks |
 | 5a: Agent Definitions & Pipeline | `L-` | Agent definition files, InstructionAssembler, AgentRegistry, DeliverablePipeline, forward-dependency contracts |
 | 5b: Supervision & Integration | `M` | Director + PM hierarchy, PM loop (sequential), CEO queue, state key auth |
-| 6: Skills System | `M` | SkillLibrary, two-tier matching, initial skills |
+| 6: Skills System | `M` | SkillLibrary, three-layer loading, supervision-tier resolution, 11 initial skills |
 | 7: Workflow Composition | `M` | WorkflowRegistry, auto-code workflow, WORKFLOW.yaml |
 | 8: Spec Pipeline | `L` | PM-driven batch loop, spec decomposition, git worktrees |
 | 9: Memory Service | `M` | PostgresMemoryService, cross-session search |
@@ -480,6 +483,7 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 2026-02-17 | Roadmap v2: slim format, BOM split to 07-COMPONENTS.md |
 | 2026-02-18 | Phase 4 DONE |
 | 2026-03-10 | Phase 5 scope finalized (Decisions #50-58); split into 5a + 5b; FRDs written |
+| 2026-03-11 | Phase 6 scope updated from FRD: three-layer loading model, supervision-tier resolution, autonomous creation, `applies_to` filtering, 11 initial skills; completion contract expanded from 5→8 items |
 | 2026-03-11 | All open questions resolved (Decisions #59-67); migrated to `.decision-log.md` |
 
 ---

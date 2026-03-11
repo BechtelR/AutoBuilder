@@ -123,7 +123,7 @@ fallback_chains:
   anthropic/claude-sonnet-4-6: ["anthropic/claude-haiku-4-5-20251001"]
 ```
 
-Phase 1 implements static routing (model_role to model lookup table). Adaptive routing with cost tracking and latency monitoring deferred to Phase 2.
+Phase 3 implements static routing (model_role to model lookup table). Adaptive routing with cost tracking and latency monitoring deferred to Phase 11.
 
 ### 1.5 Gateway API: FastAPI
 
@@ -205,7 +205,7 @@ Shared domain definitions live in `app/models/`:
 
 **Choice**: typer for the command-line interface
 
-**Rationale**: The CLI is the primary user interface for Phase 1 (web dashboard is Phase 3). typer provides a modern, type-hint-driven CLI framework built on top of click. It auto-generates help text from type annotations and supports subcommands, options, and arguments with minimal boilerplate.
+**Rationale**: The CLI is the primary user interface for Phase 10 (web dashboard is Phase 12). typer provides a modern, type-hint-driven CLI framework built on top of click. It auto-generates help text from type annotations and supports subcommands, options, and arguments with minimal boilerplate.
 
 **CLI requirements**:
 - Start/stop autonomous runs
@@ -317,7 +317,7 @@ Redis Streams enable reliable SSE: when a dashboard client disconnects and recon
 
 **OpenTelemetry**: ADK has native OpenTelemetry integration for distributed tracing. All agent executions, tool calls, and state transitions are traced automatically.
 
-**Langfuse** (Phase 2): Open-source, self-hosted LLM observability platform. Provides token usage tracking, cost monitoring, prompt versioning, and evaluation metrics specific to LLM workloads. Complements OpenTelemetry's general tracing with LLM-specific insights.
+**Langfuse** (Phase 11): Open-source, self-hosted LLM observability platform. Provides token usage tracking, cost monitoring, prompt versioning, and evaluation metrics specific to LLM workloads. Complements OpenTelemetry's general tracing with LLM-specific insights.
 
 ---
 
@@ -392,6 +392,7 @@ Key decisions with rationale, collected for reference:
 | Database topology | Single database | Split databases | Gateway API is THE system; dashboard is a pure consumer; no reason for interfaces to have their own persistence |
 | Dashboard ORM | None (codegen) | Drizzle / Prisma | Dashboard has no database; type safety comes from OpenAPI codegen, not an ORM |
 | ADK integration | Anti-corruption layer | Direct coupling | Isolates framework-specific APIs; enables framework replacement without cascading changes |
+| Skill file format | Agent Skills open standard | Custom format | Cross-platform interoperability (agentskills.io); deterministic trigger matching is custom, file format is standard |
 | Database engine | PostgreSQL + pgvector | SQLite (dev) + PostgreSQL (prod) | Concurrent worker access, vector search built-in, eliminates dev/prod divergence, Docker already required for Redis |
 
 ---
@@ -494,8 +495,8 @@ testpaths = ["tests"]
 | `redis[hiredis]` | Task queue backend, event bus (Streams), cache |
 | `pydantic` | Single source of truth for types; structured outputs; validation; settings |
 | `httpx` | Async HTTP client for webhooks and external API calls |
-| `typer` | CLI framework for Phase 1 user interface |
-| `pyyaml` | Skill frontmatter parsing; workflow manifest parsing; routing config |
+| `typer` | CLI framework for Phase 10 user interface |
+| `pyyaml` | Skill frontmatter parsing (Agent Skills open standard YAML); workflow manifest parsing; routing config |
 
 ### What Is NOT Included
 
@@ -513,5 +514,5 @@ testpaths = ["tests"]
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: 2026-02-11*
+*Document Version: 2.1*
+*Last Updated: 2026-03-11*
