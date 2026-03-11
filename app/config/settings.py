@@ -4,6 +4,7 @@ from functools import lru_cache
 from urllib.parse import urlparse
 
 from arq.connections import RedisSettings
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -20,6 +21,14 @@ class Settings(BaseSettings):
     default_fast_model: str = "anthropic/claude-haiku-4-5-20251001"
 
     search_provider: str = "tavily"
+    context_budget_threshold: int = 80
+
+    @field_validator("context_budget_threshold")
+    @classmethod
+    def _validate_threshold(cls, v: int) -> int:
+        if not 0 <= v <= 100:
+            raise ValueError("context_budget_threshold must be between 0 and 100")
+        return v
 
     model_config = {
         "env_prefix": "AUTOBUILDER_",

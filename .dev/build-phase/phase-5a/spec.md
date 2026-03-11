@@ -119,24 +119,24 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 **Depends on:** —
 **Description:** Add CeoQueueStatus enum. Add SQLAlchemy mapped models for ceo_queue, director_queue, and project_configs tables using the established TimestampMixin pattern. Create a single Alembic migration for all three tables. CeoItemType, EscalationPriority, EscalationRequestType, and DirectorQueueStatus enums already exist in `app/models/enums.py`.
 **BOM Components:**
-- [ ] `D05` — `ceo_queue` table
-- [ ] `D08` — `project_configs` table
-- [ ] `D16` — CEO queue migration
-- [ ] `D19` — Project configs migration
-- [ ] `V13` — CEO queue type enum (`CeoItemType` — exists, verify usage)
-- [ ] `V14` — CEO queue priority enum (`EscalationPriority` — exists, verify usage)
-- [ ] `V15` — CEO queue status enum (`CeoQueueStatus` — new)
-- [ ] `V23` — `director_queue` table
-- [ ] `V24` — `director_queue` migration
+- [x] `D05` — `ceo_queue` table
+- [x] `D08` — `project_configs` table
+- [x] `D16` — CEO queue migration
+- [x] `D19` — Project configs migration
+- [x] `V13` — CEO queue type enum (`CeoItemType` — exists, verify usage)
+- [x] `V14` — CEO queue priority enum (`EscalationPriority` — exists, verify usage)
+- [x] `V15` — CEO queue status enum (`CeoQueueStatus` — new)
+- [x] `V23` — `director_queue` table
+- [x] `V24` — `director_queue` migration
 **Requirements:**
-- [ ] `CeoQueueStatus` enum exists in `app/models/enums.py` with values `PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`
-- [ ] `CeoQueueItem` model exists with fields: id (UUID PK), type (CeoItemType), priority (EscalationPriority), status (CeoQueueStatus), message (str), source_project_id (UUID, nullable, indexed), source_agent (str), metadata (JSONB, nullable), session_id (str, nullable), created_at, updated_at
-- [ ] `DirectorQueueItem` model exists with fields: id (UUID PK), type (EscalationRequestType), priority (EscalationPriority), status (DirectorQueueStatus), context (str), source_project_id (UUID, nullable, indexed), source_agent (str), metadata (JSONB, nullable), created_at, updated_at
-- [ ] `ProjectConfig` model exists with fields: id (UUID PK), project_id (UUID, unique, indexed), name (str), config (JSONB), created_at, updated_at
-- [ ] All models use `TimestampMixin` and follow existing patterns in `app/db/models.py`
-- [ ] Migration creates all three tables and applies cleanly with `alembic upgrade head`
-- [ ] Migration uses sequential NNN numbering (not hash-based)
-- [ ] `pyright` passes with strict mode on all modified files
+- [x] `CeoQueueStatus` enum exists in `app/models/enums.py` with values `PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`
+- [x] `CeoQueueItem` model exists with fields: id (UUID PK), type (CeoItemType), priority (EscalationPriority), status (CeoQueueStatus), message (str), source_project_id (UUID, nullable, indexed), source_agent (str), metadata (JSONB, nullable), session_id (str, nullable), created_at, updated_at
+- [x] `DirectorQueueItem` model exists with fields: id (UUID PK), type (EscalationRequestType), priority (EscalationPriority), status (DirectorQueueStatus), context (str), source_project_id (UUID, nullable, indexed), source_agent (str), metadata (JSONB, nullable), created_at, updated_at
+- [x] `ProjectConfig` model exists with fields: id (UUID PK), project_id (UUID, unique, indexed), name (str), config (JSONB), created_at, updated_at
+- [x] All models use `TimestampMixin` and follow existing patterns in `app/db/models.py`
+- [x] Migration creates all three tables and applies cleanly with `alembic upgrade head`
+- [x] Migration uses sequential NNN numbering (not hash-based)
+- [x] `pyright` passes with strict mode on all modified files
 **Validation:**
 - `uv run alembic upgrade head` — migration applies without error
 - `uv run pyright app/db/models.py app/models/enums.py`
@@ -149,34 +149,34 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 **Depends on:** —
 **Description:** Implement the InstructionAssembler that composes typed fragments into agent instructions. Includes InstructionFragment dataclass, InstructionContext container, 6 fragment types with SAFETY hardcoded and non-overridable, curly brace escaping for SKILL/PROJECT fragments, source auditability, and {key}/{key?} placeholder preservation. Also implements the `context_from_state` helper for custom agents to read typed state values, the SkillLibraryProtocol with NullSkillLibrary stub, and the project config loader function.
 **BOM Components:**
-- [ ] `A52` — InstructionAssembler — fragment-based instruction composition
-- [ ] `A53` — InstructionFragment dataclass
-- [ ] `A57` — Base instruction fragments (6 types: SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL)
-- [ ] `A75` — SAFETY instruction fragment (hardcoded, non-overridable)
-- [ ] `A76` — InstructionContext container (per-invocation assembly data)
-- [ ] `A51` — `{key}` state template injection (placeholder preservation)
-- [ ] `M05` — State template injection (`{key}` / `{key?}`)
-- [ ] `A54` — `context_from_state` helper
-- [ ] `M06` — Project config loader (tool or init callback)
-- [ ] `A43` — `before_model_callback` context injection
+- [x] `A52` — InstructionAssembler — fragment-based instruction composition
+- [x] `A53` — InstructionFragment dataclass
+- [x] `A57` — Base instruction fragments (6 types: SAFETY, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL)
+- [x] `A75` — SAFETY instruction fragment (hardcoded, non-overridable)
+- [x] `A76` — InstructionContext container (per-invocation assembly data)
+- [x] `A51` — `{key}` state template injection (placeholder preservation)
+- [x] `M05` — State template injection (`{key}` / `{key?}`)
+- [x] `A54` — `context_from_state` helper
+- [x] `M06` — Project config loader (tool or init callback)
+- [x] `A43` — `before_model_callback` context injection
 **Requirements:**
-- [ ] `InstructionFragment` is a dataclass with fields: `fragment_type` (str), `content` (str), `source` (str)
-- [ ] `InstructionContext` is a frozen dataclass with fields: `project_config` (str | None), `task_context` (str | None), `loaded_skills` (dict[str, str]), `agent_name` (str)
-- [ ] `InstructionAssembler.assemble()` accepts agent_name, body (str), and InstructionContext; returns assembled instruction string
-- [ ] SAFETY fragment is always prepended and is identical regardless of inputs (hardcoded content, source="hardcoded")
-- [ ] Fragment assembly order: SAFETY → IDENTITY/GOVERNANCE (from body) → PROJECT → TASK → SKILL
-- [ ] Literal `{` and `}` in PROJECT and SKILL fragment content are escaped to `{{` and `}}`, except declared `{key}` and `{key?}` patterns
-- [ ] `InstructionAssembler.get_sources()` returns a list of `(fragment_type, source)` tuples for the last assembly (auditability)
-- [ ] When PROJECT config is None, the PROJECT fragment is omitted; assembly succeeds
-- [ ] When task_context is None, the TASK fragment is omitted; assembly succeeds
-- [ ] When loaded_skills is empty, the SKILL fragment is omitted; assembly succeeds
-- [ ] Identical inputs produce identical output (deterministic — NFR-5a.02)
-- [ ] `context_from_state(state, key, expected_type, required)` returns typed value or raises `ValueError` with clear message for missing required keys
-- [ ] `SkillLibraryProtocol` defines `match_skills(context: dict[str, object]) -> dict[str, str]` method
-- [ ] `NullSkillLibrary` implements `SkillLibraryProtocol` and always returns `{}`
-- [ ] `load_project_config(session, project_id)` loads config from `project_configs` table and returns config dict or None
-- [ ] `compose_callbacks(*callbacks)` chains multiple `before_model_callback` functions; first non-None return wins
-- [ ] Context injection callback writes relevant state keys to `LlmRequest` content (no-op in Phase 5a; wired in Phase 5b)
+- [x] `InstructionFragment` is a dataclass with fields: `fragment_type` (str), `content` (str), `source` (str)
+- [x] `InstructionContext` is a frozen dataclass with fields: `project_config` (str | None), `task_context` (str | None), `loaded_skills` (dict[str, str]), `agent_name` (str)
+- [x] `InstructionAssembler.assemble()` accepts agent_name, body (str), and InstructionContext; returns assembled instruction string
+- [x] SAFETY fragment is always prepended and is identical regardless of inputs (hardcoded content, source="hardcoded")
+- [x] Fragment assembly order: SAFETY → IDENTITY/GOVERNANCE (from body) → PROJECT → TASK → SKILL
+- [x] Literal `{` and `}` in PROJECT and SKILL fragment content are escaped to `{{` and `}}`, except declared `{key}` and `{key?}` patterns
+- [x] `InstructionAssembler.get_sources()` returns a list of `(fragment_type, source)` tuples for the last assembly (auditability)
+- [x] When PROJECT config is None, the PROJECT fragment is omitted; assembly succeeds
+- [x] When task_context is None, the TASK fragment is omitted; assembly succeeds
+- [x] When loaded_skills is empty, the SKILL fragment is omitted; assembly succeeds
+- [x] Identical inputs produce identical output (deterministic — NFR-5a.02)
+- [x] `context_from_state(state, key, expected_type, required)` returns typed value or raises `ValueError` with clear message for missing required keys
+- [x] `SkillLibraryProtocol` defines `match_skills(context: dict[str, object]) -> dict[str, str]` method
+- [x] `NullSkillLibrary` implements `SkillLibraryProtocol` and always returns `{}`
+- [x] `load_project_config(session, project_id)` loads config from `project_configs` table and returns config dict or None
+- [x] `compose_callbacks(*callbacks)` chains multiple `before_model_callback` functions; first non-None return wins
+- [x] Context injection callback writes relevant state keys to `LlmRequest` content (no-op in Phase 5a; wired in Phase 5b)
 **Validation:**
 - `uv run pyright app/agents/assembler.py app/agents/protocols.py app/agents/state_helpers.py`
 - `uv run pytest tests/agents/test_assembler.py tests/agents/test_state_helpers.py -v`
@@ -188,34 +188,34 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 **Depends on:** P5a.D2
 **Description:** AgentRegistry scans agent definition directories for `.md` files, parses YAML frontmatter and instruction bodies, resolves the 3-scope file cascade (global → workflow → project), validates definitions, and builds configured ADK agents (LlmAgent and CustomAgent) on demand. Includes class registry for CustomAgent type resolution, partial override support, project-scope type:custom rejection, and resolution auditability via session state.
 **BOM Components:**
-- [ ] `A55` — Agent definition files (markdown + YAML frontmatter format)
-- [ ] `A56` — AgentRegistry class (scan + build from files)
-- [ ] `A77` — Partial override (frontmatter-only definition files inherit parent body)
-- [ ] `A78a` — Project-scope type validation (`type: llm` only from project scope)
-- [ ] `A80` — Resolution auditability (`agent_resolution_sources` session state key)
-- [ ] `A50` — `output_key` state communication (set on built agents)
-- [ ] `E02` — Agent tree construction (via `AgentRegistry.build()`)
-- [ ] `E03` — PM agent construction (via `AgentRegistry.build()`)
+- [x] `A55` — Agent definition files (markdown + YAML frontmatter format)
+- [x] `A56` — AgentRegistry class (scan + build from files)
+- [x] `A77` — Partial override (frontmatter-only definition files inherit parent body)
+- [x] `A78a` — Project-scope type validation (`type: llm` only from project scope)
+- [x] `A80` — Resolution auditability (`agent_resolution_sources` session state key)
+- [x] `A50` — `output_key` state communication (set on built agents)
+- [x] `E02` — Agent tree construction (via `AgentRegistry.build()`)
+- [x] `E03` — PM agent construction (via `AgentRegistry.build()`)
 **Requirements:**
-- [ ] `AgentRegistry.__init__(global_dir, workflow_dir=None, project_dir=None)` accepts 1-3 directory paths
-- [ ] `AgentRegistry.scan()` discovers all `.md` files in provided directories and indexes by agent name (filename stem)
-- [ ] Scanning extracts frontmatter (name, description, type, tool_role, model_role, output_key, class, applies_to) and instruction body
-- [ ] Required frontmatter fields: `name`, `description`, `type`; missing any → rejection with file path and field name
-- [ ] Unknown `type` values (not "llm" or "custom") → rejection with file path
-- [ ] 3-scope cascade: project-scope file overrides workflow-scope overrides global-scope, matched by filename stem
-- [ ] Partial override: definition file with no content after closing `---` (only whitespace) inherits parent scope's body
-- [ ] Partial override: frontmatter fields from child scope merge over parent scope's frontmatter
-- [ ] Full override: any non-whitespace content after `---` replaces the parent body entirely
-- [ ] Project-scope definition with `type: custom` → rejection with error identifying file path (FR-5a.05)
-- [ ] Name collision (two files in same scope with same `name` frontmatter) → rejection of both with file paths (FR-5a.10)
-- [ ] `AgentRegistry.build(name, ctx, definition=None)` builds a configured agent; `definition` param overrides lookup key (e.g., `build("PM_proj1", ctx, definition="pm")`)
-- [ ] For `type: llm`: builds `LlmAgent` with model from `LlmRouter.select_model(model_role)`, tools from `GlobalToolset` for `tool_role`, instruction from `InstructionAssembler.assemble()`, `output_key` set on agent
-- [ ] For `type: custom`: resolves `class` field via class registry dict, instantiates with `model_role` for hybrids and `instruction_body` if present
-- [ ] Missing agent name (no definition in any scope) → raises error (FR-5a.09)
-- [ ] Resolution auditability: builds a dict of `{agent_name: {scope, file_path, partial_override}}` and writes to session state key `agent_resolution_sources`
-- [ ] Class registry: `dict[str, type[BaseAgent]]` mapping string names to Python CustomAgent types; populated via explicit registration
-- [ ] Scan completes within 2 seconds for all global-scope definition files (NFR-5a.01); scan results cached for subsequent builds
-- [ ] `pyright` passes with strict mode
+- [x] `AgentRegistry.__init__(global_dir, workflow_dir=None, project_dir=None)` accepts 1-3 directory paths
+- [x] `AgentRegistry.scan()` discovers all `.md` files in provided directories and indexes by agent name (filename stem)
+- [x] Scanning extracts frontmatter (name, description, type, tool_role, model_role, output_key, class, applies_to) and instruction body
+- [x] Required frontmatter fields: `name`, `description`, `type`; missing any → rejection with file path and field name
+- [x] Unknown `type` values (not "llm" or "custom") → rejection with file path
+- [x] 3-scope cascade: project-scope file overrides workflow-scope overrides global-scope, matched by filename stem
+- [x] Partial override: definition file with no content after closing `---` (only whitespace) inherits parent scope's body
+- [x] Partial override: frontmatter fields from child scope merge over parent scope's frontmatter
+- [x] Full override: any non-whitespace content after `---` replaces the parent body entirely
+- [x] Project-scope definition with `type: custom` → rejection with error identifying file path (FR-5a.05)
+- [x] Name collision (two files in same scope with same `name` frontmatter) → rejection of both with file paths (FR-5a.10)
+- [x] `AgentRegistry.build(name, ctx, definition=None)` builds a configured agent; `definition` param overrides lookup key (e.g., `build("PM_proj1", ctx, definition="pm")`)
+- [x] For `type: llm`: builds `LlmAgent` with model from `LlmRouter.select_model(model_role)`, tools from `GlobalToolset` for `tool_role`, instruction from `InstructionAssembler.assemble()`, `output_key` set on agent
+- [x] For `type: custom`: resolves `class` field via class registry dict, instantiates with `model_role` for hybrids and `instruction_body` if present
+- [x] Missing agent name (no definition in any scope) → raises error (FR-5a.09)
+- [x] Resolution auditability: builds a dict of `{agent_name: {scope, file_path, partial_override}}` and writes to session state key `agent_resolution_sources`
+- [x] Class registry: `dict[str, type[BaseAgent]]` mapping string names to Python CustomAgent types; populated via explicit registration
+- [x] Scan completes within 2 seconds for all global-scope definition files (NFR-5a.01); scan results cached for subsequent builds
+- [x] `pyright` passes with strict mode
 **Validation:**
 - `uv run pyright app/agents/_registry.py`
 - `uv run pytest tests/agents/test_registry.py -v`
@@ -227,25 +227,25 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 **Depends on:** P5a.D3
 **Description:** Author all 6 LLM agent definition files as markdown with YAML frontmatter. Each file defines the agent's identity, governance rules, tool_role, model_role, output_key, and instruction body. Director and PM definitions are configurations only — their supervision behavior (delegation, escalation, callbacks) is Phase 5b. Worker agents (planner, coder, reviewer, fixer) have complete instruction bodies for pipeline execution.
 **BOM Components:**
-- [ ] `A01` — Director agent (LlmAgent, opus)
-- [ ] `A02` — PM agent (LlmAgent, sonnet)
-- [ ] `A03` — Director agent definition file (`director.md`)
-- [ ] `A04` — PM agent definition file (`pm.md`)
-- [ ] `A20` — `planner` (LlmAgent, opus)
-- [ ] `A21` — `coder` (LlmAgent, sonnet)
-- [ ] `A22` — `reviewer` (LlmAgent, sonnet)
-- [ ] `A23` — `fixer` (LlmAgent, sonnet)
+- [x] `A01` — Director agent (LlmAgent, opus)
+- [x] `A02` — PM agent (LlmAgent, sonnet)
+- [x] `A03` — Director agent definition file (`director.md`)
+- [x] `A04` — PM agent definition file (`pm.md`)
+- [x] `A20` — `planner` (LlmAgent, opus)
+- [x] `A21` — `coder` (LlmAgent, sonnet)
+- [x] `A22` — `reviewer` (LlmAgent, sonnet)
+- [x] `A23` — `fixer` (LlmAgent, sonnet)
 **Requirements:**
-- [ ] Each file has valid YAML frontmatter with required fields (name, description, type: llm)
-- [ ] `director.md`: name=director, model_role=plan, tool_role=director, output_key=director_response. Body covers cross-project governance, CEO communication, PM delegation intent (wired in Phase 5b)
-- [ ] `pm.md`: name=pm, model_role=plan, tool_role=pm, output_key=pm_response. Body covers project management, batch strategy, quality oversight, escalation protocol (wired in Phase 5b)
-- [ ] `planner.md`: name=planner, model_role=plan, tool_role=planner, output_key=implementation_plan. Body instructs structured plan output consumable by coder, references `{current_deliverable_spec}` and `{loaded_skills}`
-- [ ] `coder.md`: name=coder, model_role=code, tool_role=coder, output_key=code_output. Body instructs implementation from plan, references `{implementation_plan}` and `{loaded_skills}`
-- [ ] `reviewer.md`: name=reviewer, model_role=review, tool_role=reviewer, output_key=review_result. Body instructs structured review (pass/fail with findings), references `{code_output}`, `{lint_results}`, `{test_results}`
-- [ ] `fixer.md`: name=fixer, model_role=code, tool_role=fixer, output_key=code_output. Body instructs targeted fixes from review, references `{review_result}`. Note: output_key=code_output (overwrites coder's output — intentional for review cycle)
-- [ ] All files parseable by AgentRegistry.scan() without errors
-- [ ] All files buildable by AgentRegistry.build() into configured LlmAgent instances
-- [ ] `{key}` placeholders in instruction bodies reference valid state keys that will exist at runtime
+- [x] Each file has valid YAML frontmatter with required fields (name, description, type: llm)
+- [x] `director.md`: name=director, model_role=plan, tool_role=director, output_key=director_response. Body covers cross-project governance, CEO communication, PM delegation intent (wired in Phase 5b)
+- [x] `pm.md`: name=pm, model_role=plan, tool_role=pm, output_key=pm_response. Body covers project management, batch strategy, quality oversight, escalation protocol (wired in Phase 5b)
+- [x] `planner.md`: name=planner, model_role=plan, tool_role=planner, output_key=implementation_plan. Body instructs structured plan output consumable by coder, references `{current_deliverable_spec}` and `{loaded_skills}`
+- [x] `coder.md`: name=coder, model_role=code, tool_role=coder, output_key=code_output. Body instructs implementation from plan, references `{implementation_plan}` and `{loaded_skills}`
+- [x] `reviewer.md`: name=reviewer, model_role=review, tool_role=reviewer, output_key=review_result. Body instructs structured review (pass/fail with findings), references `{code_output}`, `{lint_results}`, `{test_results}`
+- [x] `fixer.md`: name=fixer, model_role=code, tool_role=fixer, output_key=code_output. Body instructs targeted fixes from review, references `{review_result}`. Note: output_key=code_output (overwrites coder's output — intentional for review cycle)
+- [x] All files parseable by AgentRegistry.scan() without errors
+- [x] All files buildable by AgentRegistry.build() into configured LlmAgent instances
+- [x] `{key}` placeholders in instruction bodies reference valid state keys that will exist at runtime
 **Validation:**
 - `uv run pytest tests/agents/test_registry.py -k "test_build_llm" -v`
 
@@ -256,26 +256,26 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 **Depends on:** P5a.D2, P5a.D3
 **Description:** Implement 6 deterministic CustomAgent subclasses and their definition files. Each agent overrides `_run_async_impl`, reads upstream state, performs its operation, and writes results to session state via `Event(actions=EventActions(state_delta={...}))`. SkillLoaderAgent uses NullSkillLibrary (empty results). MemoryLoaderAgent uses InMemoryMemoryService (empty results, graceful degradation). Linter/TestRunner/Formatter execute configurable commands. RegressionTestAgent is defined and buildable but not integrated into batch execution (Phase 8).
 **BOM Components:**
-- [ ] `A30` — SkillLoaderAgent (CustomAgent)
-- [ ] `A31` — LinterAgent (CustomAgent)
-- [ ] `A32` — TestRunnerAgent (CustomAgent)
-- [ ] `A33` — FormatterAgent (CustomAgent)
-- [ ] `A35` — RegressionTestAgent (CustomAgent)
-- [ ] `A37` — MemoryLoaderAgent (CustomAgent)
-- [ ] `M15` — MemoryLoaderAgent (state.md cross-reference)
+- [x] `A30` — SkillLoaderAgent (CustomAgent)
+- [x] `A31` — LinterAgent (CustomAgent)
+- [x] `A32` — TestRunnerAgent (CustomAgent)
+- [x] `A33` — FormatterAgent (CustomAgent)
+- [x] `A35` — RegressionTestAgent (CustomAgent)
+- [x] `A37` — MemoryLoaderAgent (CustomAgent)
+- [x] `M15` — MemoryLoaderAgent (state.md cross-reference)
 **Requirements:**
-- [ ] All agents extend `BaseAgent` and override `_run_async_impl` with `# type: ignore[override]`
-- [ ] All state writes use `yield Event(author=self.name, actions=EventActions(state_delta={...}))` — never direct `ctx.session.state["key"] = val`
-- [ ] SkillLoaderAgent: queries `SkillLibraryProtocol.match_skills()`, writes `loaded_skills: {}` and `loaded_skill_names: []` with NullSkillLibrary
-- [ ] MemoryLoaderAgent: queries `BaseMemoryService.search_memory()`, writes `memory_context: {}` and `memory_loaded: true` with InMemoryMemoryService
-- [ ] MemoryLoaderAgent: on service error, writes `memory_context: {}`, `memory_loaded: false` and logs warning; does not raise
-- [ ] LinterAgent: reads project config for linter command (default: `ruff check .`), runs via subprocess, writes structured `lint_results` (pass/fail, file locations, messages) and `lint_passed` (bool) to state
-- [ ] TestRunnerAgent: reads project config for test command (default: `pytest`), runs via subprocess, writes structured `test_results` (pass/fail, test names, output) and `tests_passed` (bool) to state
-- [ ] FormatterAgent: reads project config for formatter command (default: `ruff format .`), runs via subprocess, writes summary of changes to state
-- [ ] RegressionTestAgent: defined with valid definition file and CustomAgent implementation; buildable by AgentRegistry; no pipeline integration (Phase 8)
-- [ ] Each agent implementation ≤ 150 lines (NFR-5a.05)
-- [ ] Each definition file has valid frontmatter with `type: custom` and `class` field matching the class registry key
-- [ ] All agents registered in class registry in `_registry.py`
+- [x] All agents extend `BaseAgent` and override `_run_async_impl` with `# type: ignore[override]`
+- [x] All state writes use `yield Event(author=self.name, actions=EventActions(state_delta={...}))` — never direct `ctx.session.state["key"] = val`
+- [x] SkillLoaderAgent: queries `SkillLibraryProtocol.match_skills()`, writes `loaded_skills: {}` and `loaded_skill_names: []` with NullSkillLibrary
+- [x] MemoryLoaderAgent: queries `BaseMemoryService.search_memory()`, writes `memory_context: {}` and `memory_loaded: true` with InMemoryMemoryService
+- [x] MemoryLoaderAgent: on service error, writes `memory_context: {}`, `memory_loaded: false` and logs warning; does not raise
+- [x] LinterAgent: reads project config for linter command (default: `ruff check .`), runs via subprocess, writes structured `lint_results` (pass/fail, file locations, messages) and `lint_passed` (bool) to state
+- [x] TestRunnerAgent: reads project config for test command (default: `pytest`), runs via subprocess, writes structured `test_results` (pass/fail, test names, output) and `tests_passed` (bool) to state
+- [x] FormatterAgent: reads project config for formatter command (default: `ruff format .`), runs via subprocess, writes summary of changes to state
+- [x] RegressionTestAgent: defined with valid definition file and CustomAgent implementation; buildable by AgentRegistry; no pipeline integration (Phase 8)
+- [x] Each agent implementation ≤ 150 lines (NFR-5a.05)
+- [x] Each definition file has valid frontmatter with `type: custom` and `class` field matching the class registry key
+- [x] All agents registered in class registry in `_registry.py`
 **Validation:**
 - `uv run pyright app/agents/custom/`
 - `uv run pytest tests/agents/test_custom_agents.py -v`
@@ -287,17 +287,17 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 **Depends on:** P5a.D5
 **Description:** Implement 2 hybrid CustomAgent subclasses that combine deterministic control flow with internal LiteLLM calls for classification/synthesis. DependencyResolverAgent analyzes deliverable dependencies using graph resolution with LLM for ambiguous cases. DiagnosticsAgent reads lint/test results and synthesizes actionable diagnostics. Both route internal LLM calls through the LLM Router via model_role.
 **BOM Components:**
-- [ ] `A34` — DependencyResolverAgent (hybrid CustomAgent)
-- [ ] `A36` — DiagnosticsAgent (hybrid CustomAgent)
+- [x] `A34` — DependencyResolverAgent (hybrid CustomAgent)
+- [x] `A36` — DiagnosticsAgent (hybrid CustomAgent)
 **Requirements:**
-- [ ] Both agents extend `BaseAgent`, override `_run_async_impl`, write results via `state_delta`
-- [ ] DependencyResolverAgent: reads deliverable list from state, performs topological sort, uses internal `litellm.acompletion()` (routed via model_role through LlmRouter) for ambiguous dependency classification, writes dependency order to state
-- [ ] DiagnosticsAgent: reads `lint_results` and `test_results` from state, aggregates findings deterministically, uses internal `litellm.acompletion()` for root-cause analysis, writes structured `diagnostics` to state
-- [ ] Internal LiteLLM calls use `LlmRouter.select_model(model_role)` for model selection (FR-5a.34)
-- [ ] Internal LiteLLM calls use the agent's `instruction_body` (from definition file) as system prompt for the internal call
-- [ ] Both definition files have `type: custom`, `class` field, and `model_role` field
-- [ ] Each implementation ≤ 150 lines (NFR-5a.05)
-- [ ] Both agents registered in class registry
+- [x] Both agents extend `BaseAgent`, override `_run_async_impl`, write results via `state_delta`
+- [x] DependencyResolverAgent: reads deliverable list from state, performs topological sort, uses internal `litellm.acompletion()` (routed via model_role through LlmRouter) for ambiguous dependency classification, writes dependency order to state
+- [x] DiagnosticsAgent: reads `lint_results` and `test_results` from state, aggregates findings deterministically, uses internal `litellm.acompletion()` for root-cause analysis, writes structured `diagnostics` to state
+- [x] Internal LiteLLM calls use `LlmRouter.select_model(model_role)` for model selection (FR-5a.34)
+- [x] Internal LiteLLM calls use the agent's `instruction_body` (from definition file) as system prompt for the internal call
+- [x] Both definition files have `type: custom`, `class` field, and `model_role` field
+- [x] Each implementation ≤ 150 lines (NFR-5a.05)
+- [x] Both agents registered in class registry
 **Validation:**
 - `uv run pyright app/agents/custom/dependency_resolver.py app/agents/custom/diagnostics.py`
 - `uv run pytest tests/agents/test_hybrid_agents.py -v`
@@ -309,20 +309,20 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 **Depends on:** —
 **Description:** Implement the ContextBudgetMonitor (a `before_model_callback`) that token-counts the pending LLM request, writes usage percentage to session state, and raises `ContextRecreationRequired` when the configured threshold is exceeded. Also defines the `ContextRecreationRequired` exception class.
 **BOM Components:**
-- [ ] `CT04` — ContextBudgetMonitor (`before_model_callback`)
-- [ ] `CT06` — ContextRecreationRequired exception
+- [x] `CT04` — ContextBudgetMonitor (`before_model_callback`)
+- [x] `CT06` — ContextRecreationRequired exception
 **Requirements:**
-- [ ] `ContextRecreationRequired` is a custom exception (subclass of `Exception`, not `AutoBuilderError`) — it is a control flow signal, not an error
-- [ ] `ContextBudgetMonitor` is a callable matching the `before_model_callback` signature: `(CallbackContext, LlmRequest) -> LlmResponse | None`
-- [ ] Uses `litellm.token_counter(model, text)` to estimate token count of the pending request
-- [ ] Compares estimate against model's context window limit from LiteLLM's `litellm.model_cost` registry
-- [ ] Writes `context_budget_used_pct` (float, e.g., `73.2`) to session state via `callback_context.state`
-- [ ] When usage exceeds configured threshold (default: 80%), raises `ContextRecreationRequired`
-- [ ] Threshold configurable via `Settings` (new field `context_budget_threshold: int = 80`)
-- [ ] Threshold outside 0–100 rejected at startup via Pydantic validator (FR-5a.45)
-- [ ] When model's context window cannot be determined from LiteLLM, logs warning and uses 100,000 token default (FR-5a.46)
-- [ ] Monitor adds ≤ 5ms overhead per call (NFR-5a.03) — no network I/O, just local token counting
-- [ ] `pyright` passes with strict mode
+- [x] `ContextRecreationRequired` is a custom exception (subclass of `Exception`, not `AutoBuilderError`) — it is a control flow signal, not an error
+- [x] `ContextBudgetMonitor` is a callable matching the `before_model_callback` signature: `(CallbackContext, LlmRequest) -> LlmResponse | None`
+- [x] Uses `litellm.token_counter(model, text)` to estimate token count of the pending request
+- [x] Compares estimate against model's context window limit from LiteLLM's `litellm.model_cost` registry
+- [x] Writes `context_budget_used_pct` (float, e.g., `73.2`) to session state via `callback_context.state`
+- [x] When usage exceeds configured threshold (default: 80%), raises `ContextRecreationRequired`
+- [x] Threshold configurable via `Settings` (new field `context_budget_threshold: int = 80`)
+- [x] Threshold outside 0–100 rejected at startup via Pydantic validator (FR-5a.45)
+- [x] When model's context window cannot be determined from LiteLLM, logs warning and uses 100,000 token default (FR-5a.46)
+- [x] Monitor adds ≤ 5ms overhead per call (NFR-5a.03) — no network I/O, just local token counting
+- [x] `pyright` passes with strict mode
 **Validation:**
 - `uv run pyright app/agents/context_monitor.py`
 - `uv run pytest tests/agents/test_context_monitor.py -v`
@@ -334,21 +334,21 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 **Depends on:** P5a.D3, P5a.D4, P5a.D5, P5a.D6, P5a.D7
 **Description:** Implement the DeliverablePipeline factory that composes all agents into a SequentialAgent with an embedded ReviewCycle (LoopAgent). Integrate with the existing worker infrastructure so `run_workflow` can execute a real deliverable through the full pipeline. Wire up the `compose_callbacks` chain (router override → context injection → budget monitor).
 **BOM Components:**
-- [ ] `A60` — DeliverablePipeline (SequentialAgent)
-- [ ] `A61` — ReviewCycle (LoopAgent, max=3)
+- [x] `A60` — DeliverablePipeline (SequentialAgent)
+- [x] `A61` — ReviewCycle (LoopAgent, max=3)
 **Requirements:**
-- [ ] `create_deliverable_pipeline(registry, ctx)` factory function returns a configured SequentialAgent
-- [ ] Pipeline sequence: SkillLoaderAgent → MemoryLoaderAgent → planner → coder → FormatterAgent → LinterAgent → TestRunnerAgent → DiagnosticsAgent → ReviewCycle
-- [ ] ReviewCycle is a LoopAgent with `max_iterations=3` containing: reviewer → fixer → LinterAgent (re-lint) → TestRunnerAgent (re-test)
-- [ ] ReviewCycle terminates early when reviewer writes `review_passed: true` to state (termination mechanism per DD-6)
-- [ ] When ReviewCycle reaches max iterations without approval, deliverable status is marked failed in state with final review findings preserved
-- [ ] All agent outputs preserved in session state after pipeline completion (success or failure) — plan, code output, lint/test results, review findings, fix attempts
-- [ ] Downstream agents read upstream output via `{key}` template injection in instructions or `context_from_state` in CustomAgents
-- [ ] Pipeline wired into `run_workflow` task: when workflow params indicate a deliverable pipeline, the worker constructs and executes a DeliverablePipeline
-- [ ] `compose_callbacks` chains: `create_model_override_callback` → context injection → `ContextBudgetMonitor`
-- [ ] `before_model_callback` on all LLM agents in the pipeline uses the composed callback chain
-- [ ] Pipeline catches `ContextRecreationRequired` at the top level (logs it; actual recreation is Phase 5b)
-- [ ] Single deliverable executes end-to-end through the pipeline (validation: integration test with mocked LLM)
+- [x] `create_deliverable_pipeline(registry, ctx)` factory function returns a configured SequentialAgent
+- [x] Pipeline sequence: SkillLoaderAgent → MemoryLoaderAgent → planner → coder → FormatterAgent → LinterAgent → TestRunnerAgent → DiagnosticsAgent → ReviewCycle
+- [x] ReviewCycle is a LoopAgent with `max_iterations=3` containing: reviewer → fixer → LinterAgent (re-lint) → TestRunnerAgent (re-test)
+- [x] ReviewCycle terminates early when reviewer writes `review_passed: true` to state (termination mechanism per DD-6)
+- [x] When ReviewCycle reaches max iterations without approval, deliverable status is marked failed in state with final review findings preserved
+- [x] All agent outputs preserved in session state after pipeline completion (success or failure) — plan, code output, lint/test results, review findings, fix attempts
+- [x] Downstream agents read upstream output via `{key}` template injection in instructions or `context_from_state` in CustomAgents
+- [x] Pipeline wired into `run_workflow` task: when workflow params indicate a deliverable pipeline, the worker constructs and executes a DeliverablePipeline
+- [x] `compose_callbacks` chains: `create_model_override_callback` → context injection → `ContextBudgetMonitor`
+- [x] `before_model_callback` on all LLM agents in the pipeline uses the composed callback chain
+- [x] Pipeline catches `ContextRecreationRequired` at the top level (logs it; actual recreation is Phase 5b)
+- [x] Single deliverable executes end-to-end through the pipeline (validation: integration test with mocked LLM)
 **Validation:**
 - `uv run pyright app/agents/pipeline.py app/workers/adk.py app/workers/tasks.py`
 - `uv run pytest tests/agents/test_pipeline.py tests/workers/ -v`
@@ -493,21 +493,21 @@ Batch 5 (sequential): P5a.D8
 
 ### Contract Coverage
 
-| # | Roadmap Completion Contract Item | Covered By | Validation |
-|---|---|---|---|
-| 1 | InstructionAssembler composes agent instructions from typed fragments with source auditability | P5a.D2 | `pytest tests/agents/test_assembler.py` |
-| 2 | AgentRegistry scans agent definition files (.md) and builds configured agents (LlmAgent and CustomAgent) with 3-scope file cascade | P5a.D3 | `pytest tests/agents/test_registry.py` |
-| 3 | SAFETY fragment present in all assembled instructions, not overridable by project-scope or state | P5a.D2 | `pytest tests/agents/test_assembler.py -k safety` |
-| 4 | Can run a single deliverable through the full DeliverablePipeline | P5a.D8 | `pytest tests/agents/test_pipeline.py -k integration` |
-| 5 | Plan agent produces structured plan; code agent implements it | P5a.D4, P5a.D8 | `pytest tests/agents/test_pipeline.py -k "plan and code"` |
-| 6 | Lint/test agents produce structured results in state | P5a.D5 | `pytest tests/agents/test_custom_agents.py -k "linter or test_runner"` |
-| 7 | Review cycle loops on failure, terminates on approval or max iterations | P5a.D8 | `pytest tests/agents/test_pipeline.py -k review_cycle` |
-| 8 | Context budget before_model_callback reports token usage percentage | P5a.D7 | `pytest tests/agents/test_context_monitor.py -k usage_pct` |
-| 9 | Context budget monitor triggers context recreation (not lossy compaction) | P5a.D7 | `pytest tests/agents/test_context_monitor.py -k recreation` |
-| 10 | MemoryLoaderAgent executes in pipeline; returns empty context in degraded mode | P5a.D5 | `pytest tests/agents/test_custom_agents.py -k memory_loader` |
-| 11 | SkillLoaderAgent executes in pipeline via SkillLibraryProtocol; returns empty skills with NullSkillLibrary | P5a.D5 | `pytest tests/agents/test_custom_agents.py -k skill_loader` |
-| 12 | Hybrid CustomAgents (DependencyResolver, DiagnosticsAgent) use LiteLLM internally with model_role routing | P5a.D6 | `pytest tests/agents/test_hybrid_agents.py` |
-| 13 | Project-scope agent definitions rejected if type: custom | P5a.D3 | `pytest tests/agents/test_registry.py -k project_scope_custom_rejected` |
+| # | Roadmap Completion Contract Item | Covered By | Validation | Status |
+|---|---|---|---|---|
+| 1 | InstructionAssembler composes agent instructions from typed fragments with source auditability | P5a.D2 | `pytest tests/agents/test_assembler.py` | PASS |
+| 2 | AgentRegistry scans agent definition files (.md) and builds configured agents (LlmAgent and CustomAgent) with 3-scope file cascade | P5a.D3 | `pytest tests/agents/test_registry.py` | PASS |
+| 3 | SAFETY fragment present in all assembled instructions, not overridable by project-scope or state | P5a.D2 | `pytest tests/agents/test_assembler.py -k safety` | PASS |
+| 4 | Can run a single deliverable through the full DeliverablePipeline | P5a.D8 | `pytest tests/agents/test_pipeline.py -k integration` | PASS |
+| 5 | Plan agent produces structured plan; code agent implements it | P5a.D4, P5a.D8 | `pytest tests/agents/test_pipeline.py -k "plan and code"` | PASS |
+| 6 | Lint/test agents produce structured results in state | P5a.D5 | `pytest tests/agents/test_custom_agents.py -k "linter or test_runner"` | PASS |
+| 7 | Review cycle loops on failure, terminates on approval or max iterations | P5a.D8 | `pytest tests/agents/test_pipeline.py -k review_cycle` | PASS |
+| 8 | Context budget before_model_callback reports token usage percentage | P5a.D7 | `pytest tests/agents/test_context_monitor.py -k usage_pct` | PASS |
+| 9 | Context budget monitor triggers context recreation (not lossy compaction) | P5a.D7 | `pytest tests/agents/test_context_monitor.py -k recreation` | PASS |
+| 10 | MemoryLoaderAgent executes in pipeline; returns empty context in degraded mode | P5a.D5 | `pytest tests/agents/test_custom_agents.py -k memory_loader` | PASS |
+| 11 | SkillLoaderAgent executes in pipeline via SkillLibraryProtocol; returns empty skills with NullSkillLibrary | P5a.D5 | `pytest tests/agents/test_custom_agents.py -k skill_loader` | PASS |
+| 12 | Hybrid CustomAgents (DependencyResolver, DiagnosticsAgent) use LiteLLM internally with model_role routing | P5a.D6 | `pytest tests/agents/test_hybrid_agents.py` | PASS |
+| 13 | Project-scope agent definitions rejected if type: custom | P5a.D3 | `pytest tests/agents/test_registry.py -k project_scope_custom_rejected` | PASS |
 
 *13 contract items, 13 covered. Zero uncovered.*
 

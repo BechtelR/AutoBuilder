@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from google.adk.agents import BaseAgent, LlmAgent
+from google.adk.agents import BaseAgent, LlmAgent, SequentialAgent
 from google.adk.agents.context_cache_config import ContextCacheConfig
 from google.adk.apps import App
 from google.adk.apps.app import EventsCompactionConfig, ResumabilityConfig
@@ -26,6 +26,9 @@ if TYPE_CHECKING:
     from google.adk.models.llm_request import LlmRequest
     from google.adk.models.llm_response import LlmResponse
     from google.adk.sessions.base_session_service import BaseSessionService
+
+    from app.agents.assembler import InstructionContext
+    from app.router.router import LlmRouter
 
 logger = get_logger("engine")
 _plugin_logger = get_logger("engine.plugins")
@@ -194,4 +197,85 @@ def create_runner(app: App, session_service: BaseSessionService) -> Runner:
         app=app,
         session_service=session_service,
         auto_create_session=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Callbacks
+# ---------------------------------------------------------------------------
+
+
+def create_pipeline_callbacks(
+    router: LlmRouter,
+    threshold_pct: float = 80.0,
+) -> Callable[[CallbackContext, LlmRequest], LlmResponse | None]:
+    """Create the composed before_model_callback chain for pipeline agents.
+
+    Chain: router override -> context injection -> budget monitor.
+    """
+    from app.agents.context_monitor import ContextBudgetMonitor
+    from app.agents.state_helpers import compose_callbacks, create_context_injection_callback
+    from app.router.router import create_model_override_callback
+
+    router_callback = create_model_override_callback(router)
+    context_callback = create_context_injection_callback()
+    budget_monitor = ContextBudgetMonitor(threshold_pct=threshold_pct)
+
+    return compose_callbacks(router_callback, context_callback, budget_monitor)
+
+
+# ---------------------------------------------------------------------------
+# Deliverable Pipeline Factory
+# ---------------------------------------------------------------------------
+
+
+def create_deliverable_pipeline_from_context(
+    worker_ctx: dict[str, object],
+    instruction_ctx: InstructionContext,
+) -> SequentialAgent:
+    """Create a DeliverablePipeline from worker context.
+
+    Uses worker_ctx dependencies: llm_router, toolset, etc.
+    """
+    from pathlib import Path
+
+    from google.adk.memory import InMemoryMemoryService
+
+    from app.agents._registry import AgentRegistry
+    from app.agents.assembler import InstructionAssembler
+    from app.agents.pipeline import create_deliverable_pipeline
+    from app.agents.protocols import NullSkillLibrary
+    from app.config import get_settings
+    from app.models.enums import DefinitionScope
+
+    settings = get_settings()
+    router: LlmRouter = worker_ctx["llm_router"]  # type: ignore[assignment]
+    toolset = worker_ctx.get("toolset")
+
+    # Create assembler and registry
+    assembler = InstructionAssembler()
+
+    if toolset is None:
+        from app.tools._toolset import GlobalToolset
+
+        toolset = GlobalToolset()
+
+    registry = AgentRegistry(
+        assembler=assembler,
+        router=router,
+        toolset=toolset,  # type: ignore[arg-type]
+    )
+
+    # Scan agent definition directories
+    registry.scan((Path("app/agents"), DefinitionScope.GLOBAL))
+
+    # Create callbacks
+    callbacks = create_pipeline_callbacks(router, float(settings.context_budget_threshold))
+
+    return create_deliverable_pipeline(
+        registry=registry,
+        ctx=instruction_ctx,
+        skill_library=NullSkillLibrary(),
+        memory_service=InMemoryMemoryService(),
+        before_model_callback=callbacks,
     )

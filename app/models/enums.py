@@ -179,6 +179,41 @@ class ChatMessageRole(enum.StrEnum):
     DIRECTOR = "DIRECTOR"
 
 
+class CeoQueueStatus(enum.StrEnum):
+    """Status of an item in the CEO queue."""
+
+    PENDING = "PENDING"
+    SEEN = "SEEN"
+    RESOLVED = "RESOLVED"
+    DISMISSED = "DISMISSED"
+
+
+class AgentType(enum.StrEnum):
+    """Type of agent definition."""
+
+    LLM = "LLM"
+    CUSTOM = "CUSTOM"
+
+
+class DefinitionScope(enum.StrEnum):
+    """Scope level for agent definition files."""
+
+    GLOBAL = "GLOBAL"
+    WORKFLOW = "WORKFLOW"
+    PROJECT = "PROJECT"
+
+
+class FragmentType(enum.StrEnum):
+    """Instruction fragment type for InstructionAssembler."""
+
+    SAFETY = "SAFETY"
+    IDENTITY = "IDENTITY"
+    GOVERNANCE = "GOVERNANCE"
+    PROJECT = "PROJECT"
+    TASK = "TASK"
+    SKILL = "SKILL"
+
+
 class ErrorCode(enum.StrEnum):
     """Machine-readable error codes for API error responses."""
 

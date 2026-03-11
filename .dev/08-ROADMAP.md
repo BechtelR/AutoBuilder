@@ -8,7 +8,7 @@ Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0-10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention -- through a production-grade API gateway with async worker execution.
 
-**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: NEXT**
+**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: NEXT**
 
 ---
 
@@ -140,30 +140,30 @@ Anti-corruption layer translating gateway commands to ADK Runner calls and ADK E
 ## Phase 5a: Agent Definitions & Pipeline `L-`
 
 **Goal**: All agents defined, composable into a working DeliverablePipeline. Forward-dependency contracts for SkillLibrary and MemoryService.
-**Status**: PLANNED
+**Status**: DONE
 **Prerequisites**: Phase 4 (tools available)
 
 
 ### Scope Summary
-Agent definition infrastructure: AgentRegistry scans declarative markdown files (YAML frontmatter) with 3-scope file cascade (global → workflow → project); InstructionAssembler composes 6 typed fragments (SAFETY non-overridable, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL) with source auditability. Forward-dependency contracts: SkillLibraryProtocol + NullSkillLibrary stub for Phase 6; ADK BaseMemoryService + InMemoryMemoryService for Phase 9. All agents defined: Director (LlmAgent, opus), PM (LlmAgent, sonnet), worker-tier LLM agents (planner, coder, reviewer, fixer), deterministic CustomAgents (SkillLoader with NullSkillLibrary, MemoryLoader with InMemoryMemoryService, Linter, TestRunner, Formatter), hybrid CustomAgents (DependencyResolver, DiagnosticsAgent — deterministic flow with internal LiteLLM calls) (Decision #56). Pipeline composition pattern: DeliverablePipeline (SequentialAgent) with ReviewCycle (LoopAgent). ContextBudgetMonitor (before_model_callback) with ContextRecreationRequired exception. Context recreation in degraded mode (no real MemoryService). DB tables: ceo_queue, director_queue, project_configs with migrations. Agent definition files on disk for all agents.
+Agent definition infrastructure: AgentRegistry scans declarative markdown files (YAML frontmatter) with 3-scope file cascade (global → workflow → project); InstructionAssembler composes 6 typed fragments (SAFETY non-overridable, IDENTITY, GOVERNANCE, PROJECT, TASK, SKILL) with source auditability. Forward-dependency contracts: SkillLibraryProtocol + NullSkillLibrary stub for Phase 6; ADK BaseMemoryService + InMemoryMemoryService for Phase 9. All agents defined: Director (LlmAgent, opus), PM (LlmAgent, sonnet), worker-tier LLM agents (planner, coder, reviewer, fixer), deterministic CustomAgents (SkillLoader with NullSkillLibrary, MemoryLoader with InMemoryMemoryService, Linter, TestRunner, Formatter), hybrid CustomAgents (DependencyResolver, DiagnosticsAgent — deterministic flow with internal LiteLLM calls) (Decision #56). Pipeline composition pattern: DeliverablePipeline (SequentialAgent) with ReviewCycle (CustomAgent wrapper). ContextBudgetMonitor (before_model_callback) with ContextRecreationRequired exception. Context recreation in degraded mode (no real MemoryService). DB tables: ceo_queue, director_queue, project_configs with migrations. Agent definition files on disk for all agents.
 
 ### Completion Contract
 
 | Status | Contract Item | PRD |
 |--------|--------------|-----|
-| | InstructionAssembler composes agent instructions from typed fragments with source auditability | PR-5a |
-| | AgentRegistry scans agent definition files (.md) and builds configured agents (LlmAgent and CustomAgent) with 3-scope file cascade | PR-5b, PR-5c |
-| | SAFETY fragment present in all assembled instructions, not overridable by project-scope or state | NFR-4a |
-| | Can run a single deliverable through the full DeliverablePipeline | PR-10 |
-| | Plan agent produces structured plan; code agent implements it | PR-5 |
-| | Lint/test agents produce structured results in state | PR-11 |
-| | Review cycle loops on failure, terminates on approval or max iterations | PR-22 |
-| | Context budget `before_model_callback` reports token usage percentage | PR-15 |
-| | Context budget monitor triggers context recreation (not lossy compaction) | PR-15a |
-| | MemoryLoaderAgent executes in pipeline; returns empty context in degraded mode (MemoryService unavailable until Phase 9) | PR-15b |
-| | SkillLoaderAgent executes in pipeline via SkillLibraryProtocol; returns empty skills with NullSkillLibrary (real SkillLibrary in Phase 6) | PR-5a |
-| | Hybrid CustomAgents (DependencyResolver, DiagnosticsAgent) use LiteLLM internally with model_role routing | PR-5 |
-| | Project-scope agent definitions rejected if `type: custom` (`tool_role` ceiling validation deferred to Phase 7) | NFR-4b |
+| ✓ | InstructionAssembler composes agent instructions from typed fragments with source auditability | PR-5a |
+| ✓ | AgentRegistry scans agent definition files (.md) and builds configured agents (LlmAgent and CustomAgent) with 3-scope file cascade | PR-5b, PR-5c |
+| ✓ | SAFETY fragment present in all assembled instructions, not overridable by project-scope or state | NFR-4a |
+| ✓ | Can run a single deliverable through the full DeliverablePipeline | PR-10 |
+| ✓ | Plan agent produces structured plan; code agent implements it | PR-5 |
+| ✓ | Lint/test agents produce structured results in state | PR-11 |
+| ✓ | Review cycle loops on failure, terminates on approval or max iterations | PR-22 |
+| ✓ | Context budget `before_model_callback` reports token usage percentage | PR-15 |
+| ✓ | Context budget monitor triggers context recreation (not lossy compaction) | PR-15a |
+| ✓ | MemoryLoaderAgent executes in pipeline; returns empty context in degraded mode (MemoryService unavailable until Phase 9) | PR-15b |
+| ✓ | SkillLoaderAgent executes in pipeline via SkillLibraryProtocol; returns empty skills with NullSkillLibrary (real SkillLibrary in Phase 6) | PR-5a |
+| ✓ | Hybrid CustomAgents (DependencyResolver, DiagnosticsAgent) use LiteLLM internally with model_role routing | PR-5 |
+| ✓ | Project-scope agent definitions rejected if `type: custom` (`tool_role` ceiling validation deferred to Phase 7) | NFR-4b |
 
 ---
 

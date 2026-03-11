@@ -17,6 +17,7 @@ from app.models.enums import ChatMessageRole, ModelRole, PipelineEventType, Work
 from app.router import LlmRouter, create_model_override_callback
 from app.workers.adk import (
     create_app_container,
+    create_deliverable_pipeline_from_context,
     create_director_agent,
     create_echo_agent,
     create_runner,
@@ -72,37 +73,94 @@ async def run_workflow(ctx: dict[str, object], workflow_id: str) -> dict[str, st
         # Publish WORKFLOW_STARTED
         await publisher.publish_lifecycle(workflow_id, PipelineEventType.WORKFLOW_STARTED)
 
-        # Create ADK pipeline
-        callback = create_model_override_callback(router)
-        echo_agent = create_echo_agent(
-            model=router.select_model(ModelRole.FAST),
-            before_model_callback=callback,
-        )
-        app_container = create_app_container(root_agent=echo_agent)
-        runner = create_runner(app_container, session_service)
+        pipeline_type = str(workflow_params.get("pipeline_type", "echo"))
 
-        # Create or resume session
-        session = await session_service.get_session(  # type: ignore[reportUnknownMemberType]
-            app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=workflow_id
-        )
-        if session is None:
-            session = await session_service.create_session(  # type: ignore[reportUnknownMemberType]
-                app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=workflow_id
+        if pipeline_type == "deliverable":
+            from app.agents.assembler import InstructionContext
+            from app.agents.context_monitor import ContextRecreationRequired
+
+            instruction_ctx = InstructionContext(
+                project_config=str(workflow_params["project_config"])
+                if "project_config" in workflow_params
+                else None,
+                task_context=str(workflow_params["task_context"])
+                if "task_context" in workflow_params
+                else None,
+                agent_name="pipeline",
             )
 
-        # Construct the prompt from workflow params
-        prompt_text = str(workflow_params.get("prompt", "Hello, echo agent!"))
-        message = Content(parts=[Part(text=prompt_text)])
+            try:
+                pipeline = create_deliverable_pipeline_from_context(ctx, instruction_ctx)
+                app_container = create_app_container(root_agent=pipeline)
+                runner = create_runner(app_container, session_service)
 
-        # Execute and stream events
-        async for event in runner.run_async(  # type: ignore[reportUnknownMemberType]
-            user_id=SYSTEM_USER_ID,
-            session_id=session.id,  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-            new_message=message,
-        ):
-            translated = publisher.translate(event, workflow_id)
-            if translated is not None:
-                await publisher.publish(translated)
+                # Create or resume session
+                session = await session_service.get_session(  # type: ignore[reportUnknownMemberType]
+                    app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=workflow_id
+                )
+                if session is None:
+                    session = await session_service.create_session(  # type: ignore[reportUnknownMemberType]
+                        app_name=APP_NAME,
+                        user_id=SYSTEM_USER_ID,
+                        session_id=workflow_id,
+                    )
+
+                prompt_text = str(workflow_params.get("prompt", "Execute deliverable pipeline"))
+                message = Content(parts=[Part(text=prompt_text)])
+
+                async for event in runner.run_async(  # type: ignore[reportUnknownMemberType]
+                    user_id=SYSTEM_USER_ID,
+                    session_id=session.id,  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    new_message=message,
+                ):
+                    translated = publisher.translate(event, workflow_id)
+                    if translated is not None:
+                        await publisher.publish(translated)
+
+            except ContextRecreationRequired as e:
+                logger.warning(
+                    "Context recreation required for workflow %s: %.1f%% usage (threshold %.1f%%)",
+                    workflow_id,
+                    e.usage_pct,
+                    e.threshold_pct,
+                )
+                # Phase 5b: catch and trigger 4-step recreation pipeline.
+                # Phase 5a: log and continue — workflow completes with partial results.
+
+        else:
+            # Existing echo pipeline logic
+            callback = create_model_override_callback(router)
+            echo_agent = create_echo_agent(
+                model=router.select_model(ModelRole.FAST),
+                before_model_callback=callback,
+            )
+            app_container = create_app_container(root_agent=echo_agent)
+            runner = create_runner(app_container, session_service)
+
+            # Create or resume session
+            session = await session_service.get_session(  # type: ignore[reportUnknownMemberType]
+                app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=workflow_id
+            )
+            if session is None:
+                session = await session_service.create_session(  # type: ignore[reportUnknownMemberType]
+                    app_name=APP_NAME,
+                    user_id=SYSTEM_USER_ID,
+                    session_id=workflow_id,
+                )
+
+            # Construct the prompt from workflow params
+            prompt_text = str(workflow_params.get("prompt", "Hello, echo agent!"))
+            message = Content(parts=[Part(text=prompt_text)])
+
+            # Execute and stream events
+            async for event in runner.run_async(  # type: ignore[reportUnknownMemberType]
+                user_id=SYSTEM_USER_ID,
+                session_id=session.id,  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                new_message=message,
+            ):
+                translated = publisher.translate(event, workflow_id)
+                if translated is not None:
+                    await publisher.publish(translated)
 
         # Update status to COMPLETED
         async with factory() as db_session:

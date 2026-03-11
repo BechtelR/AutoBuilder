@@ -188,44 +188,58 @@ def task_create(
 
 def task_update(
     task_id: str,
-    status: TaskStatus | None = None,
+    status: str | None = None,
     notes: str | None = None,
 ) -> str:
     """Update a shared task's status or add notes.
 
     Args:
         task_id: The unique identifier of the task to update.
-        status: New status value, if changing.
+        status: New status value (OPEN, IN_PROGRESS, DONE, BLOCKED), if changing.
         notes: Additional notes to append, if any.
 
     Returns:
         Confirmation message.
     """
+    resolved_status: TaskStatus | None = None
+    if status is not None:
+        try:
+            resolved_status = TaskStatus(status)
+        except ValueError:
+            valid = ", ".join(s.value for s in TaskStatus)
+            return f"Error: invalid status '{status}'. Valid values: {valid}"
     logger.debug(
         "Task updated (placeholder): %s status=%s notes=%s",
         task_id,
-        status,
+        resolved_status,
         notes,
     )
     return f"Task {task_id} updated (placeholder — persistence in Phase 5)"
 
 
 def task_query(
-    filter: TaskStatus | None = None,
+    filter: str | None = None,
     assignee: str | None = None,
 ) -> str:
     """Query shared tasks with optional status filter and assignee.
 
     Args:
-        filter: Filter tasks by status value.
+        filter: Filter tasks by status (OPEN, IN_PROGRESS, DONE, BLOCKED).
         assignee: Filter tasks by assigned agent or user.
 
     Returns:
         Query result placeholder message.
     """
+    resolved_filter: TaskStatus | None = None
+    if filter is not None:
+        try:
+            resolved_filter = TaskStatus(filter)
+        except ValueError:
+            valid = ", ".join(s.value for s in TaskStatus)
+            return f"Error: invalid filter '{filter}'. Valid values: {valid}"
     logger.debug(
         "Task query (placeholder): filter=%s assignee=%s",
-        filter,
+        resolved_filter,
         assignee,
     )
     return "Task query (placeholder — persistence in Phase 5)"

@@ -3,16 +3,21 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func, text
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.models.enums import (
+    CeoItemType,
+    CeoQueueStatus,
     ChatMessageRole,
     ChatStatus,
     ChatType,
     DeliverableStatus,
+    DirectorQueueStatus,
+    EscalationPriority,
+    EscalationRequestType,
     SpecificationStatus,
     WorkflowStatus,
 )
@@ -129,3 +134,75 @@ class ChatMessage(TimestampMixin, Base):
     content: Mapped[str] = mapped_column(Text)
 
     chat: Mapped[Chat] = relationship(back_populates="messages", lazy="raise")
+
+
+class CeoQueueItem(TimestampMixin, Base):
+    """An item in the CEO escalation queue."""
+
+    __tablename__ = "ceo_queue"
+
+    type: Mapped[CeoItemType] = mapped_column(
+        SqlEnum(CeoItemType, native_enum=False),
+    )
+    priority: Mapped[EscalationPriority] = mapped_column(
+        SqlEnum(EscalationPriority, native_enum=False),
+        default=EscalationPriority.NORMAL,
+    )
+    status: Mapped[CeoQueueStatus] = mapped_column(
+        SqlEnum(CeoQueueStatus, native_enum=False),
+        default=CeoQueueStatus.PENDING,
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    source_project_id: Mapped[uuid.UUID | None] = mapped_column(
+        nullable=True, default=None, index=True
+    )
+    source_agent: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    metadata_: Mapped[dict[str, object]] = mapped_column(
+        "metadata", JSONB, server_default="{}", default=dict
+    )
+    session_id: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    resolved_by: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+
+
+class DirectorQueueItem(TimestampMixin, Base):
+    """An item in the Director escalation queue."""
+
+    __tablename__ = "director_queue"
+
+    type: Mapped[EscalationRequestType] = mapped_column(
+        SqlEnum(EscalationRequestType, native_enum=False),
+    )
+    priority: Mapped[EscalationPriority] = mapped_column(
+        SqlEnum(EscalationPriority, native_enum=False),
+        default=EscalationPriority.NORMAL,
+    )
+    status: Mapped[DirectorQueueStatus] = mapped_column(
+        SqlEnum(DirectorQueueStatus, native_enum=False),
+        default=DirectorQueueStatus.PENDING,
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    source_project_id: Mapped[uuid.UUID | None] = mapped_column(
+        nullable=True, default=None, index=True
+    )
+    source_agent: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    context: Mapped[str] = mapped_column(Text)
+    metadata_: Mapped[dict[str, object]] = mapped_column(
+        "metadata", JSONB, server_default="{}", default=dict
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    resolved_by: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+
+
+class ProjectConfig(TimestampMixin, Base):
+    """Per-project configuration stored in the database."""
+
+    __tablename__ = "project_configs"
+
+    project_name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    config: Mapped[dict[str, object]] = mapped_column(JSONB, server_default="{}", default=dict)
+    active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"), default=True)

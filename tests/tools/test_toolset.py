@@ -40,7 +40,7 @@ class TestToolCount:
 class TestRoleFiltering:
     async def test_planner_gets_15_tools(self) -> None:
         toolset = GlobalToolset()
-        tools = await toolset.get_tools(make_context("plan_agent"))  # type: ignore[arg-type]
+        tools = await toolset.get_tools(make_context("planner"))  # type: ignore[arg-type]
         names = {t.name for t in tools}
         assert len(tools) == 15
         expected = {
@@ -64,27 +64,27 @@ class TestRoleFiltering:
 
     async def test_coder_gets_27_tools(self) -> None:
         toolset = GlobalToolset()
-        tools = await toolset.get_tools(make_context("code_agent"))  # type: ignore[arg-type]
+        tools = await toolset.get_tools(make_context("coder"))  # type: ignore[arg-type]
         assert len(tools) == 27
 
     async def test_reviewer_gets_15_tools(self) -> None:
         toolset = GlobalToolset()
-        tools = await toolset.get_tools(make_context("review_agent"))  # type: ignore[arg-type]
+        tools = await toolset.get_tools(make_context("reviewer"))  # type: ignore[arg-type]
         names = {t.name for t in tools}
         assert len(tools) == 15
         # Reviewer has the same set as planner
-        planner_tools = await toolset.get_tools(make_context("plan_agent"))  # type: ignore[arg-type]
+        planner_tools = await toolset.get_tools(make_context("planner"))  # type: ignore[arg-type]
         planner_names = {t.name for t in planner_tools}
         assert names == planner_names
 
     async def test_fixer_gets_22_tools(self) -> None:
         toolset = GlobalToolset()
-        tools = await toolset.get_tools(make_context("fix_agent"))  # type: ignore[arg-type]
+        tools = await toolset.get_tools(make_context("fixer"))  # type: ignore[arg-type]
         assert len(tools) == 22
 
     async def test_fixer_excludes_dangerous_tools(self) -> None:
         toolset = GlobalToolset()
-        tools = await toolset.get_tools(make_context("fix_agent"))  # type: ignore[arg-type]
+        tools = await toolset.get_tools(make_context("fixer"))  # type: ignore[arg-type]
         names = {t.name for t in tools}
         forbidden = {"http_request", "git_commit", "git_branch", "git_worktree", "git_apply"}
         assert names.isdisjoint(forbidden), f"Fixer has forbidden tools: {names & forbidden}"
@@ -140,7 +140,7 @@ class TestRoleFiltering:
 class TestExcludedTools:
     async def test_excluded_tools_removed_from_coder(self) -> None:
         toolset = GlobalToolset(excluded_tools={"bash_exec"})
-        tools = await toolset.get_tools(make_context("code_agent"))  # type: ignore[arg-type]
+        tools = await toolset.get_tools(make_context("coder"))  # type: ignore[arg-type]
         names = {t.name for t in tools}
         assert "bash_exec" not in names
         assert len(tools) == 26  # 27 - 1
@@ -165,20 +165,23 @@ class TestExcludedTools:
 
 
 class TestResolveRole:
-    def test_plan_agent_maps_to_planner(self) -> None:
-        assert resolve_role(make_context("plan_agent")) == "planner"  # type: ignore[arg-type]
+    def test_planner_maps_to_planner(self) -> None:
+        assert resolve_role(make_context("planner")) == "planner"  # type: ignore[arg-type]
 
-    def test_code_agent_maps_to_coder(self) -> None:
-        assert resolve_role(make_context("code_agent")) == "coder"  # type: ignore[arg-type]
+    def test_coder_maps_to_coder(self) -> None:
+        assert resolve_role(make_context("coder")) == "coder"  # type: ignore[arg-type]
 
-    def test_review_agent_maps_to_reviewer(self) -> None:
-        assert resolve_role(make_context("review_agent")) == "reviewer"  # type: ignore[arg-type]
+    def test_reviewer_maps_to_reviewer(self) -> None:
+        assert resolve_role(make_context("reviewer")) == "reviewer"  # type: ignore[arg-type]
 
-    def test_fix_agent_maps_to_fixer(self) -> None:
-        assert resolve_role(make_context("fix_agent")) == "fixer"  # type: ignore[arg-type]
+    def test_fixer_maps_to_fixer(self) -> None:
+        assert resolve_role(make_context("fixer")) == "fixer"  # type: ignore[arg-type]
 
     def test_director_maps_to_director(self) -> None:
         assert resolve_role(make_context("director")) == "director"  # type: ignore[arg-type]
+
+    def test_pm_maps_to_pm(self) -> None:
+        assert resolve_role(make_context("pm")) == "pm"  # type: ignore[arg-type]
 
     def test_pm_prefix_maps_to_pm(self) -> None:
         assert resolve_role(make_context("pm_something")) == "pm"  # type: ignore[arg-type]

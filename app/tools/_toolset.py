@@ -206,11 +206,12 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 # ---------------------------------------------------------------------------
 
 AGENT_ROLE_MAP: dict[str, str] = {
-    "plan_agent": "planner",
-    "code_agent": "coder",
-    "review_agent": "reviewer",
-    "fix_agent": "fixer",
     "director": "director",
+    "pm": "pm",
+    "planner": "planner",
+    "coder": "coder",
+    "reviewer": "reviewer",
+    "fixer": "fixer",
 }
 
 
@@ -265,5 +266,10 @@ class GlobalToolset(BaseToolset):
     ) -> list[BaseTool]:
         """Return tools filtered by the agent's role."""
         role = resolve_role(readonly_context)
+        allowed = ROLE_PERMISSIONS.get(role, ROLE_PERMISSIONS["default"])
+        return [t for t in self._all_tools if t.name in allowed and t.name not in self._excluded]
+
+    def get_tools_for_role(self, role: str) -> list[BaseTool]:
+        """Return tools for an explicit role string, bypassing agent name lookup."""
         allowed = ROLE_PERMISSIONS.get(role, ROLE_PERMISSIONS["default"])
         return [t for t in self._all_tools if t.name in allowed and t.name not in self._excluded]

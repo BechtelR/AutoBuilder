@@ -1,6 +1,9 @@
 """Tests for ARQ worker tasks."""
 
+from __future__ import annotations
+
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from arq.connections import ArqRedis, create_pool
@@ -301,3 +304,178 @@ class TestRunDirectorTurnIntegration:
                 await conn.run_sync(Base.metadata.drop_all)
             await engine.dispose()
             await redis.aclose()
+
+
+class TestRunWorkflowDeliverablePipeline:
+    """Unit tests for deliverable pipeline code path in run_workflow."""
+
+    @pytest.mark.asyncio
+    async def test_deliverable_pipeline_triggers_new_path(self) -> None:
+        """Verify pipeline_type=deliverable triggers create_deliverable_pipeline_from_context."""
+        from google.adk.agents import SequentialAgent
+
+        # Build a minimal mock pipeline (SequentialAgent with no real sub_agents)
+        mock_pipeline = SequentialAgent(name="mock_pipeline", sub_agents=[])
+
+        mock_session_service = MagicMock()
+        mock_router = MagicMock(spec=LlmRouter)
+        mock_router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
+        mock_redis = AsyncMock()
+        mock_redis.xadd = AsyncMock()
+
+        mock_factory = MagicMock()
+        mock_db_session = AsyncMock()
+        mock_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        # Mock workflow DB record
+        mock_workflow = MagicMock()
+        mock_workflow.params = {
+            "pipeline_type": "deliverable",
+            "prompt": "Build something",
+        }
+        mock_workflow.status = WorkflowStatus.PENDING
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=mock_workflow)
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        mock_db_session.commit = AsyncMock()
+
+        ctx: dict[str, object] = {
+            "session_service": mock_session_service,
+            "llm_router": mock_router,
+            "redis": mock_redis,
+            "db_session_factory": mock_factory,
+        }
+
+        with (
+            patch(
+                "app.workers.tasks.create_deliverable_pipeline_from_context",
+                return_value=mock_pipeline,
+            ) as mock_create,
+            patch("app.workers.tasks.create_app_container") as mock_app,
+            patch("app.workers.tasks.create_runner") as mock_runner,
+        ):
+            # Make runner.run_async return empty async iterator
+            mock_runner_instance = MagicMock()
+
+            async def empty_iter(*args: object, **kwargs: object) -> None:  # type: ignore[misc]
+                return
+                yield  # type: ignore[misc]  # pragma: no cover
+
+            mock_runner_instance.run_async = empty_iter
+            mock_runner.return_value = mock_runner_instance
+            mock_app.return_value = MagicMock()
+
+            mock_session_obj = MagicMock()
+            mock_session_obj.id = "test-session-id"
+            mock_session_service.get_session = AsyncMock(return_value=mock_session_obj)
+
+            workflow_id = str(uuid.uuid4())
+            result = await run_workflow(ctx, workflow_id)
+
+        assert mock_create.called
+        assert result["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_context_recreation_caught_not_reraised(self) -> None:
+        """Verify ContextRecreationRequired is caught and logged, not re-raised.
+
+        Phase 5a: log and continue. Phase 5b: trigger recreation pipeline.
+        """
+        from app.agents.context_monitor import ContextRecreationRequired
+
+        mock_session_service = MagicMock()
+        mock_router = MagicMock(spec=LlmRouter)
+        mock_router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
+        mock_redis = AsyncMock()
+        mock_redis.xadd = AsyncMock()
+
+        mock_factory = MagicMock()
+        mock_db_session = AsyncMock()
+        mock_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        mock_workflow = MagicMock()
+        mock_workflow.params = {
+            "pipeline_type": "deliverable",
+            "prompt": "Build something",
+        }
+        mock_workflow.status = WorkflowStatus.PENDING
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=mock_workflow)
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        mock_db_session.commit = AsyncMock()
+
+        ctx: dict[str, object] = {
+            "session_service": mock_session_service,
+            "llm_router": mock_router,
+            "redis": mock_redis,
+            "db_session_factory": mock_factory,
+        }
+
+        err = ContextRecreationRequired(usage_pct=85.0, model="test-model", threshold_pct=80.0)
+
+        with patch(
+            "app.workers.tasks.create_deliverable_pipeline_from_context",
+            side_effect=err,
+        ):
+            workflow_id = str(uuid.uuid4())
+            # ContextRecreationRequired is caught and logged; workflow completes
+            result = await run_workflow(ctx, workflow_id)
+            assert result["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_echo_pipeline_still_works(self) -> None:
+        """Verify existing echo pipeline is backward compatible (no pipeline_type)."""
+        mock_session_service = MagicMock()
+        mock_router = MagicMock(spec=LlmRouter)
+        mock_router.select_model = MagicMock(return_value="anthropic/claude-haiku-4-5-20251001")
+        mock_redis = AsyncMock()
+        mock_redis.xadd = AsyncMock()
+
+        mock_factory = MagicMock()
+        mock_db_session = AsyncMock()
+        mock_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        # No pipeline_type in params means echo
+        mock_workflow = MagicMock()
+        mock_workflow.params = {"prompt": "Hello"}
+        mock_workflow.status = WorkflowStatus.PENDING
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=mock_workflow)
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        mock_db_session.commit = AsyncMock()
+
+        ctx: dict[str, object] = {
+            "session_service": mock_session_service,
+            "llm_router": mock_router,
+            "redis": mock_redis,
+            "db_session_factory": mock_factory,
+        }
+
+        with (
+            patch("app.workers.tasks.create_echo_agent") as mock_echo,
+            patch("app.workers.tasks.create_app_container") as mock_app,
+            patch("app.workers.tasks.create_runner") as mock_runner,
+        ):
+            mock_runner_instance = MagicMock()
+
+            async def empty_iter(*args: object, **kwargs: object) -> None:  # type: ignore[misc]
+                return
+                yield  # type: ignore[misc]  # pragma: no cover
+
+            mock_runner_instance.run_async = empty_iter
+            mock_runner.return_value = mock_runner_instance
+            mock_app.return_value = MagicMock()
+
+            mock_session_obj = MagicMock()
+            mock_session_obj.id = "test-session-id"
+            mock_session_service.get_session = AsyncMock(return_value=mock_session_obj)
+
+            workflow_id = str(uuid.uuid4())
+            result = await run_workflow(ctx, workflow_id)
+
+        # echo path should use create_echo_agent
+        assert mock_echo.called
+        assert result["status"] == "completed"
