@@ -24,24 +24,26 @@ FRD read:
 - `.dev/build-phase/phase-{N}/frd.md` — phase functional requirements (Spec traces to these)
 - If FRD doesn't exist: warn user to run `/shape-phase {N}` first. Proceed only if user confirms — traceability will be incomplete.
 
-Selective deep-reads (only architecture files referenced in BOM "Source" column for this phase's components):
-- Infrastructure/gateway → `02-ARCHITECTURE.md` | Agents → `architecture/agents.md`
-- Skills → `architecture/skills.md` | Workflows → `architecture/workflows.md`
-- State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
-- Tech decisions → `04-TECH_STACK.md` | Design history → `.decision-log.md`
+Selective deep-reads — derive from BOM, never hardcode:
+1. From the BOM rows for this phase, collect the unique values in the **Source** column (e.g., `gateway.md §Route Structure` → file `.dev/architecture/gateway.md`; `state.md §1.2` → file `.dev/architecture/state.md`)
+2. Deep-read ONLY those architecture files, focused on the referenced sections. No others.
+3. On-demand only (pull in during Step 4 research if a gap requires it): `.decision-log.md` (design rationale), `04-TECH_STACK.md` (tech constraints), `06-PROVIDERS.md` (model routing).
 
 Skip `CLAUDE.md` and `.claude/rules/` (already in context).
 If spec exists and no flag: ask user — overwrite or resume?
 </context>
 
 <delegation>
+Design context — read @.claude/agents/architect.md before design steps. Internalize its principles and checklist; apply them throughout Steps 3-5.
+
 Use subagents to preserve context window:
 - `Explore` — codebase research, understand existing patterns in target modules
-- `subtask` — parallel research into specific technical areas
+- `subtask` — parallel research into specific technical areas, local or web
+- `reviewer` — final document verification (Step 10): verify spec.md against the verification checklist and source documents. It finds AND fixes issues directly.
 </delegation>
 
 <process>
-Steps 1-9 sequential. Announce each step.
+Steps 1-10 sequential. Announce each step.
 
 STEP 1 — PREREQUISITE AUDIT
 A. **Load BOM scope** — read `07-COMPONENTS.md`, extract ALL components assigned to this phase number. This is the exhaustive list of what the phase must deliver. Every component ID (e.g., G10, D08, E05) becomes a deliverable or part of a deliverable.
@@ -92,7 +94,10 @@ STEP 8 — BUILD ORDER
 Topological sort into parallel batches respecting deps.
 
 STEP 9 — WRITE OUTPUT
-Write spec.md per output section. Re-read to verify completeness.
+Write spec.md per output section.
+
+STEP 10 — REVIEWER VERIFICATION
+Spawn a `reviewer` agent. Provide: spec.md path, the verification checklist (from <verification> section), and references to source documents (FRD, BOM, roadmap contract). Reviewer verifies and fixes issues directly. If reviewer flags items needing design decisions, resolve them and re-run reviewer.
 </process>
 
 <output>

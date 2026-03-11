@@ -25,7 +25,8 @@ AutoBuilder/
 │   │
 │   ├── workers/                    # ARQ async workers
 │   │   ├── settings.py             # ARQ WorkerSettings (Redis URL, queues, cron jobs)
-│   │   └── tasks.py                # Task definitions (workflow execution, cleanup)
+│   │   ├── tasks.py                # Task definitions (workflow execution, cleanup)
+│   │   └── adk.py                  # ADK engine factories (session service, agents, App container, Runner)
 │   │
 │   ├── events/                     # Event infrastructure
 │   │   ├── publisher.py            # Publish events to Redis Streams
@@ -48,7 +49,7 @@ AutoBuilder/
 │   │   ├── tokens.py               # Token counting, budget calculations
 │   │   └── hashing.py              # Hashing, checksums
 │   │
-│   ├── agents/                     # Agent definition files (Markdown + YAML frontmatter)
+│   ├── agents/                     # Agent definitions + infrastructure
 │   │   ├── director.md             # Director agent definition (LLM)
 │   │   ├── pm.md                   # PM agent definition (LLM)
 │   │   ├── planner.md              # Planning agent definition (LLM)
@@ -63,7 +64,21 @@ AutoBuilder/
 │   │   ├── dependency_resolver.md  # Dependency resolver agent definition (custom, hybrid)
 │   │   ├── diagnostics.md          # Diagnostics agent definition (custom, hybrid)
 │   │   ├── regression_tester.md    # Regression test agent definition (custom, deterministic)
-│   │   └── _registry.py            # AgentRegistry + class registry (CustomAgent string→type resolution)
+│   │   ├── _registry.py            # AgentRegistry + class registry (CustomAgent string→type resolution)
+│   │   ├── assembler.py            # InstructionAssembler + InstructionFragment + InstructionContext
+│   │   ├── protocols.py            # SkillLibraryProtocol, NullSkillLibrary
+│   │   ├── state_helpers.py        # context_from_state, project config loader, compose_callbacks
+│   │   ├── context_monitor.py      # ContextBudgetMonitor (before_model_callback) + ContextRecreationRequired
+│   │   ├── pipeline.py             # DeliverablePipeline factory (SequentialAgent + ReviewCycle)
+│   │   └── custom/                 # CustomAgent Python implementations
+│   │       ├── skill_loader.py     # SkillLoaderAgent (deterministic)
+│   │       ├── memory_loader.py    # MemoryLoaderAgent (deterministic)
+│   │       ├── linter.py           # LinterAgent (deterministic)
+│   │       ├── test_runner.py      # TestRunnerAgent (deterministic)
+│   │       ├── formatter.py        # FormatterAgent (deterministic)
+│   │       ├── regression_tester.py # RegressionTestAgent (deterministic)
+│   │       ├── dependency_resolver.py # DependencyResolverAgent (hybrid)
+│   │       └── diagnostics.py      # DiagnosticsAgent (hybrid)
 │   │
 │   ├── tools/                      # FunctionTool wrappers + GlobalToolset
 │   │   ├── _toolset.py             # GlobalToolset(BaseToolset) — per-role tool vending
@@ -209,7 +224,8 @@ AutoBuilder/
 | `app/models/` | Shared domain definitions (enums, constants, base Pydantic models) |
 | `app/lib/` | Shared libraries — logging, exceptions, decorators, base classes |
 | `app/utils/` | Stateless utility functions — string helpers, token counting, hashing |
-| `app/agents/` | ADK agent definitions (LLM, deterministic, hybrid) — Markdown + YAML frontmatter files + AgentRegistry |
+| `app/agents/` | Agent definitions (.md) + infrastructure (AgentRegistry, InstructionAssembler, pipeline factory, context monitor) |
+| `app/agents/custom/` | CustomAgent Python implementations (deterministic and hybrid) |
 | `app/tools/` | 42 FunctionTool wrappers (8 modules) + `GlobalToolset(BaseToolset)` for per-role vending |
 | `app/skills/` | Markdown skill files with YAML frontmatter |
 | `app/workflows/` | Pluggable workflow definitions (each a self-contained directory) |
@@ -233,5 +249,5 @@ AutoBuilder/
 
 ---
 
-*Document Version: 1.7*
-*Last Updated: 2026-03-10*
+*Document Version: 1.8*
+*Last Updated: 2026-03-11*

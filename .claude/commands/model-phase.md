@@ -23,23 +23,26 @@ Bootstrap (parallel reads):
 - @.dev/03-STRUCTURE.md — file placement truth
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
-Selective deep-reads (only architecture files referenced in BOM "Source" column for this phase's components):
-- Agents → `architecture/agents.md` | Skills → `architecture/skills.md` | Workflows → `architecture/workflows.md`
-- State/memory → `architecture/state.md` | Tools → `architecture/tools.md`
-- Tech decisions → `04-TECH_STACK.md` | Design history → `.decision-log.md`
+Selective deep-reads — derive from BOM, never hardcode:
+1. From the BOM rows for this phase, collect the unique values in the **Source** column (e.g., `agents.md §Agent Hierarchy` → file `.dev/architecture/agents.md`; `state.md §10` → file `.dev/architecture/state.md`)
+2. Deep-read ONLY those architecture files, focused on the referenced sections. No others.
+3. On-demand only (pull in during research steps if a gap requires it): `.decision-log.md` (design rationale), `04-TECH_STACK.md` (tech constraints).
 
 If frd.md doesn't exist: stop and tell user to run `/shape-phase {N}` first.
 If model.md exists: ask user — overwrite or skip?
 </context>
 
 <delegation>
+Design context — read @.claude/agents/architect.md before design steps. Internalize its principles and checklist; apply them throughout Steps 3-7.
+
 Use subagents to preserve context window:
 - `Explore` — codebase research, understand existing patterns in target modules
-- `subtask` — parallel research into specific technical areas
+- `subtask` — parallel research into specific technical areas, local or web
+- `reviewer` — final document verification (Step 9): verify model.md against the verification checklist and source documents. It finds AND fixes issues directly.
 </delegation>
 
 <process>
-Steps 1-8 sequential. Announce each step.
+Steps 1-9 sequential. Announce each step.
 
 STEP 1 — READ FRD
 Extract from frd.md: capabilities (CAP-{n} IDs and descriptions), consumer roles, functional requirements (FR-{N}.{nn}), non-functional requirements, rabbit holes. Build a mental map of what this phase must do and for whom.
@@ -66,7 +69,10 @@ State machines, pipeline stages, decision trees. Use Mermaid state diagrams or f
 Only diagram non-obvious logic. If a lifecycle is linear (A → B → C) with no branching, a bullet list suffices.
 
 STEP 8 — WRITE model.md
-Follow template at `.dev/build-phase/.templates/model.md`. Fill all sections. Include integration points (existing system + future phase extensions). Re-read to verify completeness.
+Follow template at `.dev/build-phase/.templates/model.md`. Fill all sections. Include integration points (existing system + future phase extensions).
+
+STEP 9 — REVIEWER VERIFICATION
+Spawn a `reviewer` agent. Provide: model.md path, the verification checklist (from <verification> section), and references to source documents (FRD, BOM, `02-ARCHITECTURE.md`). Reviewer verifies and fixes issues directly. If reviewer flags items needing design decisions, resolve them and re-run reviewer.
 </process>
 
 <output>
