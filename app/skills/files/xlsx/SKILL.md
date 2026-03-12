@@ -1,6 +1,6 @@
 ---
 name: xlsx
-description: "This skill provides guidance for creating, reading, editing, and analyzing spreadsheet files (.xlsx, .xlsm, .csv, .tsv). It covers formula construction, formatting, charting, data cleaning, financial model conventions, and recalculation workflows using openpyxl and pandas."
+description: "This skill provides guidance for creating, reading, editing, and analyzing spreadsheet files (.xlsx, .xls, .csv). It covers formula construction, formatting, financial model conventions, and recalculation workflows using openpyxl and pandas."
 triggers:
   - file_pattern: "*.xlsx"
   - file_pattern: "*.xls"

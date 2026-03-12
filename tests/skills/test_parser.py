@@ -98,6 +98,7 @@ class TestParseSkillFrontmatter:
         assert entry.cascades == []
         assert entry.has_references is False
         assert entry.has_assets is False
+        assert entry.has_scripts is False
 
     def test_no_references_or_assets_or_scripts(self, tmp_path: Path) -> None:
         skill_file = tmp_path / "SKILL.md"

@@ -49,8 +49,7 @@ packages = ["app"]
 line-length = 100
 target-version = "py311"
 exclude = [
-    "app/skills/*/scripts",
-    "app/skills/*/*/scripts",
+    "app/skills/**/scripts",
 ]
 
 [tool.ruff.lint]
@@ -67,6 +66,10 @@ pythonVersion = "3.11"
 typeCheckingMode = "strict"
 venvPath = "."
 venv = ".venv"
+include = ["app", "tests"]
+exclude = [
+    "app/skills/**/scripts",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

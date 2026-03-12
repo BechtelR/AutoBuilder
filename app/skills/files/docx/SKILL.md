@@ -1,6 +1,6 @@
 ---
 name: docx
-description: "This skill provides guidance for creating, reading, editing, and manipulating Word documents (.docx files). It covers document generation with formatting (tables of contents, headings, page numbers, letterheads), content extraction, image insertion, find-and-replace operations, tracked changes, comments, and conversion to polished Word documents."
+description: "This skill provides guidance for creating, reading, editing, and manipulating Word documents (.docx, .doc files). It covers document generation with formatting (tables of contents, headings, page numbers), content extraction, image insertion, tracked changes, comments, and XML-level editing of existing documents."
 triggers:
   - file_pattern: "*.docx"
   - file_pattern: "*.doc"

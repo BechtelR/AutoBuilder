@@ -342,18 +342,18 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D1
 **Description:** Ship 4 file-editing skills. Original skill content (body, scripts, references) is preserved. AutoBuilder trigger declarations are added to each skill's frontmatter so they match via the deterministic trigger system — not the keyword fallback. Each skill includes a `scripts/` directory with Python helper scripts that agents invoke via `bash_exec` / file tools. The skills share an `office/` scripts subdirectory (pack, unpack, validate, soffice wrappers). Placed under a new `app/skills/files/` category.
 **BOM Components:**
-- [ ] *(no BOM component — additive to FR-6.40 initial library scope)*
+- [x] *(no BOM component — additive to FR-6.40 initial library scope)*
 **Requirements:**
-- [ ] `docx` skill copied with SKILL.md + `scripts/` directory (includes `accept_changes.py`, `comment.py`, `office/` shared scripts, `templates/`); AutoBuilder triggers added: `file_pattern: "*.docx"`, `file_pattern: "*.doc"`, tags: `[document, word, docx]`, applies_to: `[coder]`
-- [ ] `xlsx` skill copied with SKILL.md + `scripts/` directory (includes `recalc.py`, `office/` shared scripts); AutoBuilder triggers added: `file_pattern: "*.xlsx"`, `file_pattern: "*.xls"`, `file_pattern: "*.csv"`, tags: `[spreadsheet, excel, xlsx]`, applies_to: `[coder]`
-- [ ] `pptx` skill copied with SKILL.md + `editing.md` + `pptxgenjs.md` + `scripts/` directory (includes `add_slide.py`, `clean.py`, `thumbnail.py`, `office/` shared scripts); AutoBuilder triggers added: `file_pattern: "*.pptx"`, `file_pattern: "*.ppt"`, tags: `[presentation, powerpoint, pptx]`, applies_to: `[coder]`
-- [ ] `pdf` skill copied with SKILL.md + `forms.md` + `reference.md` + `scripts/` directory (includes form-filling, validation, and conversion scripts); AutoBuilder triggers added: `file_pattern: "*.pdf"`, tags: `[pdf, document]`, applies_to: `[coder]`
-- [ ] Each skill's SKILL.md has valid frontmatter with `name`, `description`, and AutoBuilder trigger declarations — passes `validate_skill_frontmatter()`
-- [ ] Skills match via deterministic file_pattern and tag_match triggers (not keyword fallback)
-- [ ] `SkillEntry.has_scripts` is True for all 4 skills after indexing
-- [ ] `SkillEntry.has_references` is True for pptx and pdf (which have additional .md files alongside SKILL.md — treated as references)
-- [ ] LICENSE.txt preserved in each skill directory
-- [ ] All skills indexed successfully by `SkillLibrary.scan()`
+- [x] `docx` skill copied with SKILL.md + `scripts/` directory (includes `accept_changes.py`, `comment.py`, `office/` shared scripts, `templates/`); AutoBuilder triggers added: `file_pattern: "*.docx"`, `file_pattern: "*.doc"`, tags: `[document, word, docx]`, applies_to: `[coder]`
+- [x] `xlsx` skill copied with SKILL.md + `scripts/` directory (includes `recalc.py`, `office/` shared scripts); AutoBuilder triggers added: `file_pattern: "*.xlsx"`, `file_pattern: "*.xls"`, `file_pattern: "*.csv"`, tags: `[spreadsheet, excel, xlsx]`, applies_to: `[coder]`
+- [x] `pptx` skill copied with SKILL.md + `references/editing.md` + `references/pptxgenjs.md` + `scripts/` directory (includes `add_slide.py`, `clean.py`, `thumbnail.py`, `office/` shared scripts); AutoBuilder triggers added: `file_pattern: "*.pptx"`, `file_pattern: "*.ppt"`, tags: `[presentation, powerpoint, pptx]`, applies_to: `[coder]`
+- [x] `pdf` skill copied with SKILL.md + `references/forms.md` + `references/reference.md` + `scripts/` directory (includes form-filling, validation, and conversion scripts); AutoBuilder triggers added: `file_pattern: "*.pdf"`, tags: `[pdf, document]`, applies_to: `[coder]`
+- [x] Each skill's SKILL.md has valid frontmatter with `name`, `description`, and AutoBuilder trigger declarations — passes `validate_skill_frontmatter()`
+- [x] Skills match via deterministic file_pattern and tag_match triggers (not keyword fallback)
+- [x] `SkillEntry.has_scripts` is True for all 4 skills after indexing
+- [x] `SkillEntry.has_references` is True for pptx and pdf (which have `references/` subdirectories with additional .md files)
+- [x] ~~LICENSE.txt preserved in each skill directory~~ — removed per user directive (Claude products, license not applicable)
+- [x] All skills indexed successfully by `SkillLibrary.scan()`
 **Validation:**
 - `uv run pytest tests/skills/test_skill_files.py -v`
 

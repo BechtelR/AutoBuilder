@@ -79,6 +79,7 @@ async def skills_client_with_entries() -> AsyncIterator[AsyncClient]:
             priority=20,
             has_references=False,
             has_assets=False,
+            has_scripts=True,
             path=Path("/fake/governance/SKILL.md"),
         ),
     }
@@ -135,4 +136,4 @@ class TestListSkills:
         assert data[1]["name"] == "governance"
         assert data[1]["priority"] == 20
         assert data[1]["applies_to"] == ["director"]
-        assert data[1]["has_scripts"] is False
+        assert data[1]["has_scripts"] is True
