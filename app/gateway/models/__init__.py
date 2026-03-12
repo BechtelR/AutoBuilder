@@ -13,6 +13,7 @@ from app.gateway.models.chat import (
 from app.gateway.models.common import ErrorDetail, ErrorResponse
 from app.gateway.models.events import PipelineEvent
 from app.gateway.models.health import HealthResponse, HealthStatus, ServiceStatus
+from app.gateway.models.skills import SkillCatalogEntry
 from app.gateway.models.workflows import WorkflowRunRequest, WorkflowRunResponse
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "ResolveCeoQueueItemRequest",
     "SendChatMessageRequest",
     "ServiceStatus",
+    "SkillCatalogEntry",
     "WorkflowRunRequest",
     "WorkflowRunResponse",
 ]

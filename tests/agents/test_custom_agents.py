@@ -10,8 +10,9 @@ import pytest
 from google.adk.events import Event
 
 from app.agents._registry import CLASS_REGISTRY, parse_definition_file
-from app.agents.protocols import NullSkillLibrary, SkillContent, SkillEntry, SkillMatchContext
+from app.agents.protocols import NullSkillLibrary, SkillContent, SkillMatchContext
 from app.models.enums import DefinitionScope
+from app.skills.library import SkillEntry
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -61,12 +62,18 @@ async def test_skill_loader_null_library() -> None:
 
 @pytest.mark.asyncio
 async def test_skill_loader_state_delta() -> None:
-    """SkillLoaderAgent populates correct state_delta keys with real skills."""
+    """SkillLoaderAgent populates LoadedSkillData with content, applies_to, triggers."""
     from app.agents.custom.skill_loader import SkillLoaderAgent
 
     mock_library = MagicMock()
-    entry = SkillEntry(name="test_skill", description="A test skill")
+    entry = SkillEntry(
+        name="test_skill",
+        description="A test skill",
+        applies_to=["coder"],
+        triggers=[],
+    )
     mock_library.match.return_value = [entry]
+    mock_library.resolve_cascades.return_value = [entry]
     mock_library.load.return_value = SkillContent(entry=entry, content="skill content here")
 
     agent = SkillLoaderAgent(name="skill_loader", skill_library=mock_library)
@@ -77,7 +84,13 @@ async def test_skill_loader_state_delta() -> None:
     delta = events[0].actions.state_delta
     assert "loaded_skills" in delta
     assert "loaded_skill_names" in delta
-    assert as_dict(delta["loaded_skills"])["test_skill"] == "skill content here"
+
+    skill_data = as_dict(delta["loaded_skills"])["test_skill"]
+    assert isinstance(skill_data, dict)
+    assert skill_data["content"] == "skill content here"
+    assert skill_data["applies_to"] == ["coder"]
+    assert isinstance(skill_data["matched_triggers"], list)
+
     assert delta["loaded_skill_names"] == ["test_skill"]
 
     # Verify match was called with correct context
@@ -85,6 +98,63 @@ async def test_skill_loader_state_delta() -> None:
     assert isinstance(call_args, SkillMatchContext)
     assert call_args.deliverable_type == "api"
     assert call_args.agent_role == "coder"
+
+    # Verify resolve_cascades was called
+    mock_library.resolve_cascades.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_skill_loader_matched_triggers() -> None:
+    """SkillLoaderAgent captures matched trigger types in LoadedSkillData."""
+    from app.agents.custom.skill_loader import SkillLoaderAgent
+    from app.models.enums import TriggerType
+    from app.skills.library import TriggerSpec
+
+    mock_library = MagicMock()
+    entry = SkillEntry(
+        name="api_skill",
+        description="API skill",
+        triggers=[TriggerSpec(trigger_type=TriggerType.DELIVERABLE_TYPE, value="api")],
+    )
+    mock_library.match.return_value = [entry]
+    mock_library.resolve_cascades.return_value = [entry]
+    mock_library.load.return_value = SkillContent(entry=entry, content="api content")
+
+    agent = SkillLoaderAgent(name="skill_loader", skill_library=mock_library)
+    ctx = make_ctx({"deliverable_type": "api"})
+
+    events = await collect_events(agent._run_async_impl(ctx))  # type: ignore[reportPrivateUsage]
+    delta = events[0].actions.state_delta
+    skill_data = as_dict(delta["loaded_skills"])["api_skill"]
+    assert isinstance(skill_data, dict)
+    assert "DELIVERABLE_TYPE" in skill_data["matched_triggers"]
+
+
+@pytest.mark.asyncio
+async def test_skill_loader_cascade_resolution() -> None:
+    """SkillLoaderAgent calls resolve_cascades and includes cascaded entries."""
+    from app.agents.custom.skill_loader import SkillLoaderAgent
+
+    mock_library = MagicMock()
+    entry_a = SkillEntry(name="a_skill", description="A")
+    entry_b = SkillEntry(name="b_skill", description="B (cascaded)")
+    mock_library.match.return_value = [entry_a]
+    mock_library.resolve_cascades.return_value = [entry_a, entry_b]
+
+    def _load(entry: SkillEntry) -> SkillContent:
+        return SkillContent(entry=entry, content=f"{entry.name} body")
+
+    mock_library.load.side_effect = _load
+
+    agent = SkillLoaderAgent(name="skill_loader", skill_library=mock_library)
+    ctx = make_ctx()
+
+    events = await collect_events(agent._run_async_impl(ctx))  # type: ignore[reportPrivateUsage]
+    delta = events[0].actions.state_delta
+    assert delta["loaded_skill_names"] == ["a_skill", "b_skill"]
+    skills = as_dict(delta["loaded_skills"])
+    assert "a_skill" in skills
+    assert "b_skill" in skills
 
 
 # ---------------------------------------------------------------------------

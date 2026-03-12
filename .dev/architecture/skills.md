@@ -90,21 +90,20 @@ The same `SkillLibrary.match()` engine handles all tiers. The difference is **wh
 
 Each skill is a `SKILL.md` file (per the Agent Skills open standard) with YAML frontmatter. The format follows the standard's three-level progressive disclosure model:
 
-- **L1 (Frontmatter metadata):** Lightweight index fields. Standard fields (`name`, `description`) at top level; AutoBuilder extensions (`triggers`, `tags`, `applies_to`, `priority`) under `metadata`. Parsed for matching without reading the body.
+- **L1 (Frontmatter metadata):** Lightweight index fields. Standard fields (`name`, `description`) and AutoBuilder extensions (`triggers`, `tags`, `applies_to`, `priority`, `cascades`) all at top level. Parsed for matching without reading the body.
 - **L2 (Instructions/body):** Full markdown content -- conventions, patterns, examples. Loaded into agent context only on match.
-- **L3 (References/assets):** Optional supporting files in `references/` and `assets/` subdirectories alongside the skill file.
+- **L3 (References/assets/scripts):** Optional supporting files in `references/`, `assets/`, and `scripts/` subdirectories alongside the skill file. Agents access scripts via file tools (`file_read`, `bash_exec`) -- no automatic execution on skill load.
 
 ```markdown
 ---
 name: fastapi-endpoint
 description: How to implement a REST API endpoint following project conventions
-metadata:
-  triggers:
-    - deliverable_type: api_endpoint
-    - file_pattern: "*/routes/*.py"
-  tags: [api, http, routing, fastapi]
-  applies_to: [coder, reviewer]
-  priority: 10
+triggers:
+  - deliverable_type: api_endpoint
+  - file_pattern: "*/routes/*.py"
+tags: [api, http, routing, fastapi]
+applies_to: [coder, reviewer]
+priority: 10
 ---
 
 ## API Endpoint Implementation
@@ -152,25 +151,25 @@ Every endpoint requires:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | Unique identifier. Project-local skills with the same name as a global skill override it. |
-| `description` | string | Yes | Human-readable summary. Included in skill index for debugging. Also used as keyword fallback for trigger matching when `metadata.triggers` is absent (see [Interoperability](#interoperability)). |
+| `description` | string | Yes | Human-readable summary. Included in skill index for debugging. Also used as keyword fallback for trigger matching when `triggers` is absent (see [Interoperability](#interoperability)). |
 
-**Extension fields** (AutoBuilder-specific):
+**Extension fields** (AutoBuilder-specific, top-level):
 
-> **OPEN ITEM:** The Agent Skills spec defines `metadata` as a string-to-string map. AutoBuilder's extension fields (`triggers`, `tags`, `applies_to`, `priority`, `cascades`) are complex types (lists, objects, integers) that violate this constraint. The current design places them under `metadata` for namespacing, but the preferred approach (per Phase 6 FRD) is to promote them to top-level YAML keys alongside `name`/`description`. Top-level placement keeps `metadata` spec-compliant for true string-value annotations while other parsers simply ignore unknown top-level keys. Decision to be resolved during Phase 6 build.
+Extension fields are placed at the top level alongside `name`/`description`. This keeps `metadata` spec-compliant (string-to-string map for annotations) while other parsers simply ignore unknown top-level keys. The skill parser uses `extra="ignore"` so unrecognized fields are silently dropped.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `metadata.triggers` | list | Yes* | One or more trigger conditions. Skill matches if ANY trigger matches (OR logic). *Not required for third-party skills -- see [Interoperability](#interoperability). |
-| `metadata.tags` | list of strings | No | Additional matching keywords for `tag_match` trigger type. |
-| `metadata.applies_to` | list of strings | No | Which agents receive this skill's content. If omitted, applies to all agents. |
-| `metadata.priority` | integer | No | Higher priority skills load first when multiple skills match. Default: 0. |
-| `metadata.cascades` | list of objects | No | Skills to load alongside this skill when it matches. See [Skill Cascading](#skill-cascading). |
+| `triggers` | list | Yes* | One or more trigger conditions. Skill matches if ANY trigger matches (OR logic). *Not required for third-party skills -- see [Interoperability](#interoperability). |
+| `tags` | list of strings | No | Additional matching keywords for `tag_match` trigger type. |
+| `applies_to` | list of strings | No | Which agents receive this skill's content. If omitted, applies to all agents. |
+| `priority` | integer | No | Higher priority skills load first when multiple skills match. Default: 0. |
+| `cascades` | list of objects | No | Skills to load alongside this skill when it matches. See [Skill Cascading](#skill-cascading). |
 
 ---
 
 ## Trigger Matching
 
-Triggers are read from `metadata.triggers` in the skill frontmatter. Skills without `metadata.triggers` fall back to `description` keyword matching (see [Interoperability](#interoperability)).
+Triggers are read from `triggers` in the skill frontmatter. Skills without `triggers` fall back to `description` keyword matching (see [Interoperability](#interoperability)).
 
 ### Trigger Types
 
@@ -180,24 +179,23 @@ Triggers are read from `metadata.triggers` in the skill frontmatter. Skills with
 | `file_pattern` | Any file in `state["target_files"]` | Glob pattern match |
 | `tag_match` | Any tag in `state["deliverable_tags"]` | Set intersection (any overlap) |
 | `explicit` | `state["requested_skills"]` | Named request (agent or user requested this skill by name) |
-| `always` | Always matches for specified agents | Unconditional — the skill loads on every invocation for the agents listed in `metadata.applies_to` |
+| `always` | Always matches for specified agents | Unconditional — the skill loads on every invocation for the agents listed in `applies_to` |
 
 ### OR Logic
 
 A skill matches if **any** of its triggers match. This is intentional: triggers describe the different contexts where a skill is relevant. An API endpoint skill might trigger on both `deliverable_type: api_endpoint` AND `file_pattern: "*/routes/*.py"` because either condition means the skill is relevant.
 
 ```yaml
-metadata:
-  triggers:
-    - deliverable_type: api_endpoint       # Matches if deliverable type is "api_endpoint"
-    - file_pattern: "*/routes/*.py"        # OR if any target file is in a routes directory
+triggers:
+  - deliverable_type: api_endpoint       # Matches if deliverable type is "api_endpoint"
+  - file_pattern: "*/routes/*.py"        # OR if any target file is in a routes directory
 ```
 
 If the deliverable type is `api_endpoint` but no target files exist yet (initial generation), the skill still matches via the first trigger. If the deliverable type is `refactor` but the target files are in `routes/`, the skill still matches via the second trigger.
 
 ### Interoperability
 
-Third-party skills following the standard [Agent Skills](https://agentskills.io/specification) format may not include `metadata.triggers`. When `metadata.triggers` is absent, `SkillLoaderAgent` falls back to keyword matching against the skill's `description` field. This allows community-authored skills to work out of the box without modification, though explicit triggers provide more precise matching.
+Third-party skills following the standard [Agent Skills](https://agentskills.io/specification) format may not include `triggers`. When `triggers` is absent, `SkillLoaderAgent` falls back to keyword matching against the skill's `description` field. This allows community-authored skills to work out of the box without modification, though explicit triggers provide more precise matching.
 
 ### Override Rules
 
@@ -285,7 +283,7 @@ class SkillLoaderAgent(BaseAgent):
 
 ### How Agents Consume Skills
 
-The `metadata.applies_to` field in skill frontmatter controls which agents receive the skill. The `InstructionAssembler` (Decision #50) filters loaded skills during `assemble()` to only include those relevant to the current agent. Filtering happens at assembly time using the `applies_to` metadata stored alongside content in session state. Skills without an `applies_to` field are delivered to all agents. Skills are ordered by priority in the assembled instructions.
+The `applies_to` field in skill frontmatter controls which agents receive the skill. The `InstructionAssembler` (Decision #50) filters loaded skills during `assemble()` to only include those relevant to the current agent. Filtering happens at assembly time using the `applies_to` metadata stored alongside content in session state. Skills without an `applies_to` field are delivered to all agents. Skills are ordered by priority in the assembled instructions.
 
 For workers, the assembler reads `loaded_skills` from session state (written by `SkillLoaderAgent`) and filters per-agent. For Director/PM, skills are already in the `InstructionContext` from build-time resolution and are filtered identically by the assembler.
 
@@ -295,7 +293,7 @@ The assembler composes SKILL-type fragments from loaded skills alongside IDENTIT
 
 ## Directory Layout
 
-Per the Agent Skills open standard, each skill lives in its own directory named after the skill, containing a `SKILL.md` file and optional `references/` and `assets/` subdirectories.
+Per the Agent Skills open standard, each skill lives in its own directory named after the skill, containing a `SKILL.md` file and optional `references/`, `assets/`, and `scripts/` subdirectories.
 
 ### Global Skills (Ship with AutoBuilder)
 
@@ -341,6 +339,28 @@ app/skills/
     │       └── workflow-manifest.yaml  # Template: WORKFLOW.yaml with all fields
     └── project-conventions/
         └── SKILL.md               # How to configure project-level overrides (agents, skills, conventions)
+├── files/                          # File-editing skills (Anthropic third-party)
+│   ├── docx/
+│   │   ├── SKILL.md               # Word document creation, editing, analysis
+│   │   └── scripts/               # Helper scripts (unpack, pack, validate, etc.)
+│   ├── xlsx/
+│   │   ├── SKILL.md               # Spreadsheet creation and editing
+│   │   └── scripts/
+│   ├── pptx/
+│   │   ├── SKILL.md               # Presentation creation and editing
+│   │   ├── editing.md             # Editing workflow guide
+│   │   ├── pptxgenjs.md           # Creation from scratch guide
+│   │   └── scripts/
+│   └── pdf/
+│       ├── SKILL.md               # PDF processing and form filling
+│       ├── forms.md               # PDF form filling guide
+│       ├── reference.md           # Advanced PDF operations
+│       └── scripts/
+└── governance/                     # Supervision-tier role-bound skills
+    ├── director-oversight/
+    │   └── SKILL.md               # Director governance and oversight (always, applies_to: [director])
+    └── pm-management/
+        └── SKILL.md               # PM project management (always, applies_to: [pm])
 ```
 
 ### Project-Local Skills (Live in the User's Repo)
@@ -419,18 +439,17 @@ The skill index is cached in Redis for fast access across worker invocations. Ca
 
 ## Skill Cascading
 
-Skills can declare `cascades` in their frontmatter metadata to trigger loading of related reference materials. This keeps individual skills small and focused while enabling rich context through composition.
+Skills can declare `cascades` in their frontmatter to trigger loading of related reference materials. This keeps individual skills small and focused while enabling rich context through composition.
 
 ```yaml
 ---
 name: api-endpoint
 description: REST API endpoint conventions
-metadata:
-  triggers:
-    - deliverable_type: api_endpoint
-  cascades:
-    - reference: error-handling
-    - reference: project-conventions
+triggers:
+  - deliverable_type: api_endpoint
+cascades:
+  - reference: error-handling
+  - reference: project-conventions
 ---
 ```
 
@@ -505,6 +524,6 @@ This is disproportionate value for the effort. Skills transform agents from gene
 
 ---
 
-**Document Version:** 4.0
+**Document Version:** 4.1
 **Last Updated:** 2026-03-11
-**Status:** Framework Validated -- Phase 6 FRD Findings Propagated
+**Status:** Phase 6 Complete -- Extension fields updated to top-level placement per DD-1

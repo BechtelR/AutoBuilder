@@ -9,7 +9,7 @@ The system implements the Agent Skills open standard file format (`SKILL.md` wit
 
 The three-layer deterministic model applies across all agent tiers: (1) role-bound skills via `always` trigger + `applies_to` — Director always gets governance skills, PM always gets management skills; (2) context-matched skills via trigger matching against deliverable metadata — workers only, via SkillLoaderAgent; (3) explicit override via `requested_skills` in session state — rare, additive. Director and PM receive skills at agent build time; workers receive skills at pipeline runtime. Same matching engine, different call site.
 
-Phase 6 also ships 11 global skills (7 domain + 4 authoring) plus 2 role-bound supervision skills, establishes the project-local override directory convention (`.agents/skills/`), and enables autonomous skill creation by agents.
+Phase 6 also ships 17 global skills: 7 domain (code, review, test, planning), 4 authoring (skill, agent, workflow, project conventions), 4 file-editing (docx, xlsx, pptx, pdf including `scripts/` directories), and 2 role-bound supervision skills. It establishes the project-local override directory convention (`.agents/skills/`) and enables autonomous skill creation by agents.
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ cascades:                              # AutoBuilder extension (top-level)
 
 ### DD-2: SkillEntry Migration from Dataclass to Pydantic BaseModel
 
-`SkillEntry` expands from a frozen dataclass (3 fields: `name`, `description`, `applies_to`) to a Pydantic `BaseModel` with `ConfigDict(frozen=True)`. New fields: `triggers`, `tags`, `priority`, `cascades`, `has_references`, `has_assets`, `path`.
+`SkillEntry` expands from a frozen dataclass (3 fields: `name`, `description`, `applies_to`) to a Pydantic `BaseModel` with `ConfigDict(frozen=True)`. New fields: `triggers`, `tags`, `priority`, `cascades`, `has_references`, `has_assets`, `has_scripts`, `path`.
 
 **Rationale:** Pydantic provides validation, JSON serialization (for Redis cache), and lenient parsing (`model_config` with `extra="ignore"` for third-party skill tolerance). The frozen config maintains immutability. The existing `SkillContent` dataclass wrapping `SkillEntry + str` is preserved.
 
@@ -105,22 +105,22 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** —
 **Description:** Define the foundational types for the skill system: `TriggerType` enum in enums.py; `TriggerSpec`, `CascadeRef`, and expanded `SkillEntry` Pydantic models in library.py; `SkillMatchContext` expansion (add `requested_skills`) in protocols.py. Implement the frontmatter parser that extracts YAML from SKILL.md files with lenient parsing for third-party skills. Implement the validation function (`validate_skill_frontmatter`) callable by agents before writing skill files. Create the `app/skills/__init__.py` package init with public re-exports.
 **BOM Components:** *(checked off during build when implemented)*
-- [ ] `S01` — `SkillEntry` Pydantic model
-- [ ] `S03` — Frontmatter parser (YAML from markdown)
-- [ ] `S17` — Skill validation function (callable by agents and indexer)
+- [x] `S01` — `SkillEntry` Pydantic model
+- [x] `S03` — Frontmatter parser (YAML from markdown)
+- [x] `S17` — Skill validation function (callable by agents and indexer)
 **Requirements:**
-- [ ] `TriggerType` enum defined in `app/models/enums.py` with values: `DELIVERABLE_TYPE`, `FILE_PATTERN`, `TAG_MATCH`, `EXPLICIT`, `ALWAYS`
-- [ ] `SkillEntry` is a Pydantic `BaseModel` with `ConfigDict(frozen=True)` containing: `name` (str, required), `description` (str), `triggers` (list[TriggerSpec]), `tags` (list[str]), `applies_to` (list[str]), `priority` (int, default 0), `cascades` (list[CascadeRef]), `has_references` (bool), `has_assets` (bool), `path` (Path | None)
-- [ ] `TriggerSpec` model has `trigger_type: TriggerType` and `value: str` fields
-- [ ] `parse_skill_frontmatter(file_path: Path) -> SkillEntry | None` extracts YAML between `---` delimiters, returns `SkillEntry` on success, `None` on failure with warning log
-- [ ] Parser is lenient: unknown frontmatter fields are ignored (Pydantic `extra="ignore"`), non-standard metadata tolerated (FR-6.17)
-- [ ] Parser is strict on required fields: missing `name` or `description` → returns None with warning (FR-6.03)
-- [ ] `validate_skill_frontmatter(frontmatter: dict[str, object]) -> list[str]` returns list of error strings (empty = valid) — callable by agents (FR-6.52)
-- [ ] Frontmatter parsing is lenient for third-party skills (unknown fields ignored, non-standard metadata tolerated) but strict on required fields (`name`, `description`) (NFR-6.05)
-- [ ] `SkillMatchContext` in `protocols.py` gains `requested_skills: list[str]` field
-- [ ] `app/skills/__init__.py` exists and re-exports `SkillEntry`, `SkillLibrary` (forward ref), parser functions
-- [ ] No new external dependencies introduced — uses filesystem, Redis (existing), and PyYAML (existing transitive dependency) only (NFR-6.04)
-- [ ] All types pass pyright strict
+- [x] `TriggerType` enum defined in `app/models/enums.py` with values: `DELIVERABLE_TYPE`, `FILE_PATTERN`, `TAG_MATCH`, `EXPLICIT`, `ALWAYS`
+- [x] `SkillEntry` is a Pydantic `BaseModel` with `ConfigDict(frozen=True)` containing: `name` (str, required), `description` (str), `triggers` (list[TriggerSpec]), `tags` (list[str]), `applies_to` (list[str]), `priority` (int, default 0), `cascades` (list[CascadeRef]), `has_references` (bool), `has_assets` (bool), `has_scripts` (bool), `path` (Path | None)
+- [x] `TriggerSpec` model has `trigger_type: TriggerType` and `value: str` fields
+- [x] `parse_skill_frontmatter(file_path: Path) -> SkillEntry | None` extracts YAML between `---` delimiters, returns `SkillEntry` on success, `None` on failure with warning log
+- [x] Parser is lenient: unknown frontmatter fields are ignored (Pydantic `extra="ignore"`), non-standard metadata tolerated (FR-6.17)
+- [x] Parser is strict on required fields: missing `name` or `description` → returns None with warning (FR-6.03)
+- [x] `validate_skill_frontmatter(frontmatter: dict[str, object]) -> list[str]` returns list of error strings (empty = valid) — callable by agents (FR-6.52)
+- [x] Frontmatter parsing is lenient for third-party skills (unknown fields ignored, non-standard metadata tolerated) but strict on required fields (`name`, `description`) (NFR-6.05)
+- [x] `SkillMatchContext` in `protocols.py` gains `requested_skills: list[str]` field
+- [x] `app/skills/__init__.py` exists and re-exports `SkillEntry`, `SkillLibrary` (forward ref), parser functions
+- [x] No new external dependencies introduced — uses filesystem, Redis (existing), and PyYAML (existing transitive dependency) only (NFR-6.04)
+- [x] All types pass pyright strict
 **Validation:**
 - `uv run pyright app/skills/ app/agents/protocols.py app/models/enums.py`
 - `uv run pytest tests/skills/test_parser.py -v`
@@ -132,21 +132,21 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D1
 **Description:** Implement the five trigger matcher strategies plus the description keyword fallback for third-party skill interoperability. Each matcher evaluates a single `TriggerSpec` against a `SkillMatchContext`. The `match_triggers` orchestrator function evaluates all triggers on a skill entry with OR logic and returns match status. The `DescriptionKeywordMatcher` provides conservative fallback matching for skills without triggers.
 **BOM Components:**
-- [ ] `S04` — `deliverable_type` trigger matcher
-- [ ] `S05` — `file_pattern` trigger matcher (glob)
-- [ ] `S06` — `tag_match` trigger matcher (set intersection)
-- [ ] `S07` — `explicit` trigger matcher
-- [ ] `S08` — `always` trigger matcher
-- [ ] `S09` — Description keyword fallback (interop)
+- [x] `S04` — `deliverable_type` trigger matcher
+- [x] `S05` — `file_pattern` trigger matcher (glob)
+- [x] `S06` — `tag_match` trigger matcher (set intersection)
+- [x] `S07` — `explicit` trigger matcher
+- [x] `S08` — `always` trigger matcher
+- [x] `S09` — Description keyword fallback (interop)
 **Requirements:**
-- [ ] `deliverable_type` matcher: exact string match between trigger value and `context.deliverable_type` (FR-6.07)
-- [ ] `file_pattern` matcher: glob match using `fnmatch` — trigger pattern tested against each file in `context.file_patterns`; match if any file matches (FR-6.08)
-- [ ] `tag_match` matcher: set intersection between skill's `tags` and `context.tags`; match if any overlap (FR-6.09)
-- [ ] `explicit` matcher: skill's `name` checked against `context.requested_skills`; match if present (FR-6.10)
-- [ ] `always` matcher: unconditional match, always returns True (FR-6.11)
-- [ ] `match_triggers(entry: SkillEntry, context: SkillMatchContext) -> list[str]` returns list of matched trigger type names (empty = no match). OR logic: any single trigger match is sufficient (FR-6.12)
-- [ ] `DescriptionKeywordMatcher.matches_description(description, context) -> bool`: extracts significant words (>4 chars, not stopwords), requires ≥2 to appear across context strings (FR-6.15, FR-6.16)
-- [ ] Keyword fallback is used ONLY when skill has no triggers defined (FR-6.15)
+- [x] `deliverable_type` matcher: exact string match between trigger value and `context.deliverable_type` (FR-6.07)
+- [x] `file_pattern` matcher: glob match using `fnmatch` — trigger pattern tested against each file in `context.file_patterns`; match if any file matches (FR-6.08)
+- [x] `tag_match` matcher: set intersection between skill's `tags` and `context.tags`; match if any overlap (FR-6.09)
+- [x] `explicit` matcher: skill's `name` checked against `context.requested_skills`; match if present (FR-6.10)
+- [x] `always` matcher: unconditional match, always returns True (FR-6.11)
+- [x] `match_triggers(entry: SkillEntry, context: SkillMatchContext) -> list[str]` returns list of matched trigger type names (empty = no match). OR logic: any single trigger match is sufficient (FR-6.12)
+- [x] `DescriptionKeywordMatcher.matches_description(description, context) -> bool`: extracts significant words (>4 chars, not stopwords), requires ≥2 to appear across context strings (FR-6.15, FR-6.16)
+- [x] Keyword fallback is used ONLY when skill has no triggers defined (FR-6.15)
 **Validation:**
 - `uv run pyright app/skills/matchers.py`
 - `uv run pytest tests/skills/test_matchers.py -v`
@@ -158,32 +158,32 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D1, P6.D2
 **Description:** Implement the `SkillLibrary` class: recursive filesystem scanning to build an in-memory index, two-tier scan (global first, project-local overrides by name), deterministic trigger matching via matchers, full body loading from disk, and transitive cascade resolution with cycle detection. The library implements the `SkillLibraryProtocol` structurally (duck typing). Index keyed by skill `name`.
 **BOM Components:**
-- [ ] `S02` — `SkillLibrary` class
-- [ ] `S10` — Two-tier scan (global + project-local override)
-- [ ] `S15` — Skill cascade resolution
-- [ ] `S20` — `app/skills/` directory structure
-- [ ] `S21` — `.agents/skills/` project-local directory support
+- [x] `S02` — `SkillLibrary` class
+- [x] `S10` — Two-tier scan (global + project-local override)
+- [x] `S15` — Skill cascade resolution
+- [x] `S20` — `app/skills/` directory structure
+- [x] `S21` — `.agents/skills/` project-local directory support
 **Requirements:**
-- [ ] `SkillLibrary.__init__(global_dir: Path, project_dir: Path | None = None, redis: ArqRedis | None = None)` — stores configuration, does not scan on init
-- [ ] `scan()` recursively finds all `SKILL.md` files in configured directories, parses frontmatter via `parse_skill_frontmatter`, builds `_index: dict[str, SkillEntry]` (FR-6.01)
-- [ ] Scan order: global directory first, then project-local directory. Project-local entries overwrite global entries with same name (FR-6.18, FR-6.21)
-- [ ] Duplicate names within same scan scope: first found wins, warning logged (FR-6.06)
-- [ ] Name vs directory mismatch: warning logged, frontmatter `name` used (FR-6.04)
-- [ ] `references/` and `assets/` subdirectory existence recorded in `SkillEntry.has_references` / `has_assets` (FR-6.05)
-- [ ] Project-local override logged: skill name, which scope won (FR-6.21)
-- [ ] No project-local directory configured: operates with global skills only, no errors (FR-6.20)
-- [ ] `match(context: SkillMatchContext) -> list[SkillEntry]` evaluates all indexed skills against context using trigger matchers; skills without triggers use description keyword fallback; results sorted by priority desc then name asc (FR-6.13)
-- [ ] When no skills match: returns empty list (pipeline continues normally per FR-6.14)
-- [ ] Project-local skills with unique names (not present in global set) are added to the index alongside global skills (FR-6.19)
-- [ ] `load(entry: SkillEntry) -> SkillContent` reads full markdown body (below frontmatter) from `entry.path`; logs warning if body exceeds 3000 words recommending content be moved to `references/` (NFR-6.03)
-- [ ] `resolve_cascades(entries: list[SkillEntry]) -> list[SkillEntry]` transitively resolves cascade references via visited-name tracking (FR-6.22, FR-6.23)
-- [ ] Circular cascade references detected and broken with warning log (FR-6.24)
-- [ ] Missing cascade references: warning logged, resolution continues (FR-6.25)
-- [ ] Cascaded skills respect two-tier override (FR-6.26)
-- [ ] `get_index() -> dict[str, SkillEntry]` returns full index for inspection (FR-6.39)
-- [ ] Library structurally implements `SkillLibraryProtocol` (match + load signatures compatible)
-- [ ] Full filesystem scan + frontmatter parsing completes in under 2 seconds for 100 skills (NFR-6.01)
-- [ ] Trigger matching against the full index completes in under 10 milliseconds per context — O(n) in indexed skills with constant-time per-trigger evaluation (NFR-6.02)
+- [x] `SkillLibrary.__init__(global_dir: Path, project_dir: Path | None = None, redis: ArqRedis | None = None)` — stores configuration, does not scan on init
+- [x] `scan()` recursively finds all `SKILL.md` files in configured directories, parses frontmatter via `parse_skill_frontmatter`, builds `_index: dict[str, SkillEntry]` (FR-6.01)
+- [x] Scan order: global directory first, then project-local directory. Project-local entries overwrite global entries with same name (FR-6.18, FR-6.21)
+- [x] Duplicate names within same scan scope: first found wins, warning logged (FR-6.06)
+- [x] Name vs directory mismatch: warning logged, frontmatter `name` used (FR-6.04)
+- [x] `references/`, `assets/`, and `scripts/` subdirectory existence recorded in `SkillEntry.has_references` / `has_assets` / `has_scripts` (FR-6.05). Agents access scripts via file tools (`file_read`, `bash_exec`) — no automatic execution
+- [x] Project-local override logged: skill name, which scope won (FR-6.21)
+- [x] No project-local directory configured: operates with global skills only, no errors (FR-6.20)
+- [x] `match(context: SkillMatchContext) -> list[SkillEntry]` evaluates all indexed skills against context using trigger matchers; skills without triggers use description keyword fallback; results sorted by priority desc then name asc (FR-6.13)
+- [x] When no skills match: returns empty list (pipeline continues normally per FR-6.14)
+- [x] Project-local skills with unique names (not present in global set) are added to the index alongside global skills (FR-6.19)
+- [x] `load(entry: SkillEntry) -> SkillContent` reads full markdown body (below frontmatter) from `entry.path`; logs warning if body exceeds 3000 words recommending content be moved to `references/` (NFR-6.03)
+- [x] `resolve_cascades(entries: list[SkillEntry]) -> list[SkillEntry]` transitively resolves cascade references via visited-name tracking (FR-6.22, FR-6.23)
+- [x] Circular cascade references detected and broken with warning log (FR-6.24)
+- [x] Missing cascade references: warning logged, resolution continues (FR-6.25)
+- [x] Cascaded skills respect two-tier override (FR-6.26)
+- [x] `get_index() -> dict[str, SkillEntry]` returns full index for inspection (FR-6.39)
+- [x] Library structurally implements `SkillLibraryProtocol` (match + load signatures compatible)
+- [x] Full filesystem scan + frontmatter parsing completes in under 2 seconds for 100 skills (NFR-6.01)
+- [x] Trigger matching against the full index completes in under 10 milliseconds per context — O(n) in indexed skills with constant-time per-trigger evaluation (NFR-6.02)
 **Validation:**
 - `uv run pyright app/skills/library.py`
 - `uv run pytest tests/skills/test_library.py -v`
@@ -195,19 +195,19 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D3
 **Description:** Add Redis caching to the SkillLibrary: serialize/deserialize the in-memory index to/from Redis, implement atomic invalidation, and add periodic mtime-based change detection. Cache is optional — library operates without Redis (filesystem-only mode). Cache key format: `autobuilder:skill_index:{scope_hash}` where scope_hash encodes the global+project directory combination.
 **BOM Components:**
-- [ ] `S13` — Skill index Redis cache
-- [ ] `S14` — Skill cache invalidation (file change + gateway API)
-- [ ] `M21` — Skill index cache (long TTL)
+- [x] `S13` — Skill index Redis cache
+- [x] `S14` — Skill cache invalidation (file change + gateway API)
+- [x] `M21` — Skill index cache (long TTL)
 **Requirements:**
-- [ ] `save_to_cache()` serializes the index to Redis as JSON (Path→string conversion). Atomic: old index serves until new SET completes (FR-6.31, NFR-6.06)
-- [ ] `load_from_cache() -> bool` deserializes index from Redis. Returns True on cache hit, False on miss (FR-6.31)
-- [ ] `invalidate_cache()` deletes the cached index key. Next access triggers filesystem rescan (FR-6.33)
-- [ ] Cache unavailable or expired: falls back to filesystem scan, no error (FR-6.34)
-- [ ] `check_for_changes() -> bool` compares cached file modification timestamps against current disk state; returns True if changes detected (FR-6.32)
-- [ ] When changes detected, cache is invalidated and rebuilt (FR-6.32)
-- [ ] Cache key uses deterministic hash of configured directory paths
-- [ ] Redis is optional: `redis=None` → cache methods are no-ops, library works filesystem-only
-- [ ] All cache operations are async
+- [x] `save_to_cache()` serializes the index to Redis as JSON (Path→string conversion). Atomic: old index serves until new SET completes (FR-6.31, NFR-6.06)
+- [x] `load_from_cache() -> bool` deserializes index from Redis. Returns True on cache hit, False on miss (FR-6.31)
+- [x] `invalidate_cache()` deletes the cached index key. Next access triggers filesystem rescan (FR-6.33)
+- [x] Cache unavailable or expired: falls back to filesystem scan, no error (FR-6.34)
+- [x] `check_for_changes() -> bool` compares cached file modification timestamps against current disk state; returns True if changes detected (FR-6.32)
+- [x] When changes detected, cache is invalidated and rebuilt (FR-6.32)
+- [x] Cache key uses deterministic hash of configured directory paths
+- [x] Redis is optional: `redis=None` → cache methods are no-ops, library works filesystem-only
+- [x] All cache operations are async
 **Validation:**
 - `uv run pyright app/skills/library.py`
 - `uv run pytest tests/skills/test_cache.py -v`
@@ -219,20 +219,20 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D3
 **Description:** Update the SkillLoaderAgent to call `resolve_cascades()` after matching and write `LoadedSkillData` (with `applies_to` and `matched_triggers` metadata) to session state. Update the InstructionAssembler SKILL fragment to filter `loaded_skills` by `applies_to` per agent — only skills where `applies_to` is empty or contains the current agent name are included. Update `InstructionContext.loaded_skills` type from `dict[str, str]` to `dict[str, LoadedSkillData]`. Update `NullSkillLibrary` for type compatibility. Publish skill loading events to event stream via existing state_delta event mechanism.
 **BOM Components:**
-- [ ] `S12` — `InstructionAssembler` skill injection with `applies_to` filtering
+- [x] `S12` — `InstructionAssembler` skill injection with `applies_to` filtering
 **Requirements:**
-- [ ] `SkillLoaderAgent._run_async_impl` calls `library.resolve_cascades(matched)` after initial `match()` (FR-6.22)
-- [ ] SkillLoaderAgent writes `loaded_skills: dict[str, LoadedSkillData]` to state with `content`, `applies_to`, and `matched_triggers` per skill (FR-6.35, FR-6.36, FR-6.37)
-- [ ] SkillLoaderAgent writes `loaded_skill_names: list[str]` to state (FR-6.35)
-- [ ] When no skills match, SkillLoaderAgent emits `loaded_skill_names: []` and `loaded_skills: {}` — pipeline continues normally (FR-6.14); a warning event is published to the event stream identifying the deliverable and context that produced no matches (FR-6.38)
-- [ ] `InstructionContext.loaded_skills` type changed to `dict[str, LoadedSkillData]`
-- [ ] `LoadedSkillData` TypedDict defined with `content: str`, `applies_to: list[str]`, `matched_triggers: list[str]`
-- [ ] InstructionAssembler SKILL fragment: for each skill in `ctx.loaded_skills`, include only if `applies_to` is empty OR contains `ctx.agent_name` (FR-6.27, FR-6.28)
-- [ ] Included skills appear in assembled instructions in the order returned by `SkillLibrary.match()` (priority desc, name asc — sorting is performed at match time, assembler preserves order) (FR-6.29)
-- [ ] Curly braces in skill content that are not state template references are escaped (FR-6.30)
-- [ ] `NullSkillLibrary.load()` returns `SkillContent` compatible with expanded `SkillEntry`
-- [ ] Skill loading event published to event stream via existing state_delta mechanism — the state_delta containing `loaded_skills` flows through EventPublisher naturally (FR-6.37, FR-6.38)
-- [ ] Existing tests updated for type changes; new tests for applies_to filtering
+- [x] `SkillLoaderAgent._run_async_impl` calls `library.resolve_cascades(matched)` after initial `match()` (FR-6.22)
+- [x] SkillLoaderAgent writes `loaded_skills: dict[str, LoadedSkillData]` to state with `content`, `applies_to`, and `matched_triggers` per skill (FR-6.35, FR-6.36, FR-6.37)
+- [x] SkillLoaderAgent writes `loaded_skill_names: list[str]` to state (FR-6.35)
+- [x] When no skills match, SkillLoaderAgent emits `loaded_skill_names: []` and `loaded_skills: {}` — pipeline continues normally (FR-6.14); a warning event is published to the event stream identifying the deliverable and context that produced no matches (FR-6.38)
+- [x] `InstructionContext.loaded_skills` type changed to `dict[str, LoadedSkillData]`
+- [x] `LoadedSkillData` TypedDict defined with `content: str`, `applies_to: list[str]`, `matched_triggers: list[str]`
+- [x] InstructionAssembler SKILL fragment: for each skill in `ctx.loaded_skills`, include only if `applies_to` is empty OR contains `ctx.agent_name` (FR-6.27, FR-6.28)
+- [x] Included skills appear in assembled instructions in the order returned by `SkillLibrary.match()` (priority desc, name asc — sorting is performed at match time, assembler preserves order) (FR-6.29)
+- [x] Curly braces in skill content that are not state template references are escaped (FR-6.30)
+- [x] `NullSkillLibrary.load()` returns `SkillContent` compatible with expanded `SkillEntry`
+- [x] Skill loading event published to event stream via existing state_delta mechanism — the state_delta containing `loaded_skills` flows through EventPublisher naturally (FR-6.37, FR-6.38)
+- [x] Existing tests updated for type changes; new tests for applies_to filtering
 **Validation:**
 - `uv run pyright app/agents/assembler.py app/agents/custom/skill_loader.py app/agents/protocols.py`
 - `uv run pytest tests/agents/test_assembler.py tests/agents/custom/test_skill_loader.py -v`
@@ -244,19 +244,19 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D3, P6.D4, P6.D5
 **Description:** Add Director and PM skill resolution at agent build time. When the Director is constructed (in `build_chat_session_agent`, `build_work_session_agents`, `run_director_turn`), call `skill_library.match()` with a Director-specific context and create a Director-specific `InstructionContext`. Separately, when PM is constructed, resolve PM-specific skills. Each tier gets independently resolved skills baked into instructions at construction time. Add gateway skill endpoints: `POST /skills/cache/invalidate` and `GET /skills` for operator use. Add `get_skill_library` dependency. Wire SkillLibrary creation into gateway lifespan.
 **BOM Components:**
-- [ ] `S16` — Supervision-tier skill resolution (Director/PM build-time matching)
+- [x] `S16` — Supervision-tier skill resolution (Director/PM build-time matching)
 **Requirements:**
-- [ ] `build_chat_session_agent()` accepts `skill_library` parameter; resolves Director skills via `skill_library.match(SkillMatchContext(agent_role="director"))` and creates Director-specific `InstructionContext` with resolved skills (FR-6.46)
-- [ ] `build_work_session_agents()` resolves Director and PM skills independently — separate `SkillMatchContext` per tier, separate `InstructionContext` per agent (FR-6.46, FR-6.47, FR-6.48)
-- [ ] `run_director_turn()` resolves Director skills at build time (FR-6.46, FR-6.49)
-- [ ] Skills with `always` trigger + `applies_to: [director]` load for every Director invocation regardless of session type (FR-6.49)
-- [ ] Skills with `always` trigger + no `applies_to` load for ALL agents across all tiers (FR-6.50)
-- [ ] `SkillCatalogEntry` Pydantic model defined in `app/gateway/models/skills.py` with: name, description, triggers, tags, applies_to, priority, has_references, has_assets
-- [ ] `POST /skills/cache/invalidate` triggers `skill_library.invalidate_cache()` and returns acknowledgment (FR-6.33)
-- [ ] `GET /skills` returns `list[SkillCatalogEntry]` from `skill_library.get_index()` (FR-6.39)
-- [ ] `get_skill_library` dependency added to `app/gateway/deps.py` reading from `app.state.skill_library`
-- [ ] Skills router registered in `app/gateway/main.py`
-- [ ] Gateway lifespan creates `SkillLibrary` instance, calls `scan()`, stores on `app.state`
+- [x] `build_chat_session_agent()` accepts `skill_library` parameter; resolves Director skills via `skill_library.match(SkillMatchContext(agent_role="director"))` and creates Director-specific `InstructionContext` with resolved skills (FR-6.46)
+- [x] `build_work_session_agents()` resolves Director and PM skills independently — separate `SkillMatchContext` per tier, separate `InstructionContext` per agent (FR-6.46, FR-6.47, FR-6.48)
+- [x] `run_director_turn()` resolves Director skills at build time (FR-6.46, FR-6.49)
+- [x] Skills with `always` trigger + `applies_to: [director]` load for every Director invocation regardless of session type (FR-6.49)
+- [x] Skills with `always` trigger + no `applies_to` load for ALL agents across all tiers (FR-6.50)
+- [x] `SkillCatalogEntry` Pydantic model defined in `app/gateway/models/skills.py` with: name, description, triggers, tags, applies_to, priority, has_references, has_assets, has_scripts
+- [x] `POST /skills/cache/invalidate` triggers `skill_library.invalidate_cache()` and returns acknowledgment (FR-6.33)
+- [x] `GET /skills` returns `list[SkillCatalogEntry]` from `skill_library.get_index()` (FR-6.39)
+- [x] `get_skill_library` dependency added to `app/gateway/deps.py` reading from `app.state.skill_library`
+- [x] Skills router registered in `app/gateway/main.py`
+- [x] Gateway lifespan creates `SkillLibrary` instance, calls `scan()`, stores on `app.state`
 **Validation:**
 - `uv run pyright app/workers/adk.py app/gateway/routes/skills.py app/gateway/models/skills.py`
 - `uv run pytest tests/workers/test_adk.py tests/gateway/routes/test_skills.py -v`
@@ -268,28 +268,28 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D1
 **Description:** Author 7 domain skills covering common development patterns. Each skill follows the Agent Skills open standard: SKILL.md with YAML frontmatter in a named directory. Skills have AutoBuilder trigger declarations for precise matching. Writing style is imperative/instructional. Body content under 3000 words with detailed content in `references/` where needed. Descriptions written in third-person with specific trigger phrases. Remove `.gitkeep` files from existing directories.
 **BOM Components:**
-- [ ] `S22` — Skill: `code/api-endpoint`
-- [ ] `S23` — Skill: `code/data-model`
-- [ ] `S24` — Skill: `code/database-migration`
-- [ ] `S25` — Skill: `review/security-review`
-- [ ] `S26` — Skill: `review/performance-review`
-- [ ] `S27` — Skill: `test/unit-test-patterns`
-- [ ] `S28` — Skill: `planning/task-decomposition`
+- [x] `S22` — Skill: `code/api-endpoint`
+- [x] `S23` — Skill: `code/data-model`
+- [x] `S24` — Skill: `code/database-migration`
+- [x] `S25` — Skill: `review/security-review`
+- [x] `S26` — Skill: `review/performance-review`
+- [x] `S27` — Skill: `test/unit-test-patterns`
+- [x] `S28` — Skill: `planning/task-decomposition`
 **Requirements:**
-- [ ] Each skill has a named directory containing `SKILL.md` per Agent Skills standard (FR-6.42)
-- [ ] Each skill's frontmatter contains `name` and `description` (required), plus `triggers`, `tags`, `applies_to`, `priority` as appropriate (FR-6.42)
-- [ ] `api-endpoint` skill: triggers on `deliverable_type: api_endpoint` and `file_pattern: "*/routes/*.py"`, applies_to includes `coder` and `reviewer`
-- [ ] `data-model` skill: triggers on `deliverable_type: data_model` and `file_pattern: "*/models/*.py"`, applies_to includes `coder` and `reviewer`
-- [ ] `database-migration` skill: triggers on `deliverable_type: migration` and `file_pattern: "*/migrations/*.py"`, applies_to includes `coder`
-- [ ] `security-review` skill: triggers on `tag_match` with security-related tags, applies_to `reviewer`
-- [ ] `performance-review` skill: triggers on `tag_match` with performance-related tags, applies_to `reviewer`
-- [ ] `unit-test-patterns` skill: triggers on `deliverable_type: test` and `file_pattern: "*/tests/*.py"`, applies_to `coder`
-- [ ] `task-decomposition` skill: `always` trigger, applies_to `planner`
-- [ ] All descriptions written in third-person (FR-6.43)
-- [ ] All body content in imperative/instructional style (FR-6.43)
-- [ ] Body content under 3000 words per skill (NFR-6.03)
-- [ ] `.gitkeep` files removed from `app/skills/code/`, `app/skills/review/`, `app/skills/test/`, `app/skills/planning/`
-- [ ] All skills pass `validate_skill_frontmatter()` validation
+- [x] Each skill has a named directory containing `SKILL.md` per Agent Skills standard (FR-6.42)
+- [x] Each skill's frontmatter contains `name` and `description` (required), plus `triggers`, `tags`, `applies_to`, `priority` as appropriate (FR-6.42)
+- [x] `api-endpoint` skill: triggers on `deliverable_type: api_endpoint` and `file_pattern: "*/routes/*.py"`, applies_to includes `coder` and `reviewer`
+- [x] `data-model` skill: triggers on `deliverable_type: data_model` and `file_pattern: "*/models/*.py"`, applies_to includes `coder` and `reviewer`
+- [x] `database-migration` skill: triggers on `deliverable_type: migration` and `file_pattern: "*/migrations/*.py"`, applies_to includes `coder`
+- [x] `security-review` skill: triggers on `tag_match` with security-related tags, applies_to `reviewer`
+- [x] `performance-review` skill: triggers on `tag_match` with performance-related tags, applies_to `reviewer`
+- [x] `unit-test-patterns` skill: triggers on `deliverable_type: test` and `file_pattern: "*/tests/*.py"`, applies_to `coder`
+- [x] `task-decomposition` skill: `always` trigger, applies_to `planner`
+- [x] All descriptions written in third-person (FR-6.43)
+- [x] All body content in imperative/instructional style (FR-6.43)
+- [x] Body content under 3000 words per skill (NFR-6.03)
+- [x] `.gitkeep` files removed from `app/skills/code/`, `app/skills/review/`, `app/skills/test/`, `app/skills/planning/`
+- [x] All skills pass `validate_skill_frontmatter()` validation
 **Validation:**
 - `uv run pytest tests/skills/test_skill_files.py -v` (validates all shipped skills have valid frontmatter)
 
@@ -300,20 +300,20 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D1
 **Description:** Author 4 authoring skills that teach agents how to create system artifacts. The skill-authoring skill is the most detailed — it includes a validation checklist and a `references/skill-template.md` with all supported frontmatter fields annotated. The agent-definition skill teaches agent definition file authoring. The workflow-authoring skill teaches WORKFLOW.yaml manifest creation. The project-conventions skill teaches project-level override configuration. These skills enable autonomous skill creation (CAP-11).
 **BOM Components:**
-- [ ] `S33` — Skill: `authoring/skill-authoring` (+ `references/skill-template.md`)
-- [ ] `S34` — Skill: `authoring/agent-definition`
-- [ ] `S35` — Skill: `authoring/workflow-authoring`
-- [ ] `S36` — Skill: `authoring/project-conventions`
+- [x] `S33` — Skill: `authoring/skill-authoring` (+ `references/skill-template.md`)
+- [x] `S34` — Skill: `authoring/agent-definition`
+- [x] `S35` — Skill: `authoring/workflow-authoring`
+- [x] `S36` — Skill: `authoring/project-conventions`
 **Requirements:**
-- [ ] Each skill has a named directory containing `SKILL.md` per Agent Skills standard (FR-6.42)
-- [ ] `skill-authoring` includes validation checklist covering: frontmatter structure, required fields, trigger design, progressive disclosure, writing style, resource referencing (FR-6.44)
-- [ ] `skill-authoring` includes `references/skill-template.md` with all supported frontmatter fields annotated (FR-6.45)
-- [ ] `skill-authoring` provides sufficient guidance for an agent to produce a valid SKILL.md file (FR-6.53)
-- [ ] `agent-definition` covers: markdown + YAML frontmatter format, 3-scope cascade, metadata fields, body writing conventions
-- [ ] `workflow-authoring` covers: WORKFLOW.yaml manifest schema, pipeline.py interface contract, agents/ and skills/ subdirectories
-- [ ] `project-conventions` covers: `.agents/` directory structure, project-scope agent overrides, project-local skills, configuration patterns
-- [ ] All authoring skills use `always` trigger with appropriate `applies_to` fields (e.g., `applies_to: [coder, planner]` or all agents)
-- [ ] All skills pass `validate_skill_frontmatter()` validation
+- [x] Each skill has a named directory containing `SKILL.md` per Agent Skills standard (FR-6.42)
+- [x] `skill-authoring` includes validation checklist covering: frontmatter structure, required fields, trigger design, progressive disclosure, writing style, resource referencing (FR-6.44)
+- [x] `skill-authoring` includes `references/skill-template.md` with all supported frontmatter fields annotated (FR-6.45)
+- [x] `skill-authoring` provides sufficient guidance for an agent to produce a valid SKILL.md file (FR-6.53)
+- [x] `agent-definition` covers: markdown + YAML frontmatter format, 3-scope cascade, metadata fields, body writing conventions
+- [x] `workflow-authoring` covers: WORKFLOW.yaml manifest schema, pipeline.py interface contract, agents/ and skills/ subdirectories
+- [x] `project-conventions` covers: `.agents/` directory structure, project-scope agent overrides, project-local skills, configuration patterns
+- [x] All authoring skills use `always` trigger with appropriate `applies_to` fields (e.g., `applies_to: [coder, planner]` or all agents)
+- [x] All skills pass `validate_skill_frontmatter()` validation
 **Validation:**
 - `uv run pytest tests/skills/test_skill_files.py -v`
 
@@ -324,14 +324,36 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 **Depends on:** P6.D1
 **Description:** Author 2 role-bound supervision skills using `always` trigger + `applies_to`. The Director oversight skill covers governance responsibilities, brief-shaping, CEO communication patterns, and operational identity. The PM management skill covers project orchestration, batch management, quality gates, and escalation patterns. These skills demonstrate the Layer 1 role-bound loading model and ensure supervision agents get contextual knowledge on every invocation.
 **BOM Components:**
-- [ ] `S32` — Director/PM role-bound skills (governance, oversight, management)
+- [x] `S32` — Director/PM role-bound skills (governance, oversight, management)
 **Requirements:**
-- [ ] `director-oversight` skill: `always` trigger, `applies_to: [director]`, high priority (FR-6.49)
-- [ ] `director-oversight` content covers: governance responsibilities, formation/brief-shaping guidance, CEO queue communication patterns, cross-project oversight principles
-- [ ] `pm-management` skill: `always` trigger, `applies_to: [pm]`, high priority
-- [ ] `pm-management` content covers: batch management strategy, deliverable lifecycle, quality gate enforcement, escalation decision framework, inter-batch reasoning
-- [ ] Both skills load for every invocation of their respective agents — Director and PM do NOT receive each other's role-bound skills (FR-6.48)
-- [ ] Both skills pass `validate_skill_frontmatter()` validation
+- [x] `director-oversight` skill: `always` trigger, `applies_to: [director]`, high priority (FR-6.49)
+- [x] `director-oversight` content covers: governance responsibilities, formation/brief-shaping guidance, CEO queue communication patterns, cross-project oversight principles
+- [x] `pm-management` skill: `always` trigger, `applies_to: [pm]`, high priority
+- [x] `pm-management` content covers: batch management strategy, deliverable lifecycle, quality gate enforcement, escalation decision framework, inter-batch reasoning
+- [x] Both skills load for every invocation of their respective agents — Director and PM do NOT receive each other's role-bound skills (FR-6.48)
+- [x] Both skills pass `validate_skill_frontmatter()` validation
+**Validation:**
+- `uv run pytest tests/skills/test_skill_files.py -v`
+
+---
+
+### P6.D10: File-Editing Skills
+**Files:** `app/skills/files/docx/SKILL.md`, `app/skills/files/docx/scripts/`, `app/skills/files/xlsx/SKILL.md`, `app/skills/files/xlsx/scripts/`, `app/skills/files/pptx/SKILL.md`, `app/skills/files/pptx/editing.md`, `app/skills/files/pptx/pptxgenjs.md`, `app/skills/files/pptx/scripts/`, `app/skills/files/pdf/SKILL.md`, `app/skills/files/pdf/forms.md`, `app/skills/files/pdf/reference.md`, `app/skills/files/pdf/scripts/`
+**Depends on:** P6.D1
+**Description:** Ship 4 file-editing skills. Original skill content (body, scripts, references) is preserved. AutoBuilder trigger declarations are added to each skill's frontmatter so they match via the deterministic trigger system — not the keyword fallback. Each skill includes a `scripts/` directory with Python helper scripts that agents invoke via `bash_exec` / file tools. The skills share an `office/` scripts subdirectory (pack, unpack, validate, soffice wrappers). Placed under a new `app/skills/files/` category.
+**BOM Components:**
+- [ ] *(no BOM component — additive to FR-6.40 initial library scope)*
+**Requirements:**
+- [ ] `docx` skill copied with SKILL.md + `scripts/` directory (includes `accept_changes.py`, `comment.py`, `office/` shared scripts, `templates/`); AutoBuilder triggers added: `file_pattern: "*.docx"`, `file_pattern: "*.doc"`, tags: `[document, word, docx]`, applies_to: `[coder]`
+- [ ] `xlsx` skill copied with SKILL.md + `scripts/` directory (includes `recalc.py`, `office/` shared scripts); AutoBuilder triggers added: `file_pattern: "*.xlsx"`, `file_pattern: "*.xls"`, `file_pattern: "*.csv"`, tags: `[spreadsheet, excel, xlsx]`, applies_to: `[coder]`
+- [ ] `pptx` skill copied with SKILL.md + `editing.md` + `pptxgenjs.md` + `scripts/` directory (includes `add_slide.py`, `clean.py`, `thumbnail.py`, `office/` shared scripts); AutoBuilder triggers added: `file_pattern: "*.pptx"`, `file_pattern: "*.ppt"`, tags: `[presentation, powerpoint, pptx]`, applies_to: `[coder]`
+- [ ] `pdf` skill copied with SKILL.md + `forms.md` + `reference.md` + `scripts/` directory (includes form-filling, validation, and conversion scripts); AutoBuilder triggers added: `file_pattern: "*.pdf"`, tags: `[pdf, document]`, applies_to: `[coder]`
+- [ ] Each skill's SKILL.md has valid frontmatter with `name`, `description`, and AutoBuilder trigger declarations — passes `validate_skill_frontmatter()`
+- [ ] Skills match via deterministic file_pattern and tag_match triggers (not keyword fallback)
+- [ ] `SkillEntry.has_scripts` is True for all 4 skills after indexing
+- [ ] `SkillEntry.has_references` is True for pptx and pdf (which have additional .md files alongside SKILL.md — treated as references)
+- [ ] LICENSE.txt preserved in each skill directory
+- [ ] All skills indexed successfully by `SkillLibrary.scan()`
 **Validation:**
 - `uv run pytest tests/skills/test_skill_files.py -v`
 
@@ -343,11 +365,12 @@ Director and PM role-bound skills (S32) go under a new `app/skills/governance/` 
 Batch 1 (sequential): P6.D1
   D1: Skill types, parser, validation — app/skills/library.py (types), parser.py, app/models/enums.py
 
-Batch 2 (parallel): P6.D2, P6.D7, P6.D8, P6.D9
+Batch 2 (parallel): P6.D2, P6.D7, P6.D8, P6.D9, P6.D10
   D2: Trigger matchers — app/skills/matchers.py; depends D1
   D7: Domain skills (7 files) — app/skills/{code,review,test,planning}/*/SKILL.md; depends D1 (format)
   D8: Authoring skills (4 files + references) — app/skills/authoring/*/SKILL.md; depends D1 (format)
   D9: Role-bound skills (2 files) — app/skills/governance/*/SKILL.md; depends D1 (format)
+  D10: File-editing skills app/skills/files/*/; depends D1 (format)
 
 Batch 3 (sequential): P6.D3
   D3: SkillLibrary core — app/skills/library.py (class); depends D1, D2
@@ -405,9 +428,9 @@ Batch 5 (sequential): P6.D6
 | *(same)* | FR-6.37 | P6.D5 |
 | *(same)* | FR-6.38 | P6.D5 |
 | *(same)* | FR-6.39 | P6.D6 |
-| CAP-9: Initial Skill Library | FR-6.40 | P6.D7 |
+| CAP-9: Initial Skill Library | FR-6.40 | P6.D7, P6.D10 |
 | *(same)* | FR-6.41 | P6.D8 |
-| *(same)* | FR-6.42 | P6.D7, P6.D8 |
+| *(same)* | FR-6.42 | P6.D7, P6.D8, P6.D10 |
 | *(same)* | FR-6.43 | P6.D7, P6.D8 |
 | *(same)* | FR-6.44 | P6.D8 |
 | *(same)* | FR-6.45 | P6.D8 |

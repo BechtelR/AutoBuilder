@@ -6,9 +6,23 @@ from app.agents.assembler import (
     SAFETY_CONTENT,
     InstructionAssembler,
     InstructionContext,
+    LoadedSkillData,
     escape_braces,
 )
 from app.models.enums import FragmentType
+
+
+def _skill(
+    content: str,
+    applies_to: list[str] | None = None,
+    matched_triggers: list[str] | None = None,
+) -> LoadedSkillData:
+    """Helper to build LoadedSkillData with sensible defaults."""
+    return LoadedSkillData(
+        content=content,
+        applies_to=applies_to or [],
+        matched_triggers=matched_triggers or [],
+    )
 
 
 def _make_assembler() -> InstructionAssembler:
@@ -28,7 +42,7 @@ class TestSafetyFragment:
         ctx_full = InstructionContext(
             project_config="proj config",
             task_context="task ctx",
-            loaded_skills={"skill_a": "content_a"},
+            loaded_skills={"skill_a": _skill("content_a")},
             agent_name="agent_x",
         )
 
@@ -52,7 +66,7 @@ class TestAssemblyOrder:
         ctx = InstructionContext(
             project_config="project instructions",
             task_context="task instructions",
-            loaded_skills={"my_skill": "skill body"},
+            loaded_skills={"my_skill": _skill("skill body")},
         )
         result = asm.assemble("agent", "identity body", ctx)
         parts = result.split("\n\n---\n\n")
@@ -124,7 +138,7 @@ class TestCurlyBraceEscaping:
 
     def test_skill_fragment_uses_escaping(self) -> None:
         asm = _make_assembler()
-        ctx = InstructionContext(loaded_skills={"sk": 'Template {var} and {"a": 1}'})
+        ctx = InstructionContext(loaded_skills={"sk": _skill('Template {var} and {"a": 1}')})
         result = asm.assemble("agent", "body", ctx)
         parts = result.split("\n\n---\n\n")
         skill_part = parts[2]
@@ -138,7 +152,7 @@ class TestSourceMap:
         ctx = InstructionContext(
             project_config="proj",
             task_context="task",
-            loaded_skills={"alpha": "a_content"},
+            loaded_skills={"alpha": _skill("a_content")},
             agent_name="my_agent",
         )
         asm.assemble("test_agent", "body", ctx)
@@ -158,7 +172,7 @@ class TestDeterminism:
         ctx = InstructionContext(
             project_config="proj {var}",
             task_context="task",
-            loaded_skills={"b": "bb", "a": "aa"},
+            loaded_skills={"b": _skill("bb"), "a": _skill("aa")},
         )
 
         asm1 = InstructionAssembler()
@@ -174,7 +188,10 @@ class TestDeterminism:
         ctx = InstructionContext(
             project_config="Project rules here",
             task_context="Current task context",
-            loaded_skills={"coding": "Code in Python", "testing": "Write tests"},
+            loaded_skills={
+                "coding": _skill("Code in Python"),
+                "testing": _skill("Write tests"),
+            },
             agent_name="coder",
         )
         result = asm.assemble("coder", "You are a coder agent.", ctx)
@@ -201,3 +218,84 @@ class TestDeterminism:
         skill_pos = result.index("## Skill:")
 
         assert safety_pos < body_pos < project_pos < task_pos < skill_pos
+
+
+class TestAppliesToFiltering:
+    def test_skill_included_for_matching_agent(self) -> None:
+        asm = _make_assembler()
+        ctx = InstructionContext(
+            loaded_skills={"coding": _skill("Code tips", applies_to=["coder"])},
+        )
+        result = asm.assemble("coder", "body", ctx)
+        assert "## Skill: coding" in result
+
+    def test_skill_excluded_for_non_matching_agent(self) -> None:
+        asm = _make_assembler()
+        ctx = InstructionContext(
+            loaded_skills={"coding": _skill("Code tips", applies_to=["coder"])},
+        )
+        result = asm.assemble("reviewer", "body", ctx)
+        assert "## Skill: coding" not in result
+
+    def test_empty_applies_to_includes_for_all(self) -> None:
+        asm = _make_assembler()
+        ctx = InstructionContext(
+            loaded_skills={"universal": _skill("For everyone", applies_to=[])},
+        )
+        result = asm.assemble("any_agent", "body", ctx)
+        assert "## Skill: universal" in result
+
+    def test_no_skill_fragment_when_all_filtered_out(self) -> None:
+        asm = _make_assembler()
+        ctx = InstructionContext(
+            loaded_skills={"coding": _skill("Code tips", applies_to=["coder"])},
+        )
+        asm.assemble("reviewer", "body", ctx)
+        frags = asm.get_source_map()
+        types = [f.fragment_type for f in frags]
+        assert FragmentType.SKILL not in types
+
+    def test_mixed_filtering(self) -> None:
+        asm = _make_assembler()
+        ctx = InstructionContext(
+            loaded_skills={
+                "coding": _skill("Code tips", applies_to=["coder"]),
+                "universal": _skill("For everyone"),
+                "review": _skill("Review tips", applies_to=["reviewer"]),
+            },
+        )
+        result = asm.assemble("coder", "body", ctx)
+        assert "## Skill: coding" in result
+        assert "## Skill: universal" in result
+        assert "## Skill: review" not in result
+
+    def test_source_map_only_includes_filtered_skills(self) -> None:
+        asm = _make_assembler()
+        ctx = InstructionContext(
+            loaded_skills={
+                "coding": _skill("Code tips", applies_to=["coder"]),
+                "review": _skill("Review tips", applies_to=["reviewer"]),
+            },
+        )
+        asm.assemble("coder", "body", ctx)
+        frags = asm.get_source_map()
+        skill_frags = [f for f in frags if f.fragment_type == FragmentType.SKILL]
+        assert len(skill_frags) == 1
+        assert skill_frags[0].source == "coding"
+
+
+class TestInsertionOrderPreservation:
+    def test_skills_preserve_insertion_order(self) -> None:
+        """Skills appear in dict insertion order (priority desc, name asc from match)."""
+        asm = _make_assembler()
+        # Insertion order: z_skill first, a_skill second
+        ctx = InstructionContext(
+            loaded_skills={
+                "z_skill": _skill("Z content"),
+                "a_skill": _skill("A content"),
+            },
+        )
+        result = asm.assemble("agent", "body", ctx)
+        z_pos = result.index("## Skill: z_skill")
+        a_pos = result.index("## Skill: a_skill")
+        assert z_pos < a_pos

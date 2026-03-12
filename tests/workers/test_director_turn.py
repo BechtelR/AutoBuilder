@@ -290,7 +290,9 @@ class TestRunDirectorTurnSettingsMode:
             runner = _mock_runner_with_response("Formation response")
             captured_ctx: list[object] = []
 
-            def _capturing_build(registry: object, instruction_ctx: object) -> MagicMock:
+            def _capturing_build(
+                registry: object, instruction_ctx: object, **kwargs: object
+            ) -> MagicMock:
                 captured_ctx.append(instruction_ctx)
                 return MagicMock()
 
@@ -326,7 +328,9 @@ class TestRunDirectorTurnSettingsMode:
             runner = _mock_runner_with_response("Evolution response")
             captured_ctx: list[object] = []
 
-            def _capturing_build(registry: object, instruction_ctx: object) -> MagicMock:
+            def _capturing_build(
+                registry: object, instruction_ctx: object, **kwargs: object
+            ) -> MagicMock:
                 captured_ctx.append(instruction_ctx)
                 return MagicMock()
 
@@ -360,7 +364,9 @@ class TestRunDirectorTurnSettingsMode:
             runner = _mock_runner_with_response("Director response")
             captured_ctx: list[object] = []
 
-            def _capturing_build(registry: object, instruction_ctx: object) -> MagicMock:
+            def _capturing_build(
+                registry: object, instruction_ctx: object, **kwargs: object
+            ) -> MagicMock:
                 captured_ctx.append(instruction_ctx)
                 return MagicMock()
 

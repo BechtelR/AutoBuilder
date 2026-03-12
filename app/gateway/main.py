@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from arq.connections import ArqRedis, create_pool
 from fastapi import FastAPI
@@ -15,9 +16,11 @@ from app.gateway.middleware.logging import RequestLoggingMiddleware
 from app.gateway.routes.ceo_queue import router as ceo_queue_router
 from app.gateway.routes.chat import router as chat_router
 from app.gateway.routes.health import router as health_router
+from app.gateway.routes.skills import router as skills_router
 from app.gateway.routes.workflows import router as workflow_router
 from app.lib import get_logger, setup_logging
 from app.models.constants import APP_VERSION
+from app.skills.library import SkillLibrary
 
 logger = get_logger("gateway")
 
@@ -51,6 +54,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception:
         logger.warning("Redis connection failed -- starting in degraded mode", exc_info=True)
 
+    # Initialize SkillLibrary with global skills directory
+    skills_dir = Path(__file__).resolve().parent.parent / "skills"
+    skill_library = SkillLibrary(global_dir=skills_dir, redis=arq_pool)
+    cache_hit = await skill_library.load_from_cache()
+    if not cache_hit:
+        skill_library.scan()
+        try:
+            await skill_library.save_to_cache()
+        except Exception:
+            logger.debug("Skill index cache save skipped (non-critical)")
+    app.state.skill_library = skill_library
+
     yield
 
     # Shutdown
@@ -80,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(workflow_router)
     app.include_router(chat_router)
     app.include_router(ceo_queue_router)
+    app.include_router(skills_router)
 
     return app
 

@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from app.agents.assembler import InstructionContext
     from app.events.publisher import EventPublisher
     from app.router.router import LlmRouter
+    from app.skills.library import SkillLibrary
 
 logger = get_logger("engine")
 _plugin_logger = get_logger("engine.plugins")
@@ -204,6 +205,57 @@ def create_pipeline_callbacks(
 
 
 # ---------------------------------------------------------------------------
+# Build-Time Skill Resolution
+# ---------------------------------------------------------------------------
+
+
+def _resolve_skills_for_agent(
+    skill_library: SkillLibrary | None,
+    agent_role: str,
+    agent_name: str,
+    base_ctx: InstructionContext,
+) -> InstructionContext:
+    """Resolve skills for a specific agent at build time.
+
+    Calls SkillLibrary.match() with a role-specific context, loads content,
+    and returns a new InstructionContext with resolved skills merged in.
+    Returns base_ctx unchanged when skill_library is None.
+    """
+    if skill_library is None:
+        return base_ctx
+
+    from app.agents.assembler import InstructionContext as IC
+    from app.agents.assembler import LoadedSkillData
+    from app.agents.protocols import SkillMatchContext
+    from app.skills.matchers import match_triggers
+
+    context = SkillMatchContext(agent_role=agent_role)
+    entries = skill_library.match(context)
+    entries = skill_library.resolve_cascades(entries)
+
+    loaded_skills: dict[str, LoadedSkillData] = {}
+    for entry in entries:
+        content = skill_library.load(entry)
+        triggers = match_triggers(entry, context)
+        loaded_skills[entry.name] = LoadedSkillData(
+            content=content.content,
+            applies_to=list(entry.applies_to),
+            matched_triggers=triggers,
+        )
+
+    # Merge with any existing loaded_skills from base_ctx
+    merged_skills = dict(base_ctx.loaded_skills)
+    merged_skills.update(loaded_skills)
+
+    return IC(
+        project_config=base_ctx.project_config,
+        task_context=base_ctx.task_context,
+        loaded_skills=merged_skills,
+        agent_name=agent_role,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Work Session / Chat Session Agent Builders
 # ---------------------------------------------------------------------------
 
@@ -214,7 +266,7 @@ async def build_work_session_agents(
     project_id: str,
     publisher: EventPublisher,
     *,
-    skill_library: object | None = None,
+    skill_library: SkillLibrary | None = None,
     memory_service: object | None = None,
     before_model_callback: (
         Callable[[CallbackContext, LlmRequest], LlmResponse | None] | None
@@ -224,6 +276,7 @@ async def build_work_session_agents(
 
     Director is root_agent. PM is sub_agent with supervision callbacks.
     DeliverablePipeline is PM's sub_agent for dispatching deliverables.
+    Director and PM each get independently resolved skills at build time.
     """
     from google.adk.memory import InMemoryMemoryService
 
@@ -235,13 +288,17 @@ async def build_work_session_agents(
         create_checkpoint_callback,
     )
 
-    # Build Director
-    director = registry.build("director", ctx)
+    # Resolve Director-specific skills at build time
+    director_ctx = _resolve_skills_for_agent(skill_library, "director", "director", ctx)
+    director = registry.build("director", director_ctx)
 
-    # Build PM with project-specific name
-    pm = registry.build(f"PM_{project_id}", ctx, definition="pm")
+    # Resolve PM-specific skills at build time
+    pm_name = f"PM_{project_id}"
+    pm_ctx = _resolve_skills_for_agent(skill_library, "pm", pm_name, ctx)
+    pm = registry.build(pm_name, pm_ctx, definition="pm")
 
     # Build DeliverablePipeline as PM sub_agent
+    # Pipeline still receives skill_library for runtime matching by SkillLoaderAgent
     resolved_skill_lib = NullSkillLibrary() if skill_library is None else skill_library
     resolved_memory = InMemoryMemoryService() if memory_service is None else memory_service
 
@@ -272,9 +329,15 @@ async def build_work_session_agents(
 def build_chat_session_agent(
     registry: AgentRegistry,
     ctx: InstructionContext,
+    *,
+    skill_library: SkillLibrary | None = None,
 ) -> BaseAgent:
-    """Build Director with no sub_agents for a chat session."""
-    return registry.build("director", ctx)
+    """Build Director with no sub_agents for a chat session.
+
+    Resolves Director-specific skills at build time when skill_library is provided.
+    """
+    director_ctx = _resolve_skills_for_agent(skill_library, "director", "director", ctx)
+    return registry.build("director", director_ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +360,7 @@ def create_deliverable_pipeline_from_context(
     from app.agents._registry import AgentRegistry
     from app.agents.assembler import InstructionAssembler
     from app.agents.pipeline import create_deliverable_pipeline
-    from app.agents.protocols import NullSkillLibrary
+    from app.agents.protocols import NullSkillLibrary, SkillLibraryProtocol
     from app.config import get_settings
     from app.models.enums import DefinitionScope
 
@@ -325,10 +388,16 @@ def create_deliverable_pipeline_from_context(
     # Create callbacks
     callbacks = create_pipeline_callbacks(router, float(settings.context_budget_threshold))
 
+    # Use real SkillLibrary from worker context when available
+    raw_skill_lib = worker_ctx.get("skill_library")
+    skill_lib: SkillLibraryProtocol = (  # type: ignore[assignment]
+        raw_skill_lib if raw_skill_lib is not None else NullSkillLibrary()
+    )
+
     return create_deliverable_pipeline(
         registry=registry,
         ctx=instruction_ctx,
-        skill_library=NullSkillLibrary(),
+        skill_library=skill_lib,
         memory_service=InMemoryMemoryService(),
         before_model_callback=callbacks,
     )

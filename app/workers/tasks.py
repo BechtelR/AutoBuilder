@@ -36,6 +36,8 @@ if TYPE_CHECKING:
     from google.adk.sessions.base_session_service import BaseSessionService
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from app.skills.library import SkillLibrary
+
 logger = get_logger("workers.tasks")
 
 
@@ -420,7 +422,9 @@ async def run_director_turn(
         )
         registry.scan((Path("app/agents"), DefinitionScope.GLOBAL))
 
-        director = build_chat_session_agent(registry, instruction_ctx)
+        # Resolve Director skills at build time (FR-6.46, FR-6.49)
+        skill_library: SkillLibrary | None = ctx.get("skill_library")  # type: ignore[assignment]
+        director = build_chat_session_agent(registry, instruction_ctx, skill_library=skill_library)
         app_container = create_app_container(root_agent=director)
         runner = create_runner(app_container, session_service)
 
@@ -608,11 +612,14 @@ async def run_work_session(
             router, float(settings.context_budget_threshold)
         )
 
+        # Resolve Director + PM skills at build time (FR-6.46, FR-6.47, FR-6.48)
+        work_skill_library: SkillLibrary | None = ctx.get("skill_library")  # type: ignore[assignment]
         director = await build_work_session_agents(
             registry=registry,
             ctx=instruction_ctx,
             project_id=project_id,
             publisher=publisher,
+            skill_library=work_skill_library,
             before_model_callback=pipeline_callbacks,
         )
 

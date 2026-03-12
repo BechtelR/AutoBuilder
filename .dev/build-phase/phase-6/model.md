@@ -258,6 +258,7 @@ class SkillEntry(BaseModel):
     cascades: list[CascadeRef] = Field(default_factory=list)
     has_references: bool = False  # True if references/ subdir exists (FR-6.05)
     has_assets: bool = False      # True if assets/ subdir exists (FR-6.05)
+    has_scripts: bool = False     # True if scripts/ subdir exists (FR-6.05)
     path: Path | None = None  # filesystem path to SKILL.md
 ```
 
@@ -327,6 +328,7 @@ class SkillCatalogEntry(BaseModel):
     priority: int
     has_references: bool
     has_assets: bool
+    has_scripts: bool
 ```
 
 ### SKILL.md Frontmatter Schema (YAML)

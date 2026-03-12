@@ -52,6 +52,24 @@ async def startup(ctx: dict[str, object]) -> None:
     redis: ArqRedis = ctx["redis"]  # type: ignore[assignment]
     await router.cache_to_redis(redis)
 
+    # Initialize SkillLibrary (shared across all task invocations)
+    from pathlib import Path
+
+    from app.skills.library import SkillLibrary
+
+    skills_dir = Path(__file__).resolve().parent.parent / "skills"
+    skill_library = SkillLibrary(global_dir=skills_dir, redis=redis)
+
+    # Try loading from cache first, fall back to filesystem scan
+    cache_hit = await skill_library.load_from_cache()
+    if not cache_hit:
+        skill_library.scan()
+        try:
+            await skill_library.save_to_cache()
+        except Exception:
+            logger.debug("Skill index cache save skipped (non-critical)")
+    ctx["skill_library"] = skill_library
+
     # Initialize app: scope state (E14) — idempotent
 
     session_service: BaseSessionService = ctx["session_service"]  # type: ignore[assignment]

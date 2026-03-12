@@ -6,16 +6,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.agents.protocols import (
-    NullSkillLibrary,
-    SkillEntry,
-    SkillMatchContext,
-)
+from app.agents.protocols import NullSkillLibrary, SkillMatchContext
 from app.agents.state_helpers import (
     compose_callbacks,
     context_from_state,
     create_system_reminder_callback,
 )
+from app.skills.library import SkillEntry
 
 
 class TestContextFromState:

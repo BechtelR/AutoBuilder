@@ -9,6 +9,7 @@ from google.adk.agents import BaseAgent
 from google.adk.events import Event, EventActions
 from pydantic import ConfigDict
 
+from app.agents.assembler import LoadedSkillData
 from app.agents.protocols import NullSkillLibrary, SkillMatchContext
 
 if TYPE_CHECKING:
@@ -30,6 +31,7 @@ class SkillLoaderAgent(BaseAgent):
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
         from app.agents.protocols import SkillLibraryProtocol
+        from app.skills.matchers import match_triggers
 
         state = ctx.session.state
         library = cast("SkillLibraryProtocol", self.skill_library)
@@ -40,17 +42,31 @@ class SkillLoaderAgent(BaseAgent):
             file_patterns=state.get("file_patterns", []),  # type: ignore[arg-type]
             tags=state.get("tags", []),  # type: ignore[arg-type]
             agent_role=state.get("agent_role"),  # type: ignore[arg-type]
+            requested_skills=state.get("requested_skills", []),  # type: ignore[arg-type]
         )
 
         entries = library.match(match_context)
+        entries = library.resolve_cascades(entries)
 
-        loaded_skills: dict[str, str] = {}
+        loaded_skills: dict[str, LoadedSkillData] = {}
         loaded_skill_names: list[str] = []
 
         for entry in entries:
             content = library.load(entry)
-            loaded_skills[entry.name] = content.content
+            triggers = match_triggers(entry, match_context)
+            loaded_skills[entry.name] = LoadedSkillData(
+                content=content.content,
+                applies_to=list(entry.applies_to),
+                matched_triggers=triggers,
+            )
             loaded_skill_names.append(entry.name)
+
+        if not loaded_skills:
+            logger.warning(
+                "No skills matched for deliverable_type=%s, tags=%s",
+                match_context.deliverable_type,
+                match_context.tags,
+            )
 
         logger.debug(
             "SkillLoader loaded %d skills: %s", len(loaded_skill_names), loaded_skill_names

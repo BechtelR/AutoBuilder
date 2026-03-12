@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from app.skills.library import SkillEntry
 
 
 @dataclass(frozen=True)
@@ -14,15 +17,7 @@ class SkillMatchContext:
     file_patterns: list[str] = field(default_factory=lambda: list[str]())
     tags: list[str] = field(default_factory=lambda: list[str]())
     agent_role: str | None = None
-
-
-@dataclass(frozen=True)
-class SkillEntry:
-    """Skill metadata from frontmatter."""
-
-    name: str
-    description: str = ""
-    applies_to: list[str] = field(default_factory=lambda: list[str]())
+    requested_skills: list[str] = field(default_factory=lambda: list[str]())
 
 
 @dataclass(frozen=True)
@@ -38,6 +33,7 @@ class SkillLibraryProtocol(Protocol):
 
     def match(self, context: SkillMatchContext) -> list[SkillEntry]: ...
     def load(self, entry: SkillEntry) -> SkillContent: ...
+    def resolve_cascades(self, entries: list[SkillEntry]) -> list[SkillEntry]: ...
 
 
 class NullSkillLibrary:
@@ -48,3 +44,6 @@ class NullSkillLibrary:
 
     def load(self, entry: SkillEntry) -> SkillContent:
         return SkillContent(entry=entry, content="")
+
+    def resolve_cascades(self, entries: list[SkillEntry]) -> list[SkillEntry]:
+        return entries

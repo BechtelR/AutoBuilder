@@ -28,12 +28,12 @@ The system automatically discovers SKILL.md files by recursively scanning config
 
 **Requirements:**
 
-- [ ] **FR-6.01**: When the system starts or the skill index is rebuilt, it recursively scans all configured skill directories for files named `SKILL.md`, parses their YAML frontmatter, and builds an in-memory index keyed by the `name` field.
-- [ ] **FR-6.02**: When a SKILL.md file has valid frontmatter containing at minimum a `name` and `description` field, the system indexes it with all parsed metadata (triggers, tags, applies_to, priority, cascades).
-- [ ] **FR-6.03**: When a SKILL.md file has invalid YAML frontmatter, is missing the required `name` field, or is missing the required `description` field, the system excludes it from the index and logs a warning identifying the file path and the validation failure.
-- [ ] **FR-6.04**: When a SKILL.md file's `name` value does not match the name of its parent directory, the system logs a warning but still indexes the skill using the frontmatter `name` value.
-- [ ] **FR-6.05**: When a skill directory contains a `references/` or `assets/` subdirectory, the system records their existence in the index but does not load their contents during indexing.
-- [ ] **FR-6.06**: When two SKILL.md files in the same scan scope have the same `name`, the system indexes only the first one found and logs a warning about the duplicate.
+- [x] **FR-6.01**: When the system starts or the skill index is rebuilt, it recursively scans all configured skill directories for files named `SKILL.md`, parses their YAML frontmatter, and builds an in-memory index keyed by the `name` field.
+- [x] **FR-6.02**: When a SKILL.md file has valid frontmatter containing at minimum a `name` and `description` field, the system indexes it with all parsed metadata (triggers, tags, applies_to, priority, cascades).
+- [x] **FR-6.03**: When a SKILL.md file has invalid YAML frontmatter, is missing the required `name` field, or is missing the required `description` field, the system excludes it from the index and logs a warning identifying the file path and the validation failure.
+- [x] **FR-6.04**: When a SKILL.md file's `name` value does not match the name of its parent directory, the system logs a warning but still indexes the skill using the frontmatter `name` value.
+- [x] **FR-6.05**: When a skill directory contains a `references/`, `assets/`, or `scripts/` subdirectory, the system records their existence in the index but does not load their contents during indexing. Agents access scripts via file tools (`file_read`, `bash_exec`) — no automatic execution on skill load.
+- [x] **FR-6.06**: When two SKILL.md files in the same scan scope have the same `name`, the system indexes only the first one found and logs a warning about the duplicate.
 
 ---
 
@@ -43,14 +43,14 @@ Given a deliverable's execution context (type, target files, tags, explicitly re
 
 **Requirements:**
 
-- [ ] **FR-6.07**: When a skill declares a `deliverable_type` trigger and the current deliverable's type exactly matches the trigger value, the skill matches.
-- [ ] **FR-6.08**: When a skill declares a `file_pattern` trigger and any file in the deliverable's target file list matches the glob pattern, the skill matches.
-- [ ] **FR-6.09**: When a skill declares a `tag_match` trigger and any of the deliverable's tags intersect with the skill's `tags` list, the skill matches.
-- [ ] **FR-6.10**: When a skill declares an `explicit` trigger and the skill's name appears in the deliverable's `requested_skills` list (set via session state by PM, Director, or user), the skill matches.
-- [ ] **FR-6.11**: When a skill declares an `always` trigger, the skill matches unconditionally for every deliverable execution.
-- [ ] **FR-6.12**: When a skill declares multiple triggers, the skill matches if ANY single trigger matches (OR logic). All triggers need not be satisfied.
-- [ ] **FR-6.13**: When multiple skills match the same deliverable context, all matched skills are returned, sorted by their `priority` field (higher priority first, then alphabetically by name for equal priority).
-- [ ] **FR-6.14**: When no skills match a deliverable's context via trigger matching AND no mandatory skills were assigned (see CAP-10), the pipeline continues execution normally and a warning event is published to the event stream identifying the deliverable and context that produced no matches.
+- [x] **FR-6.07**: When a skill declares a `deliverable_type` trigger and the current deliverable's type exactly matches the trigger value, the skill matches.
+- [x] **FR-6.08**: When a skill declares a `file_pattern` trigger and any file in the deliverable's target file list matches the glob pattern, the skill matches.
+- [x] **FR-6.09**: When a skill declares a `tag_match` trigger and any of the deliverable's tags intersect with the skill's `tags` list, the skill matches.
+- [x] **FR-6.10**: When a skill declares an `explicit` trigger and the skill's name appears in the deliverable's `requested_skills` list (set via session state by PM, Director, or user), the skill matches.
+- [x] **FR-6.11**: When a skill declares an `always` trigger, the skill matches unconditionally for every deliverable execution.
+- [x] **FR-6.12**: When a skill declares multiple triggers, the skill matches if ANY single trigger matches (OR logic). All triggers need not be satisfied.
+- [x] **FR-6.13**: When multiple skills match the same deliverable context, all matched skills are returned, sorted by their `priority` field (higher priority first, then alphabetically by name for equal priority).
+- [x] **FR-6.14**: When no skills match a deliverable's context via trigger matching AND no mandatory skills were assigned (see CAP-10), the pipeline continues execution normally and a warning event is published to the event stream identifying the deliverable and context that produced no matches.
 
 ---
 
@@ -60,9 +60,9 @@ Skills following the Agent Skills open standard that lack AutoBuilder-specific t
 
 **Requirements:**
 
-- [ ] **FR-6.15**: When a SKILL.md file has a valid `name` and `description` but no trigger declarations, the system falls back to matching keywords from the `description` field against the deliverable's type, tags, and file patterns.
-- [ ] **FR-6.16**: When a third-party skill's `description` contains keywords that match the current deliverable context via the fallback mechanism, the skill matches and loads identically to a trigger-matched skill.
-- [ ] **FR-6.17**: When a third-party skill has technically imperfect YAML frontmatter (e.g., extra unknown fields, non-standard metadata values), the system parses leniently — extracting known fields and ignoring unknown ones rather than rejecting the file.
+- [x] **FR-6.15**: When a SKILL.md file has a valid `name` and `description` but no trigger declarations, the system falls back to matching keywords from the `description` field against the deliverable's type, tags, and file patterns.
+- [x] **FR-6.16**: When a third-party skill's `description` contains keywords that match the current deliverable context via the fallback mechanism, the skill matches and loads identically to a trigger-matched skill.
+- [x] **FR-6.17**: When a third-party skill has technically imperfect YAML frontmatter (e.g., extra unknown fields, non-standard metadata values), the system parses leniently — extracting known fields and ignoring unknown ones rather than rejecting the file.
 
 ---
 
@@ -72,10 +72,10 @@ Skills exist at two scopes: global (shipped with the platform) and project-local
 
 **Requirements:**
 
-- [ ] **FR-6.18**: When both a global skill and a project-local skill exist with the same `name`, the project-local skill completely replaces the global skill in the index — the global skill's content, triggers, and metadata are not used.
-- [ ] **FR-6.19**: When a project-local skill has a unique `name` not present in the global skill set, it is added to the index alongside global skills.
-- [ ] **FR-6.20**: When no project-local skills directory exists or is configured, the system operates with global skills only and does not emit errors or warnings about the missing directory.
-- [ ] **FR-6.21**: When a project-local skill overrides a global skill, the override is logged (skill name, which scope won) for debugging purposes.
+- [x] **FR-6.18**: When both a global skill and a project-local skill exist with the same `name`, the project-local skill completely replaces the global skill in the index — the global skill's content, triggers, and metadata are not used.
+- [x] **FR-6.19**: When a project-local skill has a unique `name` not present in the global skill set, it is added to the index alongside global skills.
+- [x] **FR-6.20**: When no project-local skills directory exists or is configured, the system operates with global skills only and does not emit errors or warnings about the missing directory.
+- [x] **FR-6.21**: When a project-local skill overrides a global skill, the override is logged (skill name, which scope won) for debugging purposes.
 
 ---
 
@@ -85,11 +85,11 @@ Skills can declare dependencies on other skills via a `cascades` field. After pr
 
 **Requirements:**
 
-- [ ] **FR-6.22**: When a matched skill declares `cascades` referencing other skills by name, those cascaded skills are loaded alongside the directly-matched skills regardless of whether the cascaded skills' own triggers match the current context.
-- [ ] **FR-6.23**: When a cascaded skill itself declares further cascades, the system resolves them transitively (cascades of cascades) until no new skills are added.
-- [ ] **FR-6.24**: When cascade resolution encounters a circular reference (skill A cascades to B, B cascades to A), the system detects the cycle via visited-name tracking, breaks it, and logs a warning identifying the cycle chain.
-- [ ] **FR-6.25**: When a cascade references a skill name that does not exist in the index, the system logs a warning and continues — the missing cascade does not prevent other skills from loading.
-- [ ] **FR-6.26**: When a cascaded skill has both a global and project-local version, the project-local version is used (two-tier override applies to cascaded skills identically to directly-matched skills).
+- [x] **FR-6.22**: When a matched skill declares `cascades` referencing other skills by name, those cascaded skills are loaded alongside the directly-matched skills regardless of whether the cascaded skills' own triggers match the current context.
+- [x] **FR-6.23**: When a cascaded skill itself declares further cascades, the system resolves them transitively (cascades of cascades) until no new skills are added.
+- [x] **FR-6.24**: When cascade resolution encounters a circular reference (skill A cascades to B, B cascades to A), the system detects the cycle via visited-name tracking, breaks it, and logs a warning identifying the cycle chain.
+- [x] **FR-6.25**: When a cascade references a skill name that does not exist in the index, the system logs a warning and continues — the missing cascade does not prevent other skills from loading.
+- [x] **FR-6.26**: When a cascaded skill has both a global and project-local version, the project-local version is used (two-tier override applies to cascaded skills identically to directly-matched skills).
 
 ---
 
@@ -99,10 +99,10 @@ Not all agents need all skills. The `applies_to` field on each skill controls wh
 
 **Requirements:**
 
-- [ ] **FR-6.27**: When a skill specifies `applies_to: [coder, reviewer]`, only the `coder` and `reviewer` agents receive that skill's content in their assembled instructions. Other agents in the pipeline do not.
-- [ ] **FR-6.28**: When a skill omits the `applies_to` field entirely, all agents in the pipeline receive that skill's content.
-- [ ] **FR-6.29**: When multiple skills are loaded, they appear in assembled instructions ordered by `priority` (higher first), then alphabetically by name for equal priority.
-- [ ] **FR-6.30**: When a loaded skill's content contains curly braces that are not state template references, the braces are escaped to prevent unintended template substitution.
+- [x] **FR-6.27**: When a skill specifies `applies_to: [coder, reviewer]`, only the `coder` and `reviewer` agents receive that skill's content in their assembled instructions. Other agents in the pipeline do not.
+- [x] **FR-6.28**: When a skill omits the `applies_to` field entirely, all agents in the pipeline receive that skill's content.
+- [x] **FR-6.29**: When multiple skills are loaded, they appear in assembled instructions ordered by `priority` (higher first), then alphabetically by name for equal priority.
+- [x] **FR-6.30**: When a loaded skill's content contains curly braces that are not state template references, the braces are escaped to prevent unintended template substitution.
 
 ---
 
@@ -112,10 +112,10 @@ The skill index is cached for fast access across worker invocations without re-s
 
 **Requirements:**
 
-- [ ] **FR-6.31**: When the skill index is built, it is cached so that subsequent pipeline executions within the same worker or across workers retrieve the index without re-scanning the filesystem.
-- [ ] **FR-6.32**: When a periodic rescan detects that skill files have been added, removed, or modified (via file modification timestamps), the cache is invalidated and rebuilt.
-- [ ] **FR-6.33**: When a gateway API call triggers explicit cache invalidation, the next pipeline execution rebuilds the index from disk.
-- [ ] **FR-6.34**: When the cache is unavailable or expired, the system falls back to scanning the filesystem directly — cache failure does not prevent skill loading.
+- [x] **FR-6.31**: When the skill index is built, it is cached so that subsequent pipeline executions within the same worker or across workers retrieve the index without re-scanning the filesystem.
+- [x] **FR-6.32**: When a periodic rescan detects that skill files have been added, removed, or modified (via file modification timestamps), the cache is invalidated and rebuilt.
+- [x] **FR-6.33**: When a gateway API call triggers explicit cache invalidation, the next pipeline execution rebuilds the index from disk.
+- [x] **FR-6.34**: When the cache is unavailable or expired, the system falls back to scanning the filesystem directly — cache failure does not prevent skill loading.
 
 ---
 
@@ -125,11 +125,11 @@ Skill loading is fully observable through the event stream and session state. Ev
 
 **Requirements:**
 
-- [ ] **FR-6.35**: When skills are loaded for a deliverable pipeline execution, the `loaded_skill_names` key in session state contains the list of all loaded skill names (including cascaded skills).
-- [ ] **FR-6.36**: When skills are loaded, the `loaded_skills` key in session state contains a mapping of skill name to skill body content for all loaded skills.
-- [ ] **FR-6.37**: When skills are loaded, a skill loading event is published to the event stream (Redis Streams) containing the deliverable identifier, the matched skill names, and the trigger types that caused each match.
-- [ ] **FR-6.38**: When no skills match a deliverable context, a warning event is published to the event stream identifying the deliverable and the context that produced no matches (same as FR-6.14).
-- [ ] **FR-6.39**: When the skill index is built or rebuilt, a lightweight skill catalog (name and description only for each indexed skill) is available for inspection — either via session state or gateway endpoint.
+- [x] **FR-6.35**: When skills are loaded for a deliverable pipeline execution, the `loaded_skill_names` key in session state contains the list of all loaded skill names (including cascaded skills).
+- [x] **FR-6.36**: When skills are loaded, the `loaded_skills` key in session state contains a mapping of skill name to skill body content for all loaded skills.
+- [x] **FR-6.37**: When skills are loaded, a skill loading event is published to the event stream (Redis Streams) containing the deliverable identifier, the matched skill names, and the trigger types that caused each match.
+- [x] **FR-6.38**: When no skills match a deliverable context, a warning event is published to the event stream identifying the deliverable and the context that produced no matches (same as FR-6.14).
+- [x] **FR-6.39**: When the skill index is built or rebuilt, a lightweight skill catalog (name and description only for each indexed skill) is available for inspection — either via session state or gateway endpoint.
 
 ---
 
@@ -139,12 +139,12 @@ A curated set of global skills ships with the platform covering common developme
 
 **Requirements:**
 
-- [ ] **FR-6.40**: The platform ships with global skills covering: API endpoint conventions, data model patterns, database migration patterns, security review checklist, performance review checklist, unit test patterns, and task decomposition guidance.
-- [ ] **FR-6.41**: The platform ships with authoring skills covering: how to author SKILL.md files (skill-authoring), how to author agent definition files (agent-definition), how to author workflows (workflow-authoring), and how to configure project-level overrides (project-conventions).
-- [ ] **FR-6.42**: Each shipped skill follows the Agent Skills open standard file format: SKILL.md with YAML frontmatter in a named directory, with optional `references/` and `assets/` subdirectories.
-- [ ] **FR-6.43**: Each shipped skill has a `description` field written in third-person with specific trigger phrases (e.g., "This skill provides guidance when the deliverable involves..."), imperative/instructional writing style in the body, and body content under 3000 words with detailed content moved to `references/` files.
-- [ ] **FR-6.44**: The skill-authoring skill includes a validation checklist covering: frontmatter structure, required fields, trigger design, progressive disclosure (body size limits, references/ usage), writing style (imperative form, third-person description), and resource referencing.
-- [ ] **FR-6.45**: The skill-authoring skill includes a `references/skill-template.md` providing a complete SKILL.md template with all supported frontmatter fields annotated.
+- [x] **FR-6.40**: The platform ships with global skills covering: API endpoint conventions, data model patterns, database migration patterns, security review checklist, performance review checklist, unit test patterns, task decomposition guidance, and file-editing skills for common document formats (docx, xlsx, pptx, pdf) including helper scripts.
+- [x] **FR-6.41**: The platform ships with authoring skills covering: how to author SKILL.md files (skill-authoring), how to author agent definition files (agent-definition), how to author workflows (workflow-authoring), and how to configure project-level overrides (project-conventions).
+- [x] **FR-6.42**: Each shipped skill follows the Agent Skills open standard file format: SKILL.md with YAML frontmatter in a named directory, with optional `references/`, `assets/`, and `scripts/` subdirectories.
+- [x] **FR-6.43**: Each shipped skill has a `description` field written in third-person with specific trigger phrases (e.g., "This skill provides guidance when the deliverable involves..."), imperative/instructional writing style in the body, and body content under 3000 words with detailed content moved to `references/` files.
+- [x] **FR-6.44**: The skill-authoring skill includes a validation checklist covering: frontmatter structure, required fields, trigger design, progressive disclosure (body size limits, references/ usage), writing style (imperative form, third-person description), and resource referencing.
+- [x] **FR-6.45**: The skill-authoring skill includes a `references/skill-template.md` providing a complete SKILL.md template with all supported frontmatter fields annotated.
 
 ---
 
@@ -164,11 +164,11 @@ No tier assigns skill lists to another tier. The work itself — role, deliverab
 
 **Requirements:**
 
-- [ ] **FR-6.46**: When the Director agent is constructed (for chat session or work session), the system resolves skills by calling the same matching engine with a Director-specific context (agent role = director, no deliverable metadata). Matched skills are passed into the Director's instruction assembly. The Director receives its skills at build time, not at pipeline runtime.
-- [ ] **FR-6.47**: When the PM agent is constructed for a work session, the system resolves skills by calling the same matching engine with a PM-specific context (agent role = pm, no deliverable metadata). Matched skills are passed into the PM's instruction assembly. The PM receives its skills at build time, separately from the Director.
-- [ ] **FR-6.48**: When Director and PM are built in the same work session, each receives its own independently resolved skill set — the Director's role-bound skills are not the same as the PM's role-bound skills. They do not share a single skill context.
-- [ ] **FR-6.49**: When a skill declares `always` trigger with `applies_to: [director]`, it loads every time the Director is invoked — whether for a chat session, work session, or Director queue processing. The skill is part of the Director's operational identity.
-- [ ] **FR-6.50**: When a skill declares `always` trigger with no `applies_to` field, it loads for ALL agents across all tiers — Director, PM, and every worker in every pipeline. This is the mechanism for project-wide conventions that apply universally.
+- [x] **FR-6.46**: When the Director agent is constructed (for chat session or work session), the system resolves skills by calling the same matching engine with a Director-specific context (agent role = director, no deliverable metadata). Matched skills are passed into the Director's instruction assembly. The Director receives its skills at build time, not at pipeline runtime.
+- [x] **FR-6.47**: When the PM agent is constructed for a work session, the system resolves skills by calling the same matching engine with a PM-specific context (agent role = pm, no deliverable metadata). Matched skills are passed into the PM's instruction assembly. The PM receives its skills at build time, separately from the Director.
+- [x] **FR-6.48**: When Director and PM are built in the same work session, each receives its own independently resolved skill set — the Director's role-bound skills are not the same as the PM's role-bound skills. They do not share a single skill context.
+- [x] **FR-6.49**: When a skill declares `always` trigger with `applies_to: [director]`, it loads every time the Director is invoked — whether for a chat session, work session, or Director queue processing. The skill is part of the Director's operational identity.
+- [x] **FR-6.50**: When a skill declares `always` trigger with no `applies_to` field, it loads for ALL agents across all tiers — Director, PM, and every worker in every pipeline. This is the mechanism for project-wide conventions that apply universally.
 
 ---
 
@@ -178,22 +178,22 @@ Agents (Director, PM, or workers guided by the skill-authoring skill) can create
 
 **Requirements:**
 
-- [ ] **FR-6.51**: When an agent writes a SKILL.md file to the project-local skills directory via file tools, the system can index the new skill on the next cache rebuild or explicit invalidation — no restart or manual registration required.
-- [ ] **FR-6.52**: When a skill file is created, the system validates its frontmatter against the same rules used during indexing (FR-6.02, FR-6.03) — the validation logic is available as a callable function that agents or tools can invoke before writing.
-- [ ] **FR-6.53**: When the skill-authoring skill is loaded by an agent, it provides sufficient guidance for the agent to produce a valid SKILL.md file including: correct frontmatter structure, appropriate trigger design for the use case, body content following progressive disclosure principles, and proper resource referencing.
-- [ ] **FR-6.54**: When an agent creates a skill and triggers cache invalidation, the new skill is available to all subsequent pipeline executions in the same project — including the current work session's remaining deliverables.
-- [ ] **FR-6.55**: When an agent creates a skill with a `name` that conflicts with an existing global skill, the project-local override rules apply normally — the new skill replaces the global skill for that project.
+- [x] **FR-6.51**: When an agent writes a SKILL.md file to the project-local skills directory via file tools, the system can index the new skill on the next cache rebuild or explicit invalidation — no restart or manual registration required.
+- [x] **FR-6.52**: When a skill file is created, the system validates its frontmatter against the same rules used during indexing (FR-6.02, FR-6.03) — the validation logic is available as a callable function that agents or tools can invoke before writing.
+- [x] **FR-6.53**: When the skill-authoring skill is loaded by an agent, it provides sufficient guidance for the agent to produce a valid SKILL.md file including: correct frontmatter structure, appropriate trigger design for the use case, body content following progressive disclosure principles, and proper resource referencing.
+- [x] **FR-6.54**: When an agent creates a skill and triggers cache invalidation, the new skill is available to all subsequent pipeline executions in the same project — including the current work session's remaining deliverables.
+- [x] **FR-6.55**: When an agent creates a skill with a `name` that conflicts with an existing global skill, the project-local override rules apply normally — the new skill replaces the global skill for that project.
 
 ---
 
 ## Non-Functional Requirements
 
-- [ ] **NFR-6.01**: Skill index building (full filesystem scan + frontmatter parsing) completes in under 2 seconds for a library of 100 skills.
-- [ ] **NFR-6.02**: Trigger matching against the full index completes in under 10 milliseconds per deliverable context — matching is O(n) in the number of indexed skills with constant-time per-trigger evaluation.
-- [ ] **NFR-6.03**: Individual skill body content (L2) is under 3000 words (~5000 tokens). Skills exceeding this are valid but log a warning recommending content be moved to `references/` files.
-- [ ] **NFR-6.04**: The skill system introduces no new external dependencies — it uses only the filesystem, Redis (already available), and Python standard library for YAML parsing and glob matching.
-- [ ] **NFR-6.05**: Skill frontmatter parsing is lenient for third-party skills (unknown fields ignored, non-standard metadata tolerated) but strict for required fields (`name`, `description`).
-- [ ] **NFR-6.06**: Cache invalidation is atomic — at no point does a pipeline execution see a partially rebuilt index. The old index serves requests until the new index is fully built.
+- [x] **NFR-6.01**: Skill index building (full filesystem scan + frontmatter parsing) completes in under 2 seconds for a library of 100 skills.
+- [x] **NFR-6.02**: Trigger matching against the full index completes in under 10 milliseconds per deliverable context — matching is O(n) in the number of indexed skills with constant-time per-trigger evaluation.
+- [x] **NFR-6.03**: Individual skill body content (L2) is under 3000 words (~5000 tokens). Skills exceeding this are valid but log a warning recommending content be moved to `references/` files.
+- [x] **NFR-6.04**: The skill system introduces no new external dependencies — it uses only the filesystem, Redis (already available), and Python standard library for YAML parsing and glob matching.
+- [x] **NFR-6.05**: Skill frontmatter parsing is lenient for third-party skills (unknown fields ignored, non-standard metadata tolerated) but strict for required fields (`name`, `description`).
+- [x] **NFR-6.06**: Cache invalidation is atomic — at no point does a pipeline execution see a partially rebuilt index. The old index serves requests until the new index is fully built.
 
 ---
 
@@ -220,14 +220,14 @@ Agents (Director, PM, or workers guided by the skill-authoring skill) can create
 ## No-Gos
 
 - **Workflow-tier skills (three-tier merge)** — Phase 7. Requires WorkflowRegistry to provide the middle scope. Two-tier (global + project-local) is the Phase 6 boundary.
-- **`scripts/` execution** — Phase 7+. The Agent Skills standard marks `allowed-tools` as experimental. Skills can include scripts in their directory for reference, but automatic execution is deferred.
+- **Automatic `scripts/` execution** — Deferred. The Agent Skills standard marks `allowed-tools` as experimental. Skills include `scripts/` directories and the system discovers them (`has_scripts` on SkillEntry), but agents invoke scripts via existing tools (`bash_exec`, `file_read`) — no automatic execution triggered by skill loading.
 - **Self-updating skills** — Phase 7+. The Anthropic skill-creator pattern where skills edit their own SKILL.md based on performance feedback is valuable but out of scope.
 - **Skill versioning and deprecation** — Not needed until the skill library is mature. Files on disk are the source of truth; git provides version history.
 - **Marketplace / registry / discovery service** — Phase 13+ at earliest. The file format IS the interop layer. Drop SKILL.md files in the project directory.
 - **User-level skills** (`~/.agents/skills/`) — The standard recommends this scan scope. Defer until there's a demonstrated need for user-wide (not project-specific) skills.
 - **Description optimization eval loop** — The Anthropic skill-creator's automated trigger-testing system is sophisticated but unnecessary when deterministic triggers are the primary matching mechanism. Defer.
 - **Skill effectiveness metrics** — Tracking which skills improve deliverable outcomes is valuable but requires completed pipeline runs with comparison data. Phase 11+ (observability hardening).
-- **L3 automatic loading** — `references/` and `assets/` files are available on disk and agents can read them via file tools. Automatic injection of L3 content into agent context is deferred.
+- **L3 automatic loading** — `references/`, `assets/`, and `scripts/` files are available on disk and agents can read them via file tools. Automatic injection of L3 content into agent context is deferred.
 
 ---
 

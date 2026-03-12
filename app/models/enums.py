@@ -251,6 +251,16 @@ class CeoQueueAction(enum.StrEnum):
     DISMISS = "DISMISS"
 
 
+class TriggerType(enum.StrEnum):
+    """Trigger types for skill matching."""
+
+    DELIVERABLE_TYPE = "DELIVERABLE_TYPE"
+    FILE_PATTERN = "FILE_PATTERN"
+    TAG_MATCH = "TAG_MATCH"
+    EXPLICIT = "EXPLICIT"
+    ALWAYS = "ALWAYS"
+
+
 class FormationStatus(enum.StrEnum):
     """Status of the Director formation process."""
 

@@ -1,0 +1,39 @@
+# WORKFLOW.yaml — Complete Template
+# All fields annotated. Only `name` is required.
+
+name: my-workflow                      # Required: unique identifier, matches directory name
+
+description: >-                        # Optional: human-readable summary for debugging
+  What this workflow handles and when the PM routes deliverables here.
+
+# Trigger conditions: when does the PM assign a deliverable to this workflow?
+# At least one trigger recommended. OR logic: any trigger match routes here.
+triggers:
+  - deliverable_type: api_endpoint     # Exact match on deliverable type
+  - deliverable_type: database_migration
+  - tag_match: code                    # Deliverable has this tag
+  - always: true                       # Fallback: use when no other workflow matches
+
+# Tool gates: what tools does the pipeline require?
+required_tools:                        # Pipeline fails if these tools are unavailable
+  - read
+  - write
+  - bash
+  - search
+
+optional_tools:                        # Used when available, not required
+  - mcp
+
+# Model overrides for this workflow (override global AUTOBUILDER_DEFAULT_*_MODEL settings)
+default_models:
+  CODE: claude-3-5-sonnet-latest       # Model for coder agent
+  PLAN: claude-3-5-sonnet-latest       # Model for planner agent
+  REVIEW: claude-3-5-sonnet-latest     # Model for reviewer agent
+  FAST: claude-3-haiku-latest          # Model for fast/cheap operations
+
+# Pipeline configuration
+pipeline:
+  max_review_cycles: 3                 # Max reviewer→fixer→reviewer loops before escalation
+  timeout_seconds: 300                 # Wall-clock timeout for the full pipeline
+  enable_linting: true                 # Run linter agent after coder
+  enable_testing: true                 # Run tester agent after linter

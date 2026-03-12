@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import TypedDict
 
 from app.models.enums import FragmentType
 
@@ -47,13 +48,23 @@ class InstructionFragment:
     source: str = ""
 
 
+class LoadedSkillData(TypedDict):
+    """Skill content + metadata for per-agent filtering and observability."""
+
+    content: str
+    applies_to: list[str]  # empty = all agents
+    matched_triggers: list[str]  # trigger types that caused match (FR-6.37)
+
+
 @dataclass(frozen=True)
 class InstructionContext:
     """Per-invocation data for instruction assembly."""
 
     project_config: str | None = None
     task_context: str | None = None
-    loaded_skills: dict[str, str] = field(default_factory=lambda: dict[str, str]())
+    loaded_skills: dict[str, LoadedSkillData] = field(
+        default_factory=lambda: dict[str, LoadedSkillData]()
+    )
     agent_name: str = ""
 
 
@@ -118,19 +129,31 @@ class InstructionAssembler:
                 )
             )
 
-        # SKILL: from ctx.loaded_skills
+        # SKILL: from ctx.loaded_skills (insertion order = priority desc, name asc)
         if ctx.loaded_skills:
             skill_sections: list[str] = []
-            for skill_name in sorted(ctx.loaded_skills):
-                skill_content = escape_braces(ctx.loaded_skills[skill_name])
-                skill_sections.append(f"## Skill: {skill_name}\n\n{skill_content}")
-            fragments.append(
-                InstructionFragment(
-                    fragment_type=FragmentType.SKILL,
-                    content="\n\n".join(skill_sections),
-                    source=",".join(sorted(ctx.loaded_skills)),
+            included_names: list[str] = []
+            # Use ctx.agent_name for applies_to filtering when set (carries the
+            # role name, e.g. "pm"), falling back to agent_name (the ADK instance
+            # name, e.g. "PM_{project_id}").
+            role_name = ctx.agent_name or agent_name
+            for skill_name, skill_data in ctx.loaded_skills.items():
+                applies_to = skill_data["applies_to"]
+                # FR-6.27, FR-6.28: Filter by applies_to
+                if applies_to and role_name not in applies_to:
+                    continue
+                # FR-6.30: Escape curly braces
+                content = escape_braces(skill_data["content"])
+                skill_sections.append(f"## Skill: {skill_name}\n\n{content}")
+                included_names.append(skill_name)
+            if skill_sections:
+                fragments.append(
+                    InstructionFragment(
+                        fragment_type=FragmentType.SKILL,
+                        content="\n\n".join(skill_sections),
+                        source=",".join(included_names),
+                    )
                 )
-            )
 
         self._fragments = fragments
         return _SEPARATOR.join(f.content for f in fragments)
