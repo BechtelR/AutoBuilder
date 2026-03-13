@@ -221,22 +221,32 @@ Skill library adopting the Agent Skills open standard file format (`SKILL.md`) w
 
 ## Phase 7: Workflow Composition `M`
 
-**Goal**: Pluggable workflow architecture -- auto-code is ONLY THE FIRST MVP workflow, not a hardcoded pipeline.
+**Goal**: Pluggable workflow architecture with stage schema, resource management, and Director authoring -- auto-code is ONLY THE FIRST MVP workflow, not a hardcoded pipeline.
 **Status**: PLANNED
 **Prerequisites**: Phase 6 (skills system operational), Phase 5b (supervision operational)
 
 
 ### Scope Summary
-WorkflowRegistry with automatic directory scanning for `WORKFLOW.yaml` manifests, deterministic keyword matching, and deferred ADK pipeline instantiation. WORKFLOW.yaml manifest format defining triggers, required/optional tools, default models, and pipeline configuration. Auto-code workflow as first implementation with its own manifest, pipeline composition, agents, and skills.
+Phase 7a — Core workflow infrastructure: WorkflowManifest and StageConfig models, WorkflowRegistry with automatic directory scanning for `WORKFLOW.yaml` manifests, deterministic keyword matching, and deferred pipeline instantiation. Stage schema architecture where stages are named configuration scopes filtering existing infrastructure (agents, skills, tools, quality gates) — not new primitives (Decision #70). Workflow ecosystem model: self-contained directories with standards (GOVERNANCE fragments), knowledge (file_read), and validators (Decision #71). Auto-code as first workflow with 4 stages (SHAPE, PLAN, BUILD, VERIFY) with configurable per-stage approval (`ceo` or `director`). Stage transition machinery with `STAGE_TRANSITION` events and `STAGE_APPROVAL` CEO queue items. InstructionAssembler stage context injection.
+
+Phase 7b — Authoring, resources & validation: `validate_workflow` FunctionTool for deterministic workflow validation. Resource library (DB entity) for CEO resources with metadata-only storage and `secret_ref` pointers (Decision #75). `ResourcePreflightAgent` (deterministic CustomAgent) for manifest-declared resource validation with 8 check types (Decision #72). Director authoring skills (`workflow-composition`, `resource-composition`) (Decision #74). Forward-compatible `produces`/`consumes` artifact declarations for Phase 8+ compound workflows (Decision #73).
 
 ### Completion Contract
 
 | Status | Contract Item | PRD |
 |--------|--------------|-----|
-| | WorkflowRegistry discovers auto-code on startup | PR-4 |
+| | WorkflowRegistry discovers auto-code on startup via directory scanning | PR-4 |
 | | `POST /workflows/run {"workflow": "auto-code"}` resolves and instantiates pipeline | PR-4 |
 | | Adding a new workflow = adding a directory + manifest (zero registration code) | PR-4, NFR-5 |
-| | auto-code pipeline stages match architecture doc | PR-6 |
+| | auto-code WORKFLOW.yaml defines 4 stages (SHAPE, PLAN, BUILD, VERIFY) with per-stage approval | PR-4, PR-5 |
+| | `resolve_stage_config()` merges workflow defaults + stage overrides → effective StageConfig | PR-5 |
+| | Stage's agent/skill/tool lists filter existing infrastructure (AgentRegistry, SkillLibrary, GlobalToolset) | PR-5 |
+| | Stage transitions publish events to Redis Streams; `STAGE_APPROVAL` items route through CEO queue | PR-5, PR-17 |
+| | `ResourcePreflightAgent` validates manifest-declared resources before first deliverable | PR-8 |
+| | Resource library CRUD operational via gateway API; Director can browse via `browse_resources` tool | PR-8 |
+| | `validate_workflow` tool validates manifest schema + dry-run pipeline construction | PR-4, NFR-5 |
+| | Director `workflow-composition` and `resource-composition` authoring skills operational | PR-4, PR-13 |
+| | `tool_role` ceiling validation against workflow manifest enforced in AgentRegistry | NFR-4b |
 
 ---
 
@@ -459,7 +469,7 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 5a: Agent Definitions & Pipeline | `L-` | Agent definition files, InstructionAssembler, AgentRegistry, DeliverablePipeline, forward-dependency contracts |
 | 5b: Supervision & Integration | `M` | Director + PM hierarchy, PM loop (sequential), CEO queue, state key auth |
 | 6: Skills System | `M` | SkillLibrary, three-layer loading, supervision-tier resolution, 11 initial skills |
-| 7: Workflow Composition | `M` | WorkflowRegistry, auto-code workflow, WORKFLOW.yaml |
+| 7: Workflow Composition | `M` | WorkflowRegistry, stage schema, auto-code workflow, resource library, Director authoring |
 | 8: Spec Pipeline | `L` | PM-driven batch loop, spec decomposition, git worktrees |
 | 9: Memory Service | `M` | PostgresMemoryService, cross-session search |
 | 10: Events, CLI, Observability | `L` | SSE, webhooks, typer CLI, OpenTelemetry |
@@ -484,8 +494,9 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 2026-02-18 | Phase 4 DONE |
 | 2026-03-10 | Phase 5 scope finalized (Decisions #50-58); split into 5a + 5b; FRDs written |
 | 2026-03-11 | Phase 6 scope updated from FRD: three-layer loading model, supervision-tier resolution, autonomous creation, `applies_to` filtering, 11 initial skills; completion contract expanded from 5→8 items |
+| 2026-03-12 | Phase 7 scope expanded: stage schema (D-70), workflow ecosystem (D-71), resource pre-flight (D-72), workflow chaining (D-73), Director authoring (D-74), resource library (D-75); completion contract expanded from 4→12 items; split into Phase 7a (core infrastructure) + 7b (authoring/resources) |
 | 2026-03-11 | All open questions resolved (Decisions #59-67); migrated to `.decision-log.md` |
 
 ---
 
-*Last Updated: 2026-03-11*
+*Last Updated: 2026-03-12*

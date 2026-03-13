@@ -12,7 +12,7 @@ The architecture is organized around five layers:
 4. **Engine layer** -- ADK orchestration (batch scheduling, pipelines, agents, tools, state)
 5. **Infrastructure layer** -- Redis (queue + events + cache + cron), database (SQLAlchemy + Alembic), filesystem
 
-All agent types -- LLM and deterministic -- participate in the same ADK event stream, state system, and observability infrastructure. While auto-code is the first workflow, the architecture is workflow-agnostic -- pipeline stages, quality gates, and artifact types are defined per workflow, not hardcoded.
+All agent types -- LLM and deterministic -- participate in the same ADK event stream, state system, and observability infrastructure. While auto-code is the first workflow, the architecture is workflow-agnostic -- pipeline stages, quality gates, and artifact types are defined per workflow, not hardcoded. Workflows use a **stage schema** where stages are named configuration scopes filtering existing infrastructure (agents, skills, tools, quality gates), not new execution primitives (Decision #70). A **resource library** (DB-backed) tracks CEO-registered resources with deterministic pre-flight validation (Decisions #72, #75).
 
 ---
 
@@ -126,7 +126,7 @@ Detailed architecture documentation is organized by domain in the `architecture/
 |--------|------|---------|
 | Context | [context.md](./architecture/context.md) | Context assembly lifecycle, budgeting, recreation, knowledge loading |
 | Skills | [skills.md](./architecture/skills.md) | Skill-based knowledge injection, three-layer deterministic loading, trigger matching, supervision-tier resolution |
-| Workflows | [workflows.md](./architecture/workflows.md) | Pluggable workflow system, manifests, registry, composition |
+| Workflows | [workflows.md](./architecture/workflows.md) | Pluggable workflow system, stage schema, manifests, registry, resource library, Director authoring |
 | Observability | [observability.md](./architecture/observability.md) | OpenTelemetry + Langfuse, tracing, logging, event stream |
 
 ---
@@ -149,7 +149,7 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | PR-5c | 3-scope agent definition cascade | [agents.md](./architecture/agents.md) §Definition Cascade |
 | PR-6 | Default workflow plugins | [workflows.md](./architecture/workflows.md) §auto-code: The First Workflow |
 | PR-7 | Project conventions override | [workflows.md](./architecture/workflows.md) §Workflow Manifest, [state.md](./architecture/state.md) §1.2 |
-| PR-8 | Resource pre-flight validation | [execution.md](./architecture/execution.md) §Director-Level Loop, [workers.md](./architecture/workers.md) §Worker Lifecycle |
+| PR-8 | Resource pre-flight validation | [execution.md](./architecture/execution.md) §Director-Level Loop, [workers.md](./architecture/workers.md) §Worker Lifecycle, [workflows.md](./architecture/workflows.md) §Resource Pre-Flight |
 | PR-9 | Observable async work queues | [workers.md](./architecture/workers.md) §ARQ Workers, [events.md](./architecture/events.md) §Redis Streams |
 | PR-10 | PM execution loop | [execution.md](./architecture/execution.md) §PM-Level Loop, [agents.md](./architecture/agents.md) §PM Agent |
 | PR-11 | Validator pipeline | [agents.md](./architecture/agents.md) §Worker-Tier Custom Agents, [execution.md](./architecture/execution.md) §PM-Level Loop |
@@ -220,8 +220,14 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | — | Hybrid CustomAgent model | CustomAgents span deterministic to hybrid (internal LiteLLM calls); `type` is always `llm` or `custom` | [agents.md](./architecture/agents.md) |
 | — | Agent security model | Project-scope restricted to `type: llm` + tool_role ceiling; state key authorization via tier prefixes | [agents.md](./architecture/agents.md) |
 | — | Deterministic skill loading | Three-layer model: role-bound (always trigger), context-matched (deliverable triggers), explicit override. No LLM in matching. Applies to all tiers — Director/PM at build time, workers at pipeline runtime. | [skills.md](./architecture/skills.md) |
+| — | Stage schema (config scopes) | Stages filter existing infrastructure (agents, skills, tools, quality gates), not new primitives. Configurable approval per-stage. | [workflows.md](./architecture/workflows.md) |
+| — | Workflow ecosystem model | Self-contained directory with standards, knowledge, validators. Standards inject as GOVERNANCE fragments. | [workflows.md](./architecture/workflows.md) |
+| — | Resource pre-flight validation | Deterministic CustomAgent validates manifest-declared resources before execution. Check types are an enum. | [workflows.md](./architecture/workflows.md) |
+| — | Workflow chaining forward-compatible | Single-workflow primary; `produces`/`consumes` declarations for Phase 8+ compound workflows. | [workflows.md](./architecture/workflows.md) |
+| — | Director workflow authoring | Via enhanced authoring skills + existing file tools + `validate_workflow` FunctionTool. | [workflows.md](./architecture/workflows.md) |
+| — | Resource library (DB entity) | CEO resources as metadata in DB; secrets via `secret_ref` env var pointers; Director browses via tool. | [workflows.md](./architecture/workflows.md) |
 
 ---
 
-*Document Version: 2.5*
-*Last Updated: 2026-03-11*
+*Document Version: 2.6*
+*Last Updated: 2026-03-12*

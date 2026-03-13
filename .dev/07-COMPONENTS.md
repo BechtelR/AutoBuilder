@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 1.9.0*
+*Version: 2.0.0*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -432,8 +432,38 @@ Source: `architecture/workflows.md`
 | F14 | `auto-code/pipeline.py` module | module | 7 | workflows.md §auto-code: The First Workflow | All auto-code agents |
 | F15 | `auto-code/agents/` (planner, coder, reviewer) | module | 7 | workflows.md §auto-code: The First Workflow | — |
 | F16 | `auto-code/skills/` (workflow-specific) | config | 7 | workflows.md §auto-code: The First Workflow | — |
-| F17 | Compound workflow decomposition | mechanism | 11 | workflows.md §Compound Workflows | WorkflowRegistry |
+| F17 | Compound workflow decomposition | mechanism | 8 | workflows.md §Workflow Chaining | WorkflowRegistry |
 | F18 | `pipeline.py` interface contract (function signature) | config | 7 | workflows.md §WorkflowRegistry | — |
+| F19 | `WorkflowManifest` Pydantic model | module | 7 | workflows.md §Workflow Manifest | — |
+| F20 | `StageConfig` frozen dataclass | module | 7 | workflows.md §Stage Schema Architecture | — |
+| F21 | `StageSchema` frozen dataclass (ordered list, `get()`, `next()`, `is_final()`) | module | 7 | workflows.md §Stage Schema Architecture | StageConfig |
+| F22 | `resolve_stage_config()` function (merge workflow defaults + stage overrides) | mechanism | 7 | workflows.md §Stage Schema Architecture | WorkflowManifest, StageConfig |
+| F23 | `PipelineType` enum (`BATCH_PARALLEL`, `SEQUENTIAL`, `SINGLE_PASS`) | config | 7 | workflows.md §Workflow Manifest | — |
+| F24 | `ResourceDeclaration` model (tools, credentials, services, inputs) | module | 7 | workflows.md §Resource Pre-Flight | — |
+| F25 | `ValidatorDeclaration` model (name, type, schedule, required, fail_action) | module | 7 | workflows.md §Workflow Ecosystem Model | — |
+| F26 | `ResourcePreflightAgent` (deterministic CustomAgent) | agent | 7 | workflows.md §Resource Pre-Flight | ResourceDeclaration, CEO queue |
+| F27 | `ResourceCheckType` enum (8 check types) | config | 7 | workflows.md §Resource Pre-Flight | — |
+| F28 | `resource_preflight.md` agent definition file | config | 7 | workflows.md §Resource Pre-Flight | AgentRegistry |
+| F29 | `ResourceEntry` SQLAlchemy model (`resource_library` table) | db | 7 | workflows.md §Resource Library | Alembic |
+| F30 | `ProjectResource` SQLAlchemy model (`project_resources` table) | db | 7 | workflows.md §Resource Library | Alembic |
+| F31 | `resource_library` + `project_resources` migration | migration | 7 | workflows.md §Resource Library | Alembic |
+| F32 | `GET/POST/PUT/DELETE /resources` CRUD routes | route | 7 | workflows.md §Resource Library | ResourceEntry |
+| F33 | `POST /projects/{id}/resources/bind` route | route | 7 | workflows.md §Resource Library | ProjectResource |
+| F34 | `browse_resources` FunctionTool (Director tool) | tool | 7 | workflows.md §Resource Library | ResourceEntry |
+| F35 | `validate_workflow` FunctionTool | tool | 7 | workflows.md §Director Workflow Authoring | WorkflowManifest, WorkflowRegistry |
+| F36 | `current_stage` column migration (project table) | migration | 7 | workflows.md §Stage Schema Architecture | Alembic |
+| F37 | `CeoQueueItemType.STAGE_APPROVAL` enum value | config | 7 | workflows.md §Stage Schema Architecture | enums.py |
+| F38 | `STAGE_TRANSITION` event type | config | 7 | workflows.md §Stage Schema Architecture | enums.py |
+| F39 | Stage-aware pipeline factory (StageConfig → `create_deliverable_pipeline()`) | mechanism | 7 | workflows.md §Stage Schema Architecture | pipeline.py |
+| F40 | AgentRegistry stage filter (`agent_filter` parameter) | mechanism | 7 | workflows.md §Stage Schema Architecture | _registry.py |
+| F41 | InstructionAssembler stage context (TASK + GOVERNANCE fragments) | mechanism | 7 | workflows.md §Stage Schema Architecture | assembler.py |
+| F42 | `auto-code/standards/coding-standards.md` GOVERNANCE fragment | config | 7 | workflows.md §auto-code: The First Workflow | — |
+| F43 | `auto-code/validators/` (lint.yaml, test.yaml, review.yaml) | config | 7 | workflows.md §auto-code: The First Workflow | — |
+| F44 | Skill: `authoring/workflow-composition` (Director-tier) | skill | 7 | workflows.md §Director Workflow Authoring | — |
+| F45 | Skill: `authoring/resource-composition` (Director-tier) | skill | 7 | workflows.md §Director Workflow Authoring | — |
+| F46 | `produces`/`consumes` manifest declarations (forward-compatible) | config | 7 | workflows.md §Workflow Chaining | — |
+| F47 | `ResourceCategory` enum | config | 7 | workflows.md §Resource Library | enums.py |
+| F48 | `ResourceStatus` enum | config | 7 | workflows.md §Resource Library | enums.py |
 
 ---
 
@@ -582,10 +612,10 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Metric | Count |
 |--------|-------|
-| Total components | 331 |
+| Total components | 361 |
 | Dropped | 2 |
-| Active components | 329 |
-| Assigned (with phase) | 329 |
+| Active components | 359 |
+| Assigned (with phase) | 359 |
 | **Unassigned (gaps)** | **0** |
 | Phase 0-2 (done) | 19 |
 | Phase 3 | 37 |
@@ -593,11 +623,11 @@ Components removed from the registry as unnecessary or over-engineered:
 | Phase 5a | 48 |
 | Phase 5b | 21 |
 | Phase 6 | 31 |
-| Phase 7 | 21 |
-| Phase 8 | 21 |
+| Phase 7 | 51 |
+| Phase 8 | 22 |
 | Phase 9 | 10 |
 | Phase 10 | 25 |
-| Phase 11 | 17 |
+| Phase 11 | 16 |
 | Phase 12 | 12 |
 | Phase 13 / 13+ / 14 | 5 |
 
@@ -607,6 +637,7 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 2.0.0 | 2026-03-12 | Phase 7 architecture: F19-F48 added (WorkflowManifest, StageConfig, StageSchema, resolve_stage_config, PipelineType, ResourceDeclaration, ValidatorDeclaration, ResourcePreflightAgent, ResourceCheckType, resource_preflight.md, ResourceEntry, ProjectResource, resource migrations, resource CRUD routes, browse_resources tool, validate_workflow tool, current_stage migration, STAGE_APPROVAL/STAGE_TRANSITION enums, stage-aware pipeline factory, AgentRegistry stage filter, InstructionAssembler stage context, auto-code standards/validators, workflow-composition/resource-composition skills, produces/consumes declarations, ResourceCategory/ResourceStatus enums); F17 moved 11→8 (compound workflow is Phase 8 scope); statistics updated (Total 331→361, Active 329→359, Phase 7 21→51, Phase 8 21→22, Phase 11 17→16) |
 | 1.9.0 | 2026-03-11 | Phase 6 FRD back-propagation: S16-S17 added (supervision-tier resolution, skill validation); S33-S36 added (4 authoring skills); S32 moved 13+→6 (Director/PM role-bound skills); S12 updated (adds `applies_to` filtering); statistics updated (Total 325→331, Active 323→329, Phase 6 24→31, Phase 13+/14 6→5) |
 | 1.8.1 | 2026-03-10 | Fix Phase 3 count 36→37 (A72 move was not reflected in statistics) |
 | 1.8.0 | 2026-03-10 | Phase 5b FRD decisions: A16 added (Director queue consumption, 5b); X11 added (batch failure threshold, 8); A72 moved 5b→3 (cross-session bridge already operational via state scopes + Redis Streams); statistics updated (Total 323→325, Active 321→323, Phase 0-2 19→20, Phase 8 20→21) |
@@ -624,5 +655,5 @@ Components removed from the registry as unnecessary or over-engineered:
 
 ---
 
-*Document Version: 1.9.0*
-*Last Updated: 2026-03-11*
+*Document Version: 2.0.0*
+*Last Updated: 2026-03-12*
