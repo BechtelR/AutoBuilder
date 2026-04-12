@@ -90,7 +90,8 @@ API-first gateway (FastAPI) enqueues work to ARQ workers via Redis. Workers exec
 
 ## Critical DON'Ts
 - NEVER MAKE UP NON-EXISTENT FILES, FACTS OR REFERENCES
-- NEVER IGNORE EXISTING ERRORS, DO NOT DEFER
+- NEVER IGNORE EXISTING ERRORS, FIX IMMEDIATELY
+- NEVER DEFER ACTIONS OR WORK ITEMS, except in the case of proven blocking dependencies
 - Don't use retrospective language, eg. `old version was ABC design, but now it's XYZ design`
 - Don't expose ADK types through the gateway API
 - Don't bypass type checking with `Any`
@@ -123,6 +124,7 @@ uv run pyright                        # Identify type errors
 | `AUTOBUILDER_SEARCH_PROVIDER` | `tavily` | Web search provider (`tavily` or `brave`) |
 | `AUTOBUILDER_MAX_CONCURRENCY` | `6` | Max parallel deliverable pipelines (Phase 8) |
 | `AUTOBUILDER_SKILLS_DIR` | `./skills` | Project-local skills directory (Phase 6) |
+| `AUTOBUILDER_WORKFLOWS_DIR` | `~/.autobuilder/workflows` | User-level workflows directory (Phase 7) |
 | `ANTHROPIC_API_KEY` | -- | Claude models (primary) |
 | `OPENAI_API_KEY` | -- | OpenAI models (fallback) |
 | `GOOGLE_API_KEY` | -- | Gemini models (fallback) |

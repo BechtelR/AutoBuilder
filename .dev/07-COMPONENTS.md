@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 1.9.0*
+*Version: 2.0.0*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -407,6 +407,11 @@ Source: `architecture/skills.md`
 | S36 | Skill: `authoring/project-conventions` | skill | 6 | FRD §CAP-9 (FR-6.41) | — |
 | S31 | Auto-code skill: `test-generation` | skill | 7 | workflows.md §auto-code: The First Workflow | — |
 | S32 | Director/PM role-bound skills (governance, oversight, management) | skill | 6 | FRD §CAP-10 | SkillLibrary (`always` trigger + `applies_to`) |
+| S37 | `workflow-quality` skill (validator design patterns) | skill | 7 | workflows.md §Validators & Quality Gates | — |
+| S38 | `workflow-testing` skill (dry runs, testing patterns) | skill | 7 | workflows.md §Validators & Quality Gates | — |
+| S39 | `director-workflow-composition` skill | skill | 7b | workflows.md §Director Workflow Authoring | — |
+| S40 | `software-development-patterns` domain skill | skill | 7b | workflows.md §Director Workflow Authoring | — |
+| S41 | `research-patterns` domain skill | skill | 7b | workflows.md §Director Workflow Authoring | — |
 
 ---
 
@@ -422,18 +427,60 @@ Source: `architecture/workflows.md`
 | F04 | `WorkflowRegistry.list_available()` | mechanism | 7 | workflows.md §WorkflowRegistry | — |
 | F05 | `WorkflowRegistry.create_pipeline()` | mechanism | 7 | workflows.md §WorkflowRegistry | GlobalToolset, SkillLibrary |
 | F06 | `WorkflowEntry` Pydantic model | module | 7 | workflows.md §WorkflowRegistry | — |
-| F07 | `WORKFLOW.yaml` manifest schema | config | 7 | workflows.md §Workflow Manifest | — |
+| F07 | `WORKFLOW.yaml` manifest schema (progressive disclosure) | config | 7 | workflows.md §Workflow Manifest | — |
 | F08 | Workflow trigger matching (keywords) | mechanism | 7 | workflows.md §WorkflowRegistry | — |
 | F09 | Workflow trigger matching (explicit) | mechanism | 7 | workflows.md §WorkflowRegistry | — |
 | F10 | Workflow ambiguity resolution (user prompt) | mechanism | 7 | workflows.md §WorkflowRegistry | — |
 | F11 | `RunConfig` model | config | 7 | workflows.md §WorkflowRegistry | — |
-| F12 | Custom workflows directory (overrides) | config | 7 | workflows.md §WorkflowRegistry | — |
+| F12 | User-level workflow directory (override by name) | config | 7 | workflows.md §Architecture | — |
 | F13 | `auto-code/WORKFLOW.yaml` manifest | workflow | 7 | workflows.md §auto-code: The First Workflow | — |
 | F14 | `auto-code/pipeline.py` module | module | 7 | workflows.md §auto-code: The First Workflow | All auto-code agents |
 | F15 | `auto-code/agents/` (planner, coder, reviewer) | module | 7 | workflows.md §auto-code: The First Workflow | — |
 | F16 | `auto-code/skills/` (workflow-specific) | config | 7 | workflows.md §auto-code: The First Workflow | — |
 | F17 | Compound workflow decomposition | mechanism | 11 | workflows.md §Compound Workflows | WorkflowRegistry |
 | F18 | `pipeline.py` interface contract (function signature) | config | 7 | workflows.md §WorkflowRegistry | — |
+| F19 | `WorkflowManifest` Pydantic model (all fields) | module | 7 | workflows.md §Workflow Manifest | — |
+| F20 | `WorkflowRegistry.get_manifest()` | mechanism | 7 | workflows.md §WorkflowRegistry | WorkflowManifest |
+| F21 | Manifest validation (L1 schema, required/warning/cross-ref) | mechanism | 7 | workflows.md §WorkflowRegistry | WorkflowManifest |
+| F22 | `StageDef` Pydantic model | module | 7 | workflows.md §Stage Schema | — |
+| F23 | `CompletionCriteria` Pydantic model | module | 7 | workflows.md §Completion Criteria & Reports | — |
+| F24 | `ValidatorDefinition` Pydantic model | module | 7 | workflows.md §Validators & Quality Gates | — |
+| F25 | Stage state keys (`pm:current_stage`, `pm:stage_*`) | mechanism | 7 | workflows.md §Stage Schema | — |
+| F26 | `reconfigure_stage` FunctionTool | tool | 7 | workflows.md §Stage Schema | Stage state keys |
+| F27 | `verify_stage_completion` deterministic gate | mechanism | 7 | workflows.md §Completion Criteria & Reports | CompletionCriteria |
+| F28 | `verify_taskgroup_completion` deterministic gate | mechanism | 7 | workflows.md §Completion Criteria & Reports | CompletionCriteria |
+| F29 | `StageExecution` DB table | db | 7 | workflows.md §Stage Schema | `workflows` |
+| F30 | `TaskGroupExecution` DB table | db | 7 | workflows.md §Stage Schema | StageExecution |
+| F31 | `ValidatorResult` DB table | db | 7 | workflows.md §Validators & Quality Gates | StageExecution |
+| F32 | Standard validator: `lint_check` | mechanism | 7 | workflows.md §Validators & Quality Gates | LinterAgent |
+| F33 | Standard validator: `test_suite` | mechanism | 7 | workflows.md §Validators & Quality Gates | TestRunnerAgent |
+| F34 | Standard validator: `regression_tests` | mechanism | 7 | workflows.md §Validators & Quality Gates | RegressionTestAgent |
+| F35 | Standard validator: `code_review` | mechanism | 7 | workflows.md §Validators & Quality Gates | ReviewerAgent |
+| F36 | Standard validator: `dependency_validation` | mechanism | 7 | workflows.md §Validators & Quality Gates | — |
+| F37 | Standard validator: `deliverable_status_check` | mechanism | 7 | workflows.md §Validators & Quality Gates | — |
+| F38 | `CompletionReport` Pydantic model | module | 7 | workflows.md §Completion Criteria & Reports | — |
+| F39 | `StageStatus` enum | module | 7 | workflows.md §Stage Schema | — |
+| F40 | `ValidatorType` enum | module | 7 | workflows.md §Validators & Quality Gates | — |
+| F41 | `ValidatorSchedule` enum | module | 7 | workflows.md §Validators & Quality Gates | — |
+| F42 | Stage lifecycle events (STAGE_STARTED, STAGE_COMPLETED, etc.) | mechanism | 7 | workflows.md §Stage Schema | PipelineEventType |
+| F43 | `ResourcesDef` validation (credentials, services, knowledge) | mechanism | 7 | workflows.md §Workflow Manifest | — |
+| F58 | `PipelineContext` dataclass (stage config, manifest ref, runtime params) | module | 7 | workflows.md §Workflow Manifest | WorkflowManifest, StageDef |
+| F59 | `McpServerDef` Pydantic model (MCP server metadata for manifest parsing) | module | 7 | workflows.md §Workflow Manifest | — |
+| F44 | `list_available_tools()` Director tool | tool | 7b | workflows.md §Director Workflow Authoring | GlobalToolset |
+| F45 | `list_mcp_servers()` Director tool | tool | 7b | workflows.md §Director Workflow Authoring | — |
+| F46 | `list_configured_credentials()` Director tool | tool | 7b | workflows.md §Director Workflow Authoring | — |
+| F47 | `list_workflows()` Director tool | tool | 7b | workflows.md §Director Workflow Authoring | WorkflowRegistry |
+| F48 | `list_available_skills()` Director tool | tool | 7b | workflows.md §Director Workflow Authoring | SkillLibrary |
+| F49 | `validate_workflow()` Director tool | tool | 7b | workflows.md §Director Workflow Authoring | WorkflowManifest |
+| F50 | Director filesystem tool scoping (path-restricted) | mechanism | 7b | workflows.md §Director Workflow Authoring | — |
+| F51 | Staging directory convention | mechanism | 7b | workflows.md §Director Workflow Authoring | — |
+| F52 | Workflow activation gate (CEO queue) | mechanism | 7b | workflows.md §Director Workflow Authoring | CEO queue |
+| F53 | Dry run execution (synthetic input, `dry_run: true`) | mechanism | 7b | workflows.md §Director Workflow Authoring | WorkflowRegistry |
+| F54 | Standard validator: `source_verification` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
+| F55 | Standard validator: `citation_check` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
+| F56 | Auto-code validator: `integration_tests` | mechanism | 7b | workflows.md §Validators & Quality Gates | Stub-referenced from Phase 7 auto-code manifest |
+| F57 | Standard validator: `architecture_conformance` | mechanism | 7b | workflows.md §Validators & Quality Gates | Stub-referenced from Phase 7 auto-code manifest |
+| F60 | Standard validator: `content_review` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
 
 ---
 
@@ -580,26 +627,7 @@ Components removed from the registry as unnecessary or over-engineered:
 
 ## Statistics
 
-| Metric | Count |
-|--------|-------|
-| Total components | 331 |
-| Dropped | 2 |
-| Active components | 329 |
-| Assigned (with phase) | 329 |
-| **Unassigned (gaps)** | **0** |
-| Phase 0-2 (done) | 19 |
-| Phase 3 | 37 |
-| Phase 4 | 62 |
-| Phase 5a | 48 |
-| Phase 5b | 21 |
-| Phase 6 | 31 |
-| Phase 7 | 21 |
-| Phase 8 | 21 |
-| Phase 9 | 10 |
-| Phase 10 | 25 |
-| Phase 11 | 17 |
-| Phase 12 | 12 |
-| Phase 13 / 13+ / 14 | 5 |
+See component entries above for current counts. Use `grep -c '| [0-9]' 07-COMPONENTS.md` for totals.
 
 ---
 
@@ -607,6 +635,7 @@ Components removed from the registry as unnecessary or over-engineered:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 2.0.0 | 2026-03-12 | Phase 7 expansion (Decisions #70-77): 44 new workflow components (F19-F57, S37-S41); Phase 7b added (Director authoring); statistics updated (Total 331→375, Active 329→373, Phase 7 21→48, Phase 7b 17) |
 | 1.9.0 | 2026-03-11 | Phase 6 FRD back-propagation: S16-S17 added (supervision-tier resolution, skill validation); S33-S36 added (4 authoring skills); S32 moved 13+→6 (Director/PM role-bound skills); S12 updated (adds `applies_to` filtering); statistics updated (Total 325→331, Active 323→329, Phase 6 24→31, Phase 13+/14 6→5) |
 | 1.8.1 | 2026-03-10 | Fix Phase 3 count 36→37 (A72 move was not reflected in statistics) |
 | 1.8.0 | 2026-03-10 | Phase 5b FRD decisions: A16 added (Director queue consumption, 5b); X11 added (batch failure threshold, 8); A72 moved 5b→3 (cross-session bridge already operational via state scopes + Redis Streams); statistics updated (Total 323→325, Active 321→323, Phase 0-2 19→20, Phase 8 20→21) |
@@ -624,5 +653,5 @@ Components removed from the registry as unnecessary or over-engineered:
 
 ---
 
-*Document Version: 1.9.0*
-*Last Updated: 2026-03-11*
+*Document Version: 2.0.0*
+*Last Updated: 2026-03-12*

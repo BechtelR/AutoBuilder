@@ -1,85 +1,120 @@
-# Phase {N} Model: {Phase Title}
+# Phase {N} Architecture Model
 *Generated: {date}*
+
+> This document assembles the architectural context for Phase {N}. The L1/L2
+> architecture docs remain the source of truth — references throughout point
+> to authoritative sections. Builders should read referenced sections for
+> full design contracts.
+
+## Overview
+<!-- 2-3 sentences: what this phase builds, key architectural concerns -->
+
+## Components
+
+<!-- Every BOM component for this phase. Grouped by architecture layer. -->
+
+```yaml
+components:
+  # --- {Layer Name} ---
+  - id: {BOM_ID}
+    name: {ComponentName}
+    layer: {architecture_layer}
+    type: deterministic | probabilistic
+    responsibility: {what it does — one sentence}
+    architecture_ref: {file} §{section}
+    location: {file_path}
+    satisfies: [CAP-{n}, ...]
+```
 
 ## Component Diagram
 
+<!-- Single Mermaid flowchart derived from the components and interfaces above. -->
+<!-- Group into subgraphs by architecture layer. Show relationships with arrows. -->
+<!-- This is a human verification aid — the YAML above is the authoritative source. -->
+
 ```mermaid
-{Mermaid flowchart showing components, their relationships, and which architecture layer each belongs to (layers defined in 02-ARCHITECTURE.md). Group components into subgraphs by layer. Show data flow direction with arrows. For UI components: names + relationships only — detailed UI design lives in separate files for dashboard phases.}
+flowchart TD
+    subgraph {LayerName}
+        {ComponentName}
+    end
 ```
 
 ## L2 Architecture Conformance
 
-| Component | L2 Architecture File | Section |
-|---|---|---|
-| {component name} | `architecture/{file}.md` | {section name} |
+<!-- Derived from component architecture_refs above. Quick-reference for review. -->
 
-*Every model component must trace to the L2 architecture section that defines its design contract.*
+| Component | Architecture Source |
+|---|---|
+| {ComponentName} | `{file}` §{section} |
 
-## Major Interfaces
+## Interfaces
 
-{Protocol classes and ABCs with method signatures only — no implementation bodies. One code block per interface. Include docstrings for non-obvious methods. These define the contracts between components.}
+<!-- Typed contracts at non-trivial component boundaries. -->
+<!-- Skip simple pass-through or single-method wrappers. -->
 
-```python
-class {InterfaceName}(Protocol):
-    """{Single-line purpose.}"""
-
-    async def {method}(self, {params}: {types}) -> {return_type}:
-        """Optional clarification."""
-        ...
+```yaml
+interfaces:
+  - from: {ComponentName}
+    to: {ComponentName}
+    sends: {TypeName}
+    returns: {TypeName}
+    notes: {behavioral expectations — omit if obvious}
 ```
 
-(repeat for all interfaces)
+## Key Types
 
-## Key Type Definitions
+<!-- Types that cross component boundaries. Not internal types. -->
 
-{Pydantic models, enums, and TypedDicts at system boundaries. Field-level detail — every field with its type and purpose. Group by domain concept.}
-
-```python
-class {ModelName}(BaseModel):
-    """{Purpose.}"""
-    {field}: {type}  # {purpose}
+```yaml
+types:
+  - name: {TypeName}
+    kind: model | enum | typed_dict
+    fields:
+      - {field}: {type}   # {description, only if non-obvious}
+    used_by: [{ComponentName}, ...]
 ```
 
-```python
-class {EnumName}(str, enum.Enum):
-    {MEMBER} = "{MEMBER}"  # {meaning}
+## Data Flows
+
+<!-- How data transforms across boundaries. One block per distinct non-trivial path. -->
+<!-- Skip flows obvious from the interfaces. -->
+
+```yaml
+flows:
+  - name: {flow_name}
+    description: {one sentence}
+    path:
+      - step: {ComponentName}
+        receives: {TypeName}
+        emits: {TypeName}
+        note: {transformation, only if non-obvious}
 ```
 
-(repeat for all types)
+## Design Decisions
 
-## Data Flow
+<!-- Decisions where the L2 architecture left options open for this phase. -->
+<!-- These inform the builder — architecture docs remain authoritative. -->
 
-{How data transforms across architecture layers. Show the type chain — what enters each boundary and what exits. Use a table or Mermaid sequence diagram.}
-
-```mermaid
-{Sequence or flowchart showing data transformation: external input → gateway Pydantic model → DB model → worker DTO → engine state → output artifact. Label each arrow with the transformation.}
-```
-
-## Logic / Process Flow
-
-{State machines, pipeline stages, decision trees. Structured text or Mermaid state diagrams. No implementation code — describe transitions, conditions, and outcomes.}
-
-```mermaid
-stateDiagram-v2
-    {State diagram showing lifecycle, transitions, and conditions}
-```
+| ID | Decision | Alternatives Considered | Rationale |
+|----|----------|------------------------|-----------|
 
 ## Integration Points
 
-### Existing System
-{Components this phase connects to that already exist. For each: what it is, how this phase uses it, the interface boundary.}
+<!-- Existing: what this phase connects to from prior phases. Future: extension points for later phases. -->
 
-| Component | Interface | How This Phase Uses It |
-|-----------|-----------|----------------------|
-| {existing component} | {protocol/API/state key} | {description} |
+```yaml
+integrations:
+  existing:
+    - component: {ComponentName}
+      connects_to: {ExistingComponent}
+      interface: {what's exchanged}
 
-### Future Phase Extensions
-{Known extension points for later phases. What hooks, registries, or patterns this phase establishes that future work will consume.}
-
-| Extension Point | Future Phase | Preparation |
-|----------------|-------------|-------------|
-| {hook/registry/pattern} | Phase {X} | {what this phase provides} |
+  future:
+    - extension_point: {hook/registry/pattern}
+      target_phase: Phase {X}
+      preparation: {what this phase establishes}
+```
 
 ## Notes
 
-{Constraints, gotchas, non-obvious decisions, performance considerations. Keep brief — if it needs a paragraph, it belongs in the spec's Design Decisions.}
+<!-- Constraints, gotchas, rabbit holes from FRD. Brief. -->

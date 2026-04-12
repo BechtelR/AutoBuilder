@@ -17,7 +17,7 @@
 6. [Supervision-Tier Skill Resolution](#supervision-tier-skill-resolution)
 7. [ADK Integration](#adk-integration)
 8. [Directory Layout](#directory-layout)
-9. [Two-Tier Library](#two-tier-library)
+9. [Three-Tier Library](#three-tier-library)
 10. [Autonomous Skill Creation](#autonomous-skill-creation)
 11. [Scope Estimate](#scope-estimate)
 
@@ -49,9 +49,9 @@ Lightweight metadata in YAML frontmatter enables matching without reading the fu
 
 The skill index is visible to the system. Full skill content loads into agent context only when a skill matches the current task. An agent implementing an API endpoint gets the API conventions skill; an agent writing a database migration gets the migration patterns skill. Neither gets the other.
 
-### 4. Two-Tier Library
+### 4. Three-Tier Library
 
-Global skills ship with AutoBuilder (workflow-agnostic best practices). Project-local skills live in the user's repo and override globals with project-specific conventions. A project-local `api-endpoint.md` replaces the global `api-endpoint.md` entirely.
+Global skills ship with AutoBuilder (workflow-agnostic best practices). Workflow skills live alongside workflow definitions and provide workflow-specific knowledge. Project-local skills live in the user's repo and override both. A project-local `api-endpoint.md` replaces the workflow or global `api-endpoint.md` entirely.
 
 ### 5. Composable
 
@@ -383,7 +383,7 @@ Top-level subdirectories (`code/`, `review/`, `test/`, `planning/`) are organiza
 
 ---
 
-## Two-Tier Library
+## Three-Tier Library
 
 ### Global Tier
 
@@ -398,6 +398,16 @@ Ships with AutoBuilder. Contains framework-agnostic best practices and common pa
 
 Global skills are useful out of the box but intentionally generic. They provide a baseline that most projects benefit from.
 
+### Workflow Tier
+
+Lives alongside workflow definitions at `app/workflows/{name}/skills/`. Contains workflow-specific knowledge:
+
+- Coding conventions and patterns specific to auto-code
+- Research methodology and citation rules for auto-research
+- Domain-specific quality criteria and validation rules
+
+Workflow skills override global skills by name but are overridden by project-local skills. They encode the expertise a workflow accumulates without polluting the global tier.
+
 ### Project-Local Tier
 
 Lives in the user's repository at `.agents/skills/`. Contains project-specific conventions:
@@ -409,26 +419,33 @@ Lives in the user's repository at `.agents/skills/`. Contains project-specific c
 
 ### Override Behavior
 
-Project-local skills with the same `name` as a global skill replace the global entirely. There is no merging.
+Skills with the same `name` are replaced entirely by the narrower scope. There is no merging.
 
-| Global Skill | Project-Local Skill | Result |
-|---|---|---|
-| `api-endpoint` (generic REST patterns) | `api-endpoint` (FastAPI-specific conventions) | Project-local wins |
-| `unit-test-patterns` (general testing) | *(none)* | Global loads |
-| *(none)* | `auth-middleware` (project-specific) | Project-local loads |
-| `security-review` (OWASP basics) | `security-review` (project compliance rules) | Project-local wins |
+| Global Skill | Workflow Skill | Project-Local Skill | Result |
+|---|---|---|---|
+| `api-endpoint` (generic REST) | `api-endpoint` (auto-code conventions) | `api-endpoint` (FastAPI-specific) | Project-local wins |
+| `unit-test-patterns` (general) | *(none)* | *(none)* | Global loads |
+| *(none)* | *(none)* | `auth-middleware` (project-specific) | Project-local loads |
+| `security-review` (OWASP basics) | `security-review` (workflow compliance) | *(none)* | Workflow wins |
 
 ### Scan Order
 
-The skill library scans global skills first, then project-local skills. Project-local entries overwrite global entries with matching names in the index.
+The skill library scans global skills first, then workflow skills, then project-local skills. Each tier's entries overwrite earlier entries with matching names in the index.
 
 ```python
 class SkillLibrary:
-    def __init__(self, global_dir: Path, project_dir: Path | None = None):
+    def __init__(
+        self,
+        global_dir: Path,
+        workflow_dir: Path | None = None,
+        project_dir: Path | None = None,
+    ):
         self._index: dict[str, SkillEntry] = {}
         self._scan(global_dir)              # Global skills load first
+        if workflow_dir:
+            self._scan(workflow_dir)          # Workflow skills override global
         if project_dir:
-            self._scan(project_dir)          # Project-local skills override
+            self._scan(project_dir)          # Project-local skills override all
 ```
 
 ### Caching
@@ -465,7 +482,7 @@ The `SkillLoaderAgent` resolves cascades after primary matching:
 4. Recurse: if cascaded skills themselves declare cascades, resolve those too
 5. Circular cascades are prevented by tracking visited skill names during resolution
 
-Cascaded skills respect the same two-tier override rules: a project-local skill overrides a global skill with the same name, whether loaded directly or via cascade.
+Cascaded skills respect the same three-tier override rules: a narrower-scope skill overrides a broader-scope skill with the same name, whether loaded directly or via cascade.
 
 ---
 
@@ -503,7 +520,7 @@ The core skills implementation is approximately 320-400 lines of Python:
 | Component | Estimated Lines | Responsibility |
 |---|---|---|
 | `SkillEntry` | ~40 | Pydantic model for frontmatter metadata (expanded: triggers, tags, priority, cascades, path) |
-| `SkillLibrary` | ~130 | Index building, matching, loading, two-tier scan, Redis caching |
+| `SkillLibrary` | ~130 | Index building, matching, loading, three-tier scan, Redis caching |
 | `SkillLoaderAgent` | ~55 | CustomAgent that runs matching, cascade resolution, and writes state (workers only) |
 | `Frontmatter parser` | ~35 | YAML frontmatter extraction from markdown files, validation function |
 | `Trigger matchers` | ~60 | Per-type matching logic (exact, glob, set intersection, description keyword fallback) |

@@ -17,6 +17,7 @@ External data → Pydantic v2. Internal DTOs → `dataclass`/`TypedDict`. Never 
 - Redis deserialize: `cast(T, json.loads(...))` — explicit assertion
 - ADK callback signatures: framework stubs incomplete
 - LiteLLM response internals: provider-agnostic wrapper types
+- Design-time or development-time tests where type safety isn't critical (mark with `# type: ignore` and comment why)
 
 ## Enums & String Literals
 All enums live in `app.models.enums`. Never define enums inline unless they are strictly private to a class.

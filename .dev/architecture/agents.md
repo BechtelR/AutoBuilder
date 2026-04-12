@@ -90,9 +90,9 @@ deliverable_pipeline = SequentialAgent(
         LinterAgent(name="Lint"),                  # CustomAgent — deterministic
         TestRunnerAgent(name="Test"),               # CustomAgent — deterministic
         DiagnosticsAgent(name="Diagnostics"),      # CustomAgent — hybrid (LiteLLM internally)
-        LoopAgent(
-            name="ReviewCycle",
-            max_iterations=3,
+        ReviewCycleAgent(                     # CustomAgent — replaces LoopAgent
+            name="ReviewCycle",                 #   (LoopAgent terminates on escalate events,
+            max_iterations=3,                   #    which LlmAgents cannot produce)
             sub_agents=[
                 reviewer,                      # LlmAgent
                 fixer,                         # LlmAgent
@@ -243,10 +243,10 @@ This overrides only `model_role` -- identity, governance, tool_role, and output_
 **Resolution order:**
 
 ```
-scan(global_dir) → scan(workflow_dir) → scan(project_dir)
-         ↓                  ↓                   ↓
-      base set          override by          override by
-                        filename match       filename match
+scan((global_dir, GLOBAL), (workflow_dir, WORKFLOW), (project_dir, PROJECT))
+         ↓                        ↓                        ↓
+      base set               override by               override by
+                            filename match             filename match
 ```
 
 Later scopes override earlier scopes. The final index maps each agent name to exactly one definition source.
@@ -371,7 +371,7 @@ These are infrastructure concerns, not agent identity — they belong in code, n
 
 The registry scans directories for `.md` agent definition files, indexes them by frontmatter, and builds ADK agents on demand. Shared across all workflows.
 
-The registry index is rebuilt per-pipeline. `scan()` is called with exactly the relevant directories for the current workflow: `scan(global_dir, current_workflow_agents_dir, project_agents_dir)`. Agents from other workflows are not in the index.
+The registry index is rebuilt per-pipeline. `scan()` is called with exactly the relevant directories for the current workflow: `scan((global_dir, GLOBAL), (workflow_agents_dir, WORKFLOW), (project_dir, PROJECT))`. Agents from other workflows are not in the index.
 
 ```python
 class AgentRegistry:
@@ -384,13 +384,15 @@ class AgentRegistry:
         self._router = router
         self._toolset = toolset
 
-    def scan(self, *dirs: Path) -> None:
-        """Scan directories for .md files. Later dirs override earlier by filename.
+    def scan(self, *dirs: tuple[Path, DefinitionScope]) -> None:
+        """Scan directories for .md agent definition files.
+        3-scope cascade: GLOBAL → WORKFLOW → PROJECT.
+        Later scopes override earlier by filename match.
         Parses frontmatter and body eagerly — full file read at scan time.
         parse_agent_file() validates that frontmatter `name` matches the filename stem;
         mismatch raises an error at scan time. Invalid files are skipped with a warning log."""
-        for d in dirs:
-            for f in d.glob("*.md"):
+        for dir_path, scope in dirs:
+            for f in dir_path.glob("*.md"):
                 entry = parse_agent_file(f)  # raises on name/filename mismatch
                 self._index[entry.name] = entry
 
@@ -724,7 +726,7 @@ The code agent consumes the structured plan and writes implementation code. Mode
 | **Model** | `anthropic/claude-sonnet-4-6` |
 | **Tool Access** | Read-only -- filesystem read, directory list, search. No write tools. |
 
-The review agent reads the code output alongside lint and test results written to state by deterministic agents. It evaluates quality and either approves the deliverable or produces structured feedback for the fix agent. If the review fails, the `LoopAgent` wrapper triggers another fix/lint/test/review cycle (up to `max_iterations`).
+The review agent reads the code output alongside lint and test results written to state by deterministic agents. It evaluates quality and either approves the deliverable or produces structured feedback for the fix agent. If the review fails, the `ReviewCycleAgent` wrapper triggers another fix/lint/test/review cycle (up to `max_iterations`).
 
 ### fixer (auto-code example)
 
@@ -736,7 +738,7 @@ The review agent reads the code output alongside lint and test results written t
 | **Model** | `anthropic/claude-sonnet-4-6` |
 | **Tool Access** | Full -- filesystem read/write/edit, bash execution |
 
-The fix agent receives structured review feedback and applies targeted corrections. It operates within the `LoopAgent` review cycle, iterating until the review agent approves or `max_iterations` is reached.
+The fix agent receives structured review feedback and applies targeted corrections. It operates within the `ReviewCycleAgent` review cycle, iterating until the review agent approves or `max_iterations` is reached.
 
 ---
 

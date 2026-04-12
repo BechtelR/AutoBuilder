@@ -66,11 +66,14 @@ Each tier runs autonomously. No human prompting is required between iterations. 
 
 Note: The specific deterministic agents in validation/verification steps vary by workflow. For auto-code: LinterAgent + TestRunnerAgent. For auto-research: SourceVerifierAgent + CitationCheckerAgent. The *pattern* (deterministic validation is mandatory) is universal; the *implementation* is workflow-specific.
 
+**Stage-scoped execution (Phase 7+):** The PM operates within the current stage's constraints -- agent configuration, tool authorization, and skill sets are scoped per stage. Stage transitions are PM-driven via `advance_stage` and gated by `verify_stage_completion`. See [workflows.md §Stage Schema](./workflows.md#stage-schema).
+
 ---
 
 ## See Also
 
 - [Agents](./agents.md) -- Agent hierarchy, Director, PM, and Worker architecture
+- [Workflows](./workflows.md) -- Workflow composition, stages, pipeline instantiation
 - [Workers](./workers.md) -- ARQ worker processes and job execution
 - [Events](./events.md) -- Redis Streams event bus and event distribution
 - [Architecture Overview](../02-ARCHITECTURE.md) -- Full system architecture

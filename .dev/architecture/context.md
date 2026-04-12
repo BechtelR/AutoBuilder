@@ -133,6 +133,8 @@ Pipeline start
   └── 7. LLM receives: system instructions + session event history + tools
 ```
 
+**Workflow variance (Phase 7+):** The pipeline steps shown above reflect the auto-code workflow. Pipeline composition varies by workflow -- each workflow defines its own agent topology and stage schema. The context recreation mechanism is shared; the pipeline stages it recreates are workflow-provided.
+
 State is populated in execution order before LLM agents read it:
 
 ```
@@ -177,7 +179,7 @@ Two deterministic `CustomAgent` implementations guarantee context loading as pip
 
 Runs as the first step in every `DeliverablePipeline` (worker tier only). Matches skills against the current deliverable context using deterministic pattern matching (exact string, glob, set intersection -- no LLM call). Writes loaded skill content with `applies_to` metadata to session state so the `InstructionAssembler` can filter per-agent at assembly time.
 
-Director and PM receive skills at agent build time via direct `SkillLibrary.match()` calls, not via `SkillLoaderAgent`. See [skills.md](./skills.md) for full skill format, trigger matching, supervision-tier resolution, and two-tier library architecture.
+Director and PM receive skills at agent build time via direct `SkillLibrary.match()` calls, not via `SkillLoaderAgent`. See [skills.md](./skills.md) for full skill format, trigger matching, supervision-tier resolution, and three-tier library architecture.
 
 ### MemoryLoaderAgent (Decision #57)
 
@@ -299,7 +301,7 @@ This is also why agent communication flows through session state (`output_key`, 
 
 - [State & Memory](./state.md) -- ADK 4-scope state, multi-level memory, session persistence, `PostgresMemoryService`
 - [Agents](./agents.md) -- agent hierarchy, definition files, `AgentRegistry`, instruction composition details
-- [Skills](./skills.md) -- skill file format, trigger matching, progressive disclosure, two-tier library
+- [Skills](./skills.md) -- skill file format, trigger matching, progressive disclosure, three-tier library
 - [Engine](./engine.md) -- `App` container, `EventsCompactionConfig`, `context_cache_config`
 - [Observability](./observability.md) -- tracing, logging, event stream monitoring
 

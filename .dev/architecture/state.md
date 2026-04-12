@@ -39,6 +39,10 @@ Key characteristics:
 
 > **Multi-session model:** Director operates via multiple concurrent sessions: **settings session** (formation/evolution, one per user), **chat sessions** for interactive CEO conversation, and **work sessions** (one per project) for background autonomous oversight. Same agent definition, different session IDs. ADK `Runner.run_async()` supports concurrent calls with different session IDs natively. The `user:` scoped formation artifacts are shared across all of these sessions automatically.
 
+> **Workflow stage state keys:** PM-tier stage state keys (`pm:current_stage`, `pm:stage_index`, `pm:stage_status`, `pm:stages_completed`, `pm:workflow_stages`) are defined in [workflows.md §Stage State Keys](./workflows.md#stage-state-keys). All use the `pm:` tier prefix per Decision #58.
+>
+> **Note:** TaskGroup lifecycle is tracked via the `TaskGroupExecution` database table (Phase 7), not session state. The `pm:` state keys above are stage-level execution state only.
+
 ### 1.3 State Scope per Tier
 
 The 6-level memory architecture applies at each tier's scope:
@@ -219,7 +223,7 @@ Mapping the original "multi-level memory" requirement (Problem #7 from plan-shap
 | **Pipeline context** | Session state (no prefix) | Deliverable spec, plan, execution output, validation results, verification results | Written by agents via `state_delta`, read via `{key}` templates |
 | **Project conventions** | Database entity (project table) + Skills | Standards, architecture decisions, workflow patterns, tech stack settings | Loaded at session start via tool/init callback; Skills via SkillLoaderAgent |
 | **Director identity + CEO profile + operating contract** | `user:` state | Director identity, CEO profile, operating contract, formation status, model preferences, notification settings, review strictness | Auto-merged into session at load; artifacts formed via Settings conversation on first access, then evolvable |
-| **Project learnings** | `MemoryService` (project-scoped) | Conventions, architectural decisions, and resolved escalations from this project's prior phases and stages. Written on phase or stage approval. | `MemoryLoaderAgent` (deterministic) or `LoadMemory` tool (on-demand) |
+| **Project learnings** | `MemoryService` (project-scoped) | Conventions, architectural decisions, and resolved escalations from this project's prior TaskGroups and stages. Written on TaskGroup or stage approval. | `MemoryLoaderAgent` (deterministic) or `LoadMemory` tool (on-demand) |
 | **Workflow expertise** | `MemoryService` (workflow-type-scoped) | Domain expertise accumulated across all projects of this workflow type: recurring failure patterns, quality signals, edge cases. Written at project completion after Director approval. Immediately available to subsequent projects of the same type. | `MemoryLoaderAgent` (deterministic) or `LoadMemory` tool (on-demand) |
 | **Business knowledge** | Skills files (global + project-local) | Domain rules, compliance requirements, workflow conventions | SkillLoaderAgent (deterministic matching) |
 
@@ -331,10 +335,10 @@ Call `memory_service.add_session_to_memory(session)` at workflow-defined checkpo
 
 | Scope | Trigger | Approver |
 |-------|---------|---------|
-| **Project** | Phase or Stage approval | Director (phase) / CEO (stage) |
+| **Project** | TaskGroup or Stage approval | Director (TaskGroup) / CEO (stage) |
 | **Workflow** | Project completion | Director approval required |
 | **Global** | Director decision | User approval required |
-| **Session** | Phase completion — extracted and ingested into Project/Workflow scope | Automatic |
+| **Session** | TaskGroup completion — extracted and ingested into Project/Workflow scope | Automatic |
 
 ### 9.3 Rewind Limitations
 

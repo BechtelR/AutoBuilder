@@ -219,24 +219,56 @@ Skill library adopting the Agent Skills open standard file format (`SKILL.md`) w
 
 ---
 
-## Phase 7: Workflow Composition `M`
+## Phase 7: Workflow Composition `L`
 
-**Goal**: Pluggable workflow architecture -- auto-code is ONLY THE FIRST MVP workflow, not a hardcoded pipeline.
-**Status**: PLANNED
+**Goal**: Pluggable workflow architecture with stage schema, validators, and quality framework. auto-code as first workflow.
+**Status**: DESIGNED
 **Prerequisites**: Phase 6 (skills system operational), Phase 5b (supervision operational)
 
 
 ### Scope Summary
-WorkflowRegistry with automatic directory scanning for `WORKFLOW.yaml` manifests, deterministic keyword matching, and deferred ADK pipeline instantiation. WORKFLOW.yaml manifest format defining triggers, required/optional tools, default models, and pipeline configuration. Auto-code workflow as first implementation with its own manifest, pipeline composition, agents, and skills.
+WorkflowRegistry with manifest parsing, validation, and directory-scanned discovery (built-in + user-level override by name). WORKFLOW.yaml manifest with progressive disclosure (2 fields minimum → full operating manual). Stage schema system: optional `stages` field with per-stage agent/tool/skill scoping, PM-driven transitions via reconciliation pattern, completion criteria composition (deliverables + validators + approval gates). Six standard validator implementations (lint, test, regression, review, dependency validation, deliverable status). Three-layer completion reports (PR-22). Deterministic TaskGroup/stage close conditions (PR-23). auto-code workflow with 5-stage schema (SHAPE→DESIGN→PLAN→BUILD→INTEGRATE). Five infrastructure authoring skills.
 
 ### Completion Contract
 
 | Status | Contract Item | PRD |
 |--------|--------------|-----|
-| | WorkflowRegistry discovers auto-code on startup | PR-4 |
-| | `POST /workflows/run {"workflow": "auto-code"}` resolves and instantiates pipeline | PR-4 |
+| | WorkflowRegistry discovers auto-code on startup via directory scan | PR-4 |
+| | `WorkflowRegistry.create_pipeline("auto-code", ctx)` resolves manifest and instantiates the stage-aware pipeline | PR-4 |
 | | Adding a new workflow = adding a directory + manifest (zero registration code) | PR-4, NFR-5 |
-| | auto-code pipeline stages match architecture doc | PR-6 |
+| | User-level workflows at `~/.autobuilder/workflows/` override built-in by name | PR-4, NFR-5 |
+| | WORKFLOW.yaml validates with progressive disclosure (2-field minimum is valid) | PR-4 |
+| | auto-code manifest includes 5-stage schema with per-stage agent/tool/skill config | PR-4, PR-5 |
+| | Stage completion criteria compose as AND (deliverables + validators + approval) | PR-11 |
+| | Standard validators (lint, test, regression, review) produce machine evidence | PR-22 |
+| | Three-layer completion reports generated (functional, architectural, contract) | PR-22 |
+| | TaskGroup/stage close conditions enforced deterministically (hard gates) | PR-23 |
+| | Five infrastructure skills operational (workflow-authoring, agent-definition, skill-authoring, workflow-quality, workflow-testing) | PR-31 |
+
+---
+
+## Phase 7b: Director Workflow Authoring `M`
+
+**Goal**: Director can create, validate, and activate new workflows through conversation with the CEO.
+**Status**: DESIGNED
+**Prerequisites**: Phase 7 (workflow composition operational)
+
+
+### Scope Summary
+Director workflow authoring via 6-phase lifecycle (requirements → discovery → draft → validation → review → activation). Five CEO resource discovery tools (list_available_tools, list_mcp_servers, list_configured_credentials, list_workflows, list_available_skills). Director filesystem tool scoping (path-restricted write access). Staging directory convention for draft workflows. Activation gate via CEO queue approval. Dry run capability for pre-activation validation. Workflow improvement loop (4 feedback sources). Four Director authoring skills.
+
+### Completion Contract
+
+| Status | Contract Item | PRD |
+|--------|--------------|-----|
+| | Director can compose a new workflow through conversation with CEO | PR-6 |
+| | Five resource discovery tools operational (never expose credential values) | PR-8 |
+| | Director writes to staging directory, not active registry | NFR-4 |
+| | CEO approval required to activate a workflow (activation gate) | NFR-4 |
+| | Validation runs L1-L4 before activation (schema, references, parse, structural) | PR-8 |
+| | Director-authored agents restricted to `type: llm` only | NFR-4b |
+| | Workflow improvement loop triggers on CEO request and post-completion review | PR-6 |
+| | Four Director authoring skills operational (director-workflow-composition, project-conventions, software-development-patterns, research-patterns) | PR-31 |
 
 ---
 
@@ -459,7 +491,8 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 5a: Agent Definitions & Pipeline | `L-` | Agent definition files, InstructionAssembler, AgentRegistry, DeliverablePipeline, forward-dependency contracts |
 | 5b: Supervision & Integration | `M` | Director + PM hierarchy, PM loop (sequential), CEO queue, state key auth |
 | 6: Skills System | `M` | SkillLibrary, three-layer loading, supervision-tier resolution, 11 initial skills |
-| 7: Workflow Composition | `M` | WorkflowRegistry, auto-code workflow, WORKFLOW.yaml |
+| 7: Workflow Composition | `L` | WorkflowRegistry, manifest, stage schema, validators, auto-code 5-stage |
+| 7b: Director Authoring | `M` | Director workflow creation, resource discovery, staging gate |
 | 8: Spec Pipeline | `L` | PM-driven batch loop, spec decomposition, git worktrees |
 | 9: Memory Service | `M` | PostgresMemoryService, cross-session search |
 | 10: Events, CLI, Observability | `L` | SSE, webhooks, typer CLI, OpenTelemetry |
@@ -485,7 +518,8 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 2026-03-10 | Phase 5 scope finalized (Decisions #50-58); split into 5a + 5b; FRDs written |
 | 2026-03-11 | Phase 6 scope updated from FRD: three-layer loading model, supervision-tier resolution, autonomous creation, `applies_to` filtering, 11 initial skills; completion contract expanded from 5→8 items |
 | 2026-03-11 | All open questions resolved (Decisions #59-67); migrated to `.decision-log.md` |
+| 2026-03-12 | Phase 7 scope expanded (Decisions #70-77): manifest, stage schema, validators, quality framework, directory override model. Phase 7b added (Director workflow authoring). Effort upgraded S→L. |
 
 ---
 
-*Last Updated: 2026-03-11*
+*Last Updated: 2026-03-12*

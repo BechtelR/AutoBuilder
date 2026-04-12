@@ -96,7 +96,7 @@ The gap AutoBuilder fills: autonomous workflow execution with structured quality
 - A practitioner hands AutoBuilder a defined workflow and receives verified, complete output without a single prompt during execution.
 - The system correctly identifies and escalates genuinely unresolvable blockers — not false positives, not silent failures.
 - Workflows complete without human intervention at a rate that makes autonomous execution the default choice over manual execution.
-- A standard mid-sized workflow phase completes within a single working day of wall-clock time.
+- A standard mid-sized workflow stage completes within a single working day of wall-clock time.
 - Total execution cost per completed workflow is less than 5% of the market rate for equivalent human team output at comparable quality.
 - Third-party workflow plugins can be built and registered without modifying core infrastructure.
 - A new team member reads this document and understands why AutoBuilder exists, who wins because of it, and what winning looks like — without reading a single technical document.

@@ -1,0 +1,257 @@
+# =============================================================================
+# WORKFLOW.yaml — auto-code
+# Autonomous software development from specification to verified output.
+#
+# This is a Tier 3 (comprehensive) manifest demonstrating all available fields.
+# A valid manifest requires only `name` and `description` (Tier 1).
+#
+# Agent definitions for this workflow live in auto-code/agents/.                   
+# The global planner is overridden with workflow-scoped definitions for                   
+# SHAPE (spec refinement) and DESIGN (architecture) stages. 
+# =============================================================================
+
+name: auto-code
+description: Autonomous software development from specification to verified output
+
+version: "1"
+
+# --- Triggers ---
+# Deterministic keyword matching (no LLM). Empty = explicit-only.
+triggers:
+  - keywords: [build, develop, implement, code]
+  - explicit: auto-code
+
+# --- Pipeline ---
+pipeline_type: batch_parallel    # single_pass | sequential | batch_parallel
+
+# --- Tools ---
+required_tools:
+  - file_read
+  - file_write
+  - file_edit
+  - bash_exec
+  - git_status
+  - git_commit
+  - git_diff
+optional_tools:
+  - web_search
+  - web_fetch
+
+# --- Models ---
+# Per-role model assignments. Stages can override these.
+default_models:
+  PLAN: anthropic/claude-opus-4-6
+  CODE: anthropic/claude-sonnet-4-6
+  REVIEW: anthropic/claude-sonnet-4-6
+  FAST: anthropic/claude-haiku-4-5-20251001
+
+# --- MCP Servers ---
+# Optional. MCP servers this workflow can use.
+mcp_servers: []
+
+# --- Stages ---
+# Ordered stage schema. Omit entirely for single-stage workflows.
+# Stages are organizational groupings (not separate execution contexts).
+# PM drives transitions via reconciliation pattern.
+stages:
+  - name: shape
+    description: Refine brief into unambiguous specification
+    agents: [planner]              # Workflow-scoped planner override with spec-writing instructions
+    tools:
+      add: [web_search, web_fetch]
+      remove: [bash_exec, git_commit, git_diff]
+    skills: [specification-writing]
+    validators:
+      - name: spec_completeness
+        type: llm
+        agent: planner
+        schedule: per_stage
+        config:
+          rubric: [objective_clear, acceptance_criteria_defined, scope_bounded, ambiguities_resolved]
+    approval: director
+
+  - name: design
+    description: Architecture, data models, API contracts, dependency graph
+    agents: [planner, reviewer]    # Workflow-scoped overrides with architecture instructions
+    tools:
+      add: [web_search, web_fetch]
+      remove: [bash_exec, git_commit]
+    validators:
+      - name: design_consistency
+        type: llm
+        agent: reviewer
+        schedule: per_stage
+        config:
+          rubric: [internal_consistency, spec_alignment, dependency_feasibility]
+    approval: director
+
+  - name: plan
+    description: Decompose design into dependency-ordered deliverables
+    agents: [planner]
+    validators:
+      - name: dependency_validation
+        type: deterministic
+        agent: ""                  # Pure function — no agent invocation
+        schedule: per_stage
+    completion_criteria: all_deliverables_planned
+    approval: auto                 # Auto-advances when criteria met
+
+  - name: build
+    description: Implement, lint, test, and review all deliverables
+    agents: [coder, reviewer, fixer, formatter, linter, tester, diagnostics]
+    models:                         # Stage-level model override (same as default here — demonstrates the feature)
+      CODE: anthropic/claude-sonnet-4-6
+    validators:
+      - name: lint_check
+        type: deterministic
+        agent: linter
+        schedule: per_deliverable
+      - name: test_suite
+        type: deterministic
+        agent: tester
+        schedule: per_deliverable
+      - name: code_review
+        type: deterministic        # Validator reads review_passed state key; the review itself is LLM (ReviewCycleAgent)
+        agent: reviewer
+        schedule: per_deliverable
+        config:
+          max_cycles: 3
+      - name: regression_tests
+        type: deterministic
+        agent: tester
+        schedule: per_batch
+    completion_criteria: all_verified
+    approval: auto
+
+  - name: integrate
+    description: Integration testing and final verification
+    agents: [tester, reviewer, diagnostics]
+    validators:
+      - name: integration_tests            # Phase 7b stub
+        type: deterministic
+        agent: tester
+        schedule: per_stage
+        required: true
+      - name: architecture_conformance     # Phase 7b stub
+        type: llm
+        agent: reviewer
+        schedule: per_stage
+        required: false            # Advisory until Phase 7b implementation
+      - name: final_approval
+        type: approval
+        schedule: per_stage
+    completion_criteria: all_verified
+    approval: ceo
+
+# --- Resources ---
+# Pre-execution validation. Director checks before first deliverable.
+resources:
+  credentials:
+    - ANTHROPIC_API_KEY            # Primary LLM provider
+  services: []                     # Health check URLs
+  knowledge: []                    # Required files/directories
+
+# --- Deliverable ---
+deliverable:
+  types:
+    - name: implementation
+      description: Source code implementing a specification
+      verification: [lint_check, test_suite, code_review]
+    - name: test
+      description: Test suite for a component
+      verification: [lint_check, test_suite]
+    - name: configuration
+      description: Configuration file or infrastructure setup
+      verification: [lint_check]
+    - name: migration
+      description: Database migration or schema change
+      verification: [lint_check, test_suite, regression_tests]
+    - name: documentation
+      description: Technical documentation, API docs, or guides
+      verification: []
+    - name: refactoring
+      description: Structural change preserving existing behavior
+      verification: [lint_check, test_suite, regression_tests, code_review]
+
+# --- Outputs ---
+outputs:
+  - type: source_code
+    description: Implemented source files
+  - type: tests
+    description: Test suites
+  - type: documentation
+    description: Generated documentation
+
+# --- Validators (workflow-level) ---
+# Workflow-level validators apply across all stages per their schedule.
+validators:
+  - name: deliverable_status_check
+    type: deterministic
+    agent: ""                    # Pure function — no agent invocation
+    schedule: per_stage
+
+# --- Completion Report ---
+# Configurable verification layers. Defaults apply when `layers` is omitted.
+completion_report:
+  # evidence_sources match validator names; results aggregated across all deliverables/batches within the stage
+  layers:
+    - name: functional
+      description: Does it work as specified?
+      evidence_sources: [test_suite, regression_tests]
+    - name: architectural
+      description: Does the implementation match documented architecture?
+      evidence_sources: [architecture_conformance]
+    - name: contract
+      description: Were all deliverables completed?
+      evidence_sources: [deliverable_status_check]
+  additional_sections:
+    - name: code_quality
+      description: Lint results, test coverage, review cycle counts
+
+# --- Brief Template ---
+# What a Brief looks like for this workflow type.
+brief_template:
+  required_fields:
+    - name: objective
+      description: What the project should accomplish
+    - name: acceptance_criteria
+      description: How success will be measured
+    - name: scope_constraints
+      description: What is explicitly in and out of scope
+  optional_fields:
+    - name: target_tech_stack
+      description: Preferred languages, frameworks, or infrastructure
+      default: ""
+    - name: existing_codebase_path
+      description: Path to the existing project root (if extending)
+      default: ""
+    - name: style_guides
+      description: Links or paths to coding style references
+      default: ""
+
+# --- Conventions ---
+# Workflow-wide rules injected as GOVERNANCE fragments.
+# Keep language-agnostic; project-specific conventions go in project config.
+conventions:
+  - Follow the project's established code style and naming conventions
+  - Tests required for all public interfaces
+  - Each deliverable must be independently verifiable
+  - Commit each deliverable atomically with a descriptive message
+
+# --- Director Guidance ---
+director_guidance:
+  stage_transition_notes:
+    shape: Verify the specification is unambiguous before approving
+    design: Ensure architecture decisions are documented with rationale
+    integrate: Review the full completion report before CEO approval
+  escalation_hints:
+    - If the PM reports 3+ consecutive batch failures, suspend and diagnose
+    - If a deliverable is blocked on external resources, surface to CEO queue
+
+# --- Config ---
+# Pipeline-specific configuration consumed by pipeline.py.
+config:
+  max_review_cycles: 3
+  enable_linting: true
+  enable_testing: true
+  git_worktree_per_deliverable: true   # Forward reference: requires git_worktree tool (Phase 8). Ignored until then.

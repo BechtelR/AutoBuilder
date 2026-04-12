@@ -1,16 +1,20 @@
 ---
-description: Design the architecture model for a phase — components, interfaces, data flow, no implementation code.
+description: Assemble the architecture model for a phase — components, interfaces, data flow, design decisions. Zero implementation code. Agent-first reference.
 argument-hint: <phase-number>
 ---
 
 <objective>
-Produce a high-level architecture model for Phase {$ARGUMENTS}. Output: `model.md` in `.dev/build-phase/phase-{N}/`.
+Produce an architecture model for Phase {$ARGUMENTS}. Output: `model.md` in `.dev/build-phase/phase-{N}/`.
 
-This is a DESIGN artifact — no implementation code. Defines components, interfaces, types, and data flow that the build phase will implement.
+This is a DESIGN artifact — it assembles the relevant architecture into one coherent picture for this phase. It does not replace the L1/L2 architecture docs (those remain the source of truth). It answers: what components does this phase involve, how do they relate, what types cross their boundaries, and what design decisions apply?
 
-Conciseness principle: model what the builder must comply with. Skip signatures that are obvious from the interface name and types. Skip diagrams for trivial flows. Design for decisions, not dictation.
+Why this exists: builders working from specs alone lack architectural context. They need to see how this phase's components fit into the system's layers, what interfaces exist between them, and how data flows across boundaries — without reading six architecture files. This document assembles that picture.
 
-CRITICAL: NOT done until model.md is written AND every component traces to an L2 architecture section. On blockers, ask the user.
+The builder conforms to the ARCHITECTURE (L1/L2 docs), not to this document. This document is the assembly, not the authority. Architecture references throughout point to the source of truth.
+
+Conciseness principle: assemble what the builder needs to see in one place. Skip what's obvious. Don't restate architecture docs — reference them. Target: under 400 lines.
+
+CRITICAL: NOT done until model.md is written AND every BOM component traces to an L2 architecture section AND every FRD capability maps to at least one component. On blockers, ask the user.
 </objective>
 
 <context>
@@ -24,92 +28,98 @@ Bootstrap (parallel reads):
 - (.dev/INDEX.md automatically loaded via .dev/CLAUDE.md)
 
 Selective deep-reads — derive from BOM, never hardcode:
-1. From the BOM rows for this phase, collect the unique values in the **Source** column (e.g., `agents.md §Agent Hierarchy` → file `.dev/architecture/agents.md`; `state.md §10` → file `.dev/architecture/state.md`)
-2. Deep-read ONLY those architecture files, focused on the referenced sections. No others.
-3. On-demand only (pull in during research steps if a gap requires it): `.decision-log.md` (design rationale), `04-TECH_STACK.md` (tech constraints).
+1. From the BOM rows for this phase, collect the unique values in the **Source** column (e.g., `agents.md §Agent Hierarchy` → file `.dev/architecture/agents.md`)
+2. Deep-read ONLY those architecture files, focused on the referenced sections
+3. On-demand only (pull in during research steps if a gap requires it): `.decision-log.md`, `04-TECH_STACK.md`
 
 If frd.md doesn't exist: stop and tell user to run `/shape-phase {N}` first.
 If model.md exists: ask user — overwrite or skip?
 </context>
 
 <delegation>
-Design context — read @.claude/agents/architect.md before design steps. Internalize its principles and checklist; apply them throughout Steps 3-7.
+Design context — read @.claude/agents/architect.md before design steps. Internalize its principles and checklist.
 
 Use subagents to preserve context window:
 - `Explore` — codebase research, understand existing patterns in target modules
-- `subtask` — parallel research into specific technical areas, local or web
-- `reviewer` — final document verification (Step 9): verify model.md against the verification checklist and source documents. It finds AND fixes issues directly.
+- `subtask` — parallel research into specific technical areas, local or external (when reference needed)
+- `reviewer` — final document verification (Step 4)
 </delegation>
 
+<format-principles>
+The output is optimized for agent consumption while remaining human-legible:
+
+1. **YAML blocks for structured relationships** — components, interfaces, data flows, types. Agents parse YAML with near-perfect accuracy. Humans scan it easily.
+2. **Prose for design rationale and notes** — the "why" behind decisions, constraints that aren't structural. Keep terse.
+3. **YAML is authoritative** — all structured relationships expressed in YAML. The component diagram (Mermaid) is a derived human verification aid, not a data source.
+4. **No Protocol/ABC class definitions** — these look like implementation code, which invites builders to refactor rather than conform. Express interfaces as typed input/output contracts.
+5. **Reference, don't duplicate** — every component points to its L2 architecture section. Don't restate what's there — the builder reads the referenced section directly.
+</format-principles>
+
 <process>
-Steps 1-9 sequential. Announce each step.
+Steps 1-4 sequential. Announce each step.
 
-STEP 1 — READ FRD
-Extract from frd.md: capabilities (CAP-{n} IDs and descriptions), consumer roles, functional requirements (FR-{N}.{nn}), non-functional requirements, rabbit holes. Build a mental map of what this phase must do and for whom.
+STEP 1 — RESEARCH
 
-STEP 2 — ARCHITECTURE CONFORMANCE
-Read the architecture layers defined in `02-ARCHITECTURE.md`. For each component in scope: identify which layer it belongs to. Flag any that don't fit cleanly — these are architecture violations requiring resolution before proceeding.
+A. **Read FRD** — extract capabilities (CAP-{n}), consumer roles, functional requirements, rabbit holes. Understand what this phase must do and for whom.
+B. **Read BOM + architecture** — for each component in scope, identify its architecture layer and the L2 section that defines its design contract. Flag components that don't fit cleanly — these are architecture gaps requiring resolution.
+C. **Survey existing code** — if prerequisite phases have been built, understand established patterns, interfaces, and conventions. Use `Explore` for substantial codebases.
 
-STEP 3 — IDENTIFY COMPONENTS
-Identify the concrete components — modules, classes, functions — needed to support this phase's domain (informed by the FRD capabilities read in Step 1). Show how they connect. Group by architecture layer. For each component, identify which L2 architecture section defines its design contract. For UI components: list names and relationships only — detailed UI design belongs in separate files.
+STEP 2 — DESIGN
 
-STEP 4 — DEFINE INTERFACES
-For each component boundary: define Protocol classes or ABCs with method signatures only. No implementation bodies. Include type hints for all parameters and return types. These are the contracts the build phase must satisfy.
-Omit signatures that are obvious from the class hierarchy (e.g., subclass constructors that just narrow a parent parameter).
+For each component group (by architecture layer):
 
-STEP 5 — DEFINE KEY TYPES
-Pydantic models at API boundaries, enums for state/status, TypedDicts for internal DTOs. Field-level detail. Follow enum convention: values MUST match names (uppercase).
+A. **Define component responsibilities** — one sentence each. What it does, not how.
+B. **Define interfaces** — at non-trivial component boundaries, specify what's exchanged (typed inputs/outputs) and any important behavioral expectations (idempotency, error propagation, etc.).
+C. **Trace data flows** — for non-trivial paths, show how data transforms across component boundaries. Name the types at each step.
+D. **Record design decisions** — where the L2 architecture leaves options open for this phase, decide. Record the decision, alternatives considered, and rationale.
+E. **Flag gaps** — components that lack L2 guidance, patterns that conflict, open questions for the user.
 
-STEP 6 — MAP DATA FLOW
-Trace how data transforms across layers. Show the type chain: what enters each boundary and what exits. Use Mermaid diagrams. Include the full type safety chain where applicable (SQLAlchemy → Pydantic → OpenAPI → TypeScript).
-One diagram per distinct data path. Skip flows that are self-evident from the interfaces (e.g., simple CRUD with no transformation).
+STEP 3 — WRITE model.md
 
-STEP 7 — DIAGRAM LOGIC FLOW
-State machines, pipeline stages, decision trees. Use Mermaid state diagrams or flowcharts. Describe transitions, conditions, and outcomes — no implementation code.
-Only diagram non-obvious logic. If a lifecycle is linear (A → B → C) with no branching, a bullet list suffices.
+Write using the structure defined in <output>. Verify:
+- Every FRD capability maps to at least one component
+- Every BOM component appears
+- Target under 400 lines
 
-STEP 8 — WRITE model.md
-Follow template at `.dev/build-phase/.templates/model.md`. Fill all sections. Include integration points (existing system + future phase extensions).
+STEP 4 — REVIEWER VERIFICATION
 
-STEP 9 — REVIEWER VERIFICATION
-Spawn a `reviewer` agent. Provide: model.md path, the verification checklist (from <verification> section), and references to source documents (FRD, BOM, `02-ARCHITECTURE.md`). Reviewer verifies and fixes issues directly. If reviewer flags items needing design decisions, resolve them and re-run reviewer.
+Spawn a `reviewer` agent with model.md, the verification checklist, and source doc references. Reviewer verifies and fixes directly. If reviewer flags items needing design decisions, resolve and re-run.
 </process>
 
 <output>
 One file: `.dev/build-phase/phase-{N}/model.md`
 
-Follow template at `.dev/build-phase/.templates/model.md` — fill all `{placeholders}`, keep all sections.
-
-Requirements:
-- Every component has an identified architecture layer and traces to an L2 architecture section
-- L2 Architecture Conformance table fully populated
-- Interfaces use Protocol/ABC with full type signatures
-- Mermaid diagrams for component, data flow, and logic flow
-- No implementation code — signatures and types only
-- Integration points cover both existing system and future extensions
+Read template at `.dev/build-phase/.templates/model.md` — fill all `{placeholders}`, keep all sections. Do NOT add sections beyond those defined in the template.
 </output>
 
 <verification>
 Re-read model.md and check:
-1. Component diagram present with Mermaid, components grouped by architecture layer
-2. L2 Architecture Conformance table present and fully populated (every component → architecture file + section)
-3. All interfaces have Protocol/ABC definitions with typed signatures
-4. Key types include Pydantic models and enums with field-level detail
-5. Data flow shows type transformations across boundaries
-6. Logic flow uses state diagrams or flowcharts (Mermaid)
-7. Integration points table covers existing components AND future extensions
-8. Zero implementation code (no function bodies beyond `...`)
-9. All components conform to the architecture layers defined in `02-ARCHITECTURE.md`
+1. Every BOM component for this phase appears in the components block
+2. Every FRD capability (CAP-{n}) is satisfied by at least one component
+3. Every component has an architecture_ref pointing to an L2 section
+4. L2 Architecture Conformance table present and consistent with component architecture_refs
+5. Every component has a layer assignment consistent with `02-ARCHITECTURE.md`
+6. Interfaces defined for non-trivial component boundaries with typed contracts
+7. Key types cover cross-boundary data — no undefined types in interfaces or flows
+8. Data flows trace non-trivial paths — no gaps in type chains
+9. Design decisions address open architectural choices (not restating L2 docs)
+10. Integration points cover existing connections and future extension points
+11. No implementation code — no function bodies, no class definitions
+12. Component diagram present (single Mermaid flowchart, consistent with YAML components and interfaces)
+13. Under 400 lines
+14. References L2 docs rather than duplicating their content
 
 Fix failures before returning.
 </verification>
 
 <success_criteria>
 - model.md written to disk at `.dev/build-phase/phase-{N}/model.md`
-- All components placed in correct architecture layer and traced to L2 architecture section
-- L2 Architecture Conformance table fully populated
-- Interfaces defined as Protocol/ABC with typed signatures
-- Mermaid diagrams for component layout, data flow, and logic flow
-- No implementation code
+- Every BOM component listed with layer, responsibility, and architecture_ref
+- Every FRD capability traces to component(s)
+- Interfaces defined at non-trivial boundaries
+- Data flows trace type chains across components
+- Design decisions recorded with rationale
+- Under 400 lines
+- Zero implementation code, zero duplication of source docs
 - Architecture conformance verified against `02-ARCHITECTURE.md`
 </success_criteria>
