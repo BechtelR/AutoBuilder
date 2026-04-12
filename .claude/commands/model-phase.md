@@ -53,6 +53,7 @@ The output is optimized for agent consumption while remaining human-legible:
 3. **YAML is authoritative** — all structured relationships expressed in YAML. The component diagram (Mermaid) is a derived human verification aid, not a data source.
 4. **No Protocol/ABC class definitions** — these look like implementation code, which invites builders to refactor rather than conform. Express interfaces as typed input/output contracts.
 5. **Reference, don't duplicate** — every component points to its L2 architecture section. Don't restate what's there — the builder reads the referenced section directly.
+6. **Scale format to component count** — When a phase has >15 components, use single-line flow-style YAML for component entries (`- { id: F01, name: ..., satisfies: [...] }`). Multi-line blocks are fine for phases with fewer components. Budget: components ≤40% of total lines, leaving room for interfaces, types, flows, and decisions. Apply the same flow-style to interfaces, types, flows, and integrations when needed to stay under 400 lines.
 </format-principles>
 
 <process>
@@ -75,6 +76,8 @@ D. **Record design decisions** — where the L2 architecture leaves options open
 E. **Flag gaps** — components that lack L2 guidance, patterns that conflict, open questions for the user.
 
 STEP 3 — WRITE model.md
+
+Before writing, estimate total lines: count BOM components × format cost (1 line for flow-style, 8 for multi-line) + ~150 lines for remaining sections. If the estimate exceeds 400, use flow-style YAML for all structured blocks (components, interfaces, types, flows, integrations).
 
 Write using the structure defined in <output>. Verify:
 - Every FRD capability maps to at least one component

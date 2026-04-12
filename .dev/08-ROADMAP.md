@@ -255,7 +255,7 @@ WorkflowRegistry with manifest parsing, validation, and directory-scanned discov
 
 
 ### Scope Summary
-Director workflow authoring via 6-phase lifecycle (requirements → discovery → draft → validation → review → activation). Five CEO resource discovery tools (list_available_tools, list_mcp_servers, list_configured_credentials, list_workflows, list_available_skills). Director filesystem tool scoping (path-restricted write access). Staging directory convention for draft workflows. Activation gate via CEO queue approval. Dry run capability for pre-activation validation. Workflow improvement loop (4 feedback sources). Four Director authoring skills.
+Director workflow authoring via 6-phase lifecycle (requirements → discovery → draft → validation → review → activation). Five CEO resource discovery tools (list_available_tools, list_mcp_servers, list_configured_credentials, list_workflows, list_available_skills). Director filesystem tool scoping (path-restricted write access). Staging directory convention for draft workflows. Activation gate via CEO queue approval. Dry run capability for pre-activation validation. Workflow improvement loop (4 feedback sources). Four Director authoring skills. Import-level sandboxing for dynamically imported pipeline definitions (deferred from Phase 7). Real implementations of INTEGRATE stage stub validators (integration_tests, architecture_conformance — replacing Phase 7 stubs that return passing).
 
 ### Completion Contract
 
@@ -269,6 +269,8 @@ Director workflow authoring via 6-phase lifecycle (requirements → discovery �
 | | Director-authored agents restricted to `type: llm` only | NFR-4b |
 | | Workflow improvement loop triggers on CEO request and post-completion review | PR-6 |
 | | Four Director authoring skills operational (director-workflow-composition, project-conventions, software-development-patterns, research-patterns) | PR-31 |
+| | Import-level sandboxing validates dynamically imported pipeline definitions before execution | NFR-4 |
+| | INTEGRATE stage validators (integration_tests, architecture_conformance) produce real evaluation results, replacing Phase 7 stubs | PR-22 |
 
 ---
 
@@ -280,7 +282,7 @@ Director workflow authoring via 6-phase lifecycle (requirements → discovery �
 
 
 ### Scope Summary
-Specification processing: submission endpoint, spec-to-deliverable decomposition, deliverable model with status tracking and dependency declaration. PM outer loop driving batch execution via `select_ready_batch()` tool with deterministic safety mechanisms (RegressionTestAgent, checkpoint_project callback). Autonomous continuation with inter-batch PM reasoning (retry/skip/reorder/escalate), Director-level cross-project management, optional human-in-the-loop pause, and partial failure handling. Git worktree isolation for parallel deliverable execution.
+Specification processing: submission endpoint, spec-to-deliverable decomposition, deliverable model with status tracking and dependency declaration. PM batch execution upgraded from sequential (Phase 5b) to parallel via `select_ready_batch()` tool with ParallelAgent composition and deterministic safety mechanisms (RegressionTestAgent, checkpoint_project callback). Autonomous continuation with inter-batch PM reasoning (retry/skip/reorder/escalate), Director-level cross-project management, optional human-in-the-loop pause, and partial failure handling. Git worktree isolation for parallel deliverable execution. Concurrency limit enforcement (max parallel pipelines, cascaded from project-level limits — deferred from Phase 5b).
 
 ### Completion Contract
 
@@ -306,7 +308,7 @@ Specification processing: submission endpoint, spec-to-deliverable decomposition
 
 
 ### Scope Summary
-PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and semantic search. Memory loading: MemoryLoaderAgent (CustomAgent, deterministic -- loads relevant memories into session state at pipeline start) and LoadMemory tool (agent-decided on-demand retrieval). Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end). Context recreation full equivalence verification: validates that recreation with real MemoryService produces fully equivalent agent context (state + skills + instructions + cross-session memory), completing the degraded-mode contract from Phase 5b.
+PostgresMemoryService backed by PostgreSQL tsvector for full-text keyword search. Memory loading: MemoryLoaderAgent (CustomAgent, deterministic -- loads relevant memories into session state at pipeline start) and LoadMemory tool (agent-decided on-demand retrieval). Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end). Context recreation full equivalence verification: validates that recreation with real MemoryService produces fully equivalent agent context (state + skills + instructions + cross-session memory), completing the degraded-mode contract from Phase 5b. Semantic search via pgvector embeddings deferred to Phase 11.
 
 ### Completion Contract
 
@@ -315,7 +317,7 @@ PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and
 | | Completed sessions are ingested into searchable memory | PR-26, PR-29 |
 | | Agents can search for patterns from prior runs | PR-28, PR-29 |
 | | Memory persists across sessions in PostgreSQL | PR-26 |
-| | Uses existing PostgreSQL database -- tsvector for keyword search, pgvector for semantic search | PR-26 |
+| | Uses existing PostgreSQL database -- tsvector for keyword search (pgvector semantic search deferred to Phase 11) | PR-26 |
 | | Context recreation with real MemoryService produces fully equivalent agent context (state + skills + instructions + cross-session memory) — validates full equivalence deferred from Phase 5b degraded mode | PR-15a |
 
 ---
@@ -328,7 +330,7 @@ PostgresMemoryService backed by PostgreSQL tsvector + pgvector for full-text and
 
 
 ### Scope Summary
-Event system on Redis Streams: publisher from workers, SSE endpoint with reconnection/replay, webhook dispatcher, audit logger, event listener CRUD, and consumer group management. CLI via typer as a pure API client (run, status, intervene, list, logs). Observability via OpenTelemetry tracing (ADK-native), structured logging hierarchy, and ADK Dev UI for local development.
+Event consumer infrastructure on Redis Streams (EventPublisher already operational from Phase 3): SSE endpoint with reconnection/replay, webhook dispatcher, audit logger, event listener CRUD, and consumer group management. Gateway workflow routes (list, select, run workflows — thin wrappers over WorkflowRegistry from Phase 7). CLI via typer as a pure API client (run, status, intervene, list, logs). Observability via OpenTelemetry tracing (ADK-native), structured logging hierarchy, and ADK Dev UI for local development.
 
 ### Completion Contract
 
@@ -337,6 +339,7 @@ Event system on Redis Streams: publisher from workers, SSE endpoint with reconne
 | | Client receives real-time events via SSE as pipeline executes | PR-34 |
 | | SSE reconnection replays missed events (no data loss) | PR-34 |
 | | Webhook listeners fire on matching events | PR-21 |
+| | Gateway workflow routes operational (list, select, run — wiring WorkflowRegistry from Phase 7) | PR-4 |
 | | CLI can launch a workflow, stream events, and query status | PR-36 |
 | | OpenTelemetry traces visible for pipeline execution | PR-35 |
 | | **Full MVP validated end-to-end**: spec -> decompose -> parallel execute -> verify -> complete | PR-1, PR-10, PR-22 |
@@ -351,7 +354,7 @@ Event system on Redis Streams: publisher from workers, SSE endpoint with reconne
 
 
 ### Scope Summary
-LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with prompt tracking, latency analysis, and quality scoring. Token/cost tracking per-deliverable and per-agent with context budget awareness. Crash recovery via PM checkpoint resume, ADK session resume with ResumabilityConfig, and tool idempotency validation. Enhanced routing: richer CLI status, agent role-based tool restrictions, adaptive LLM Router (cost/latency-aware). Advanced capabilities: compound workflow composition and semantic memory upgrade (pgvector embeddings).
+LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with prompt tracking, latency analysis, and quality scoring. Token/cost tracking per-deliverable and per-agent with context budget awareness. Crash recovery via PM checkpoint resume, ADK session resume with ResumabilityConfig, and tool idempotency validation. Adaptive LLM Router (cost/latency-aware model selection based on collected metrics). Advanced capabilities: compound workflow composition (workflows spanning multiple types, e.g. auto-design + auto-code) and semantic memory upgrade (pgvector embeddings extending Phase 9's tsvector keyword search).
 
 ### Completion Contract
 
@@ -518,8 +521,9 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 2026-03-10 | Phase 5 scope finalized (Decisions #50-58); split into 5a + 5b; FRDs written |
 | 2026-03-11 | Phase 6 scope updated from FRD: three-layer loading model, supervision-tier resolution, autonomous creation, `applies_to` filtering, 11 initial skills; completion contract expanded from 5→8 items |
 | 2026-03-11 | All open questions resolved (Decisions #59-67); migrated to `.decision-log.md` |
+| 2026-04-12 | Phases 7b-14 audit against Phase 7 design artifacts and architecture: Phase 7b scope expanded with import-level sandboxing and real INTEGRATE validator implementations (deferred from Phase 7); Phase 8 scope clarified sequential→parallel upgrade and concurrency limits; Phase 9 pgvector removed (deferred to Phase 11 semantic memory upgrade, Phase 9 uses tsvector only); Phase 10 scope corrected (EventPublisher is Phase 3, Phase 10 adds consumer infrastructure) and workflow gateway routes added; Phase 11 removed already-completed "agent role-based tool restrictions" and clarified compound workflow and pgvector scope |
 | 2026-03-12 | Phase 7 scope expanded (Decisions #70-77): manifest, stage schema, validators, quality framework, directory override model. Phase 7b added (Director workflow authoring). Effort upgraded S→L. |
 
 ---
 
-*Last Updated: 2026-03-12*
+*Last Updated: 2026-04-12*
