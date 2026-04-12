@@ -28,14 +28,14 @@ The system discovers workflow definitions by scanning configured directories for
 
 **Requirements:**
 
-- [ ] **FR-7.01**: When the system starts, it scans the built-in workflows directory for manifest files, parses each one, validates required fields, and builds an in-memory index keyed by workflow name. *(PR-4)*
-- [ ] **FR-7.02**: When both a built-in and a user-level workflow directory are configured, the system scans the built-in directory first, then the user-level directory. A user-level workflow with the same name as a built-in workflow replaces the built-in entirely in the index. *(PR-4, NFR-5)*
-- [ ] **FR-7.03**: When a user-level workflow has a unique name not present in the built-in set, it is added to the index alongside built-in workflows. *(PR-4, NFR-5)*
-- [ ] **FR-7.04**: When the user-level workflows directory does not exist or is not configured, the system operates with built-in workflows only and does not emit errors. *(PR-4, NFR-5)*
-- [ ] **FR-7.05**: When a consumer requests a workflow by explicit name, the system returns the workflow entry if it exists in the index, or reports a clear not-found error if it does not. *(PR-4)*
-- [ ] **FR-7.06**: When a consumer requests all available workflows, the system returns a list of every discovered workflow with its name, description, and pipeline type. *(PR-4)*
-- [ ] **FR-7.07**: When the registry index is built, it is cached so that subsequent requests retrieve the index without re-scanning the filesystem. When the cache is unavailable, the system falls back to a filesystem scan -- cache failure does not prevent workflow discovery. *(PR-4)*
-- [ ] **FR-7.08**: When a new workflow directory containing a valid manifest is placed in any scanned location, the system discovers it on the next startup or cache rebuild -- no code changes, no registration calls, no configuration edits are required. *(PR-4, NFR-5)*
+- [x] **FR-7.01**: When the system starts, it scans the built-in workflows directory for manifest files, parses each one, validates required fields, and builds an in-memory index keyed by workflow name. *(PR-4)*
+- [x] **FR-7.02**: When both a built-in and a user-level workflow directory are configured, the system scans the built-in directory first, then the user-level directory. A user-level workflow with the same name as a built-in workflow replaces the built-in entirely in the index. *(PR-4, NFR-5)*
+- [x] **FR-7.03**: When a user-level workflow has a unique name not present in the built-in set, it is added to the index alongside built-in workflows. *(PR-4, NFR-5)*
+- [x] **FR-7.04**: When the user-level workflows directory does not exist or is not configured, the system operates with built-in workflows only and does not emit errors. *(PR-4, NFR-5)*
+- [x] **FR-7.05**: When a consumer requests a workflow by explicit name, the system returns the workflow entry if it exists in the index, or reports a clear not-found error if it does not. *(PR-4)*
+- [x] **FR-7.06**: When a consumer requests all available workflows, the system returns a list of every discovered workflow with its name, description, and pipeline type. *(PR-4)*
+- [x] **FR-7.07**: When the registry index is built, it is cached so that subsequent requests retrieve the index without re-scanning the filesystem. When the cache is unavailable, the system falls back to a filesystem scan -- cache failure does not prevent workflow discovery. *(PR-4)*
+- [x] **FR-7.08**: When a new workflow directory containing a valid manifest is placed in any scanned location, the system discovers it on the next startup or cache rebuild -- no code changes, no registration calls, no configuration edits are required. *(PR-4, NFR-5)*
 
 ---
 
@@ -45,16 +45,16 @@ Workflow manifests validate with only two required fields: name and description.
 
 **Requirements:**
 
-- [ ] **FR-7.09**: When a manifest contains only a name and description, the system accepts it as valid. Default values apply: no triggers (explicit name selection only), no required tools, single-pass pipeline type, no stages, no validators, generic completion report structure. *(PR-4)*
-- [ ] **FR-7.09b**: When a manifest declares `config`, `brief_template`, or `director_guidance` fields, their contents are validated against their respective type schemas and stored alongside the parsed manifest. *(PR-4)*
-- [ ] **FR-7.10**: When a manifest declares stages, each stage validates independently: stage names must be present and unique within the manifest. *(PR-4)*
-- [ ] **FR-7.11**: When a manifest declares validators, each validator must have a name, type, and schedule. Validator names must be unique across the entire manifest (workflow-level and stage-level combined). *(PR-4, PR-11)*
-- [ ] **FR-7.12**: When a manifest declares resources (credentials, services, knowledge dependencies), they are recorded for pre-execution validation by the Director. *(PR-8)*
-- [ ] **FR-7.13**: When a manifest declares MCP server references, each entry records the server name and whether it is required or optional. *(PR-4)*
-- [ ] **FR-7.14**: When a manifest's name is not in kebab-case, the system rejects it with a clear validation error. *(PR-4)*
-- [ ] **FR-7.15**: When a manifest's name or description is missing, the system rejects it with a clear validation error identifying the missing field. *(PR-4)*
-- [ ] **FR-7.16**: When a manifest contains a field that is structurally invalid (e.g., a stage with a duplicate name, a pipeline type that is not one of the recognized values), the system rejects the entire manifest with a diagnostic message and excludes it from the index. *(PR-4)*
-- [ ] **FR-7.17**: When a manifest declares stages but uses a single-pass pipeline type, the system logs a non-blocking warning (manifest is still indexed). When a validator references an agent not listed in any stage's agent roster, the system logs a non-blocking warning. *(PR-4)*
+- [x] **FR-7.09**: When a manifest contains only a name and description, the system accepts it as valid. Default values apply: no triggers (explicit name selection only), no required tools, single-pass pipeline type, no stages, no validators, generic completion report structure. *(PR-4)*
+- [x] **FR-7.09b**: When a manifest declares `config`, `brief_template`, or `director_guidance` fields, their contents are validated against their respective type schemas and stored alongside the parsed manifest. *(PR-4)*
+- [x] **FR-7.10**: When a manifest declares stages, each stage validates independently: stage names must be present and unique within the manifest. *(PR-4)*
+- [x] **FR-7.11**: When a manifest declares validators, each validator must have a name, type, and schedule. Validator names must be unique across the entire manifest (workflow-level and stage-level combined). *(PR-4, PR-11)*
+- [x] **FR-7.12**: When a manifest declares resources (credentials, services, knowledge dependencies), they are recorded for pre-execution validation by the Director. *(PR-8)*
+- [x] **FR-7.13**: When a manifest declares MCP server references, each entry records the server name and whether it is required or optional. *(PR-4)*
+- [x] **FR-7.14**: When a manifest's name is not in kebab-case, the system rejects it with a clear validation error. *(PR-4)*
+- [x] **FR-7.15**: When a manifest's name or description is missing, the system rejects it with a clear validation error identifying the missing field. *(PR-4)*
+- [x] **FR-7.16**: When a manifest contains a field that is structurally invalid (e.g., a stage with a duplicate name, a pipeline type that is not one of the recognized values), the system rejects the entire manifest with a diagnostic message and excludes it from the index. *(PR-4)*
+- [x] **FR-7.17**: When a manifest declares stages but uses a single-pass pipeline type, the system logs a non-blocking warning (manifest is still indexed). When a validator references an agent not listed in any stage's agent roster, the system logs a non-blocking warning. *(PR-4)*
 
 ---
 
@@ -64,17 +64,17 @@ Workflows optionally declare an ordered sequence of stages. Each stage specifies
 
 **Requirements:**
 
-- [ ] **FR-7.18**: When a workflow with stages begins execution, the system initializes stage state: the first declared stage becomes the current stage with a pending status, and the full stage schema is available in session state for PM reasoning. *(PR-4, PR-5)*
-- [ ] **FR-7.19**: When the PM evaluates that a stage's completion criteria are met, the PM invokes a stage reconfiguration action specifying the next stage. The system updates the current stage, marks the previous stage as completed, and makes the new stage's configuration active. *(PR-5)*
-- [ ] **FR-7.20**: When the PM attempts to skip a stage (advance to a non-sequential stage), the system rejects the action with a clear message. Stages must advance sequentially. *(PR-5)*
-- [ ] **FR-7.21**: When the PM attempts to revisit an already-completed stage, the system rejects the action. Stage progression is forward-only. *(PR-5)*
-- [ ] **FR-7.22**: When a stage declares an agent roster (e.g., only planner and reviewer), only those agents participate in deliverable execution during that stage. Omitting the agent roster makes all available agents eligible. *(PR-5)*
-- [ ] **FR-7.23**: When a stage declares tool scoping (additions and removals relative to the workflow baseline), the effective tool set for that stage reflects the workflow's required tools modified by the stage's additions and removals. *(PR-5)*
-- [ ] **FR-7.24**: When a stage declares additional skills to force-load, those skills are loaded alongside context-matched and role-bound skills during that stage. Stage skill declarations are additive. *(PR-5)*
-- [ ] **FR-7.25**: When a stage declares model overrides, they merge with the workflow's default model assignments for that stage. Stage-level overrides take precedence. *(PR-5)*
-- [ ] **FR-7.26**: When a stage has `approval: auto` and the system's completion verification returns success, the stage advances automatically without PM reasoning. PM reasoning is only involved for stages requiring Director or CEO approval. *(PR-5)*
-- [ ] **FR-7.27**: When a workflow has no stages declared (empty stage list), stage reconfiguration is a no-op and stage completion verification always succeeds. The workflow operates as a flat, single-stage pipeline. *(PR-4)*
-- [ ] **FR-7.28**: When a stage transition occurs, a stage lifecycle event is published to the event stream indicating the stage name, transition direction (started or completed), and timestamp. *(PR-4)*
+- [x] **FR-7.18**: When a workflow with stages begins execution, the system initializes stage state: the first declared stage becomes the current stage with a pending status, and the full stage schema is available in session state for PM reasoning. *(PR-4, PR-5)*
+- [x] **FR-7.19**: When the PM evaluates that a stage's completion criteria are met, the PM invokes a stage reconfiguration action specifying the next stage. The system updates the current stage, marks the previous stage as completed, and makes the new stage's configuration active. *(PR-5)*
+- [x] **FR-7.20**: When the PM attempts to skip a stage (advance to a non-sequential stage), the system rejects the action with a clear message. Stages must advance sequentially. *(PR-5)*
+- [x] **FR-7.21**: When the PM attempts to revisit an already-completed stage, the system rejects the action. Stage progression is forward-only. *(PR-5)*
+- [x] **FR-7.22**: When a stage declares an agent roster (e.g., only planner and reviewer), only those agents participate in deliverable execution during that stage. Omitting the agent roster makes all available agents eligible. *(PR-5)*
+- [x] **FR-7.23**: When a stage declares tool scoping (additions and removals relative to the workflow baseline), the effective tool set for that stage reflects the workflow's required tools modified by the stage's additions and removals. *(PR-5)*
+- [x] **FR-7.24**: When a stage declares additional skills to force-load, those skills are loaded alongside context-matched and role-bound skills during that stage. Stage skill declarations are additive. *(PR-5)*
+- [x] **FR-7.25**: When a stage declares model overrides, they merge with the workflow's default model assignments for that stage. Stage-level overrides take precedence. *(PR-5)*
+- [x] **FR-7.26**: When a stage has `approval: auto` and the system's completion verification returns success, the stage advances automatically without PM reasoning. PM reasoning is only involved for stages requiring Director or CEO approval. *(PR-5)*
+- [x] **FR-7.27**: When a workflow has no stages declared (empty stage list), stage reconfiguration is a no-op and stage completion verification always succeeds. The workflow operates as a flat, single-stage pipeline. *(PR-4)*
+- [x] **FR-7.28**: When a stage transition occurs, a stage lifecycle event is published to the event stream indicating the stage name, transition direction (started or completed), and timestamp. *(PR-4)*
 
 ---
 
@@ -84,10 +84,10 @@ The PM creates TaskGroups as runtime planning artifacts within stages. A TaskGro
 
 **Requirements:**
 
-- [ ] **FR-7.29**: When the PM creates a TaskGroup within a stage, the system records the TaskGroup with its parent stage, sequence number, and initial status. *(PR-23)*
-- [ ] **FR-7.30**: When the PM attempts to close a TaskGroup, the system evaluates close conditions deterministically: all deliverables within the TaskGroup must be at their required completion status, all scheduled validators for the TaskGroup's scope must be passing, and no unresolved escalations may exist. If any condition fails, the close is rejected with the specific failure reasons. *(PR-23)*
-- [ ] **FR-7.31**: When a TaskGroup's close conditions are not met, the PM cannot override or bypass the gate. The rejection is absolute -- it is a hard gate, not a recommendation. *(PR-23)*
-- [ ] **FR-7.32**: When a TaskGroup completes successfully, the system records the completion timestamp and generates a completion report scoped to that TaskGroup's deliverables and validator results. *(PR-22, PR-23)*
+- [x] **FR-7.29**: When the PM creates a TaskGroup within a stage, the system records the TaskGroup with its parent stage, sequence number, and initial status. *(PR-23)*
+- [x] **FR-7.30**: When the PM attempts to close a TaskGroup, the system evaluates close conditions deterministically: all deliverables within the TaskGroup must be at their required completion status, all scheduled validators for the TaskGroup's scope must be passing, and no unresolved escalations may exist. If any condition fails, the close is rejected with the specific failure reasons. *(PR-23)*
+- [x] **FR-7.31**: When a TaskGroup's close conditions are not met, the PM cannot override or bypass the gate. The rejection is absolute -- it is a hard gate, not a recommendation. *(PR-23)*
+- [x] **FR-7.32**: When a TaskGroup completes successfully, the system records the completion timestamp and generates a completion report scoped to that TaskGroup's deliverables and validator results. *(PR-22, PR-23)*
 
 ---
 
@@ -97,11 +97,11 @@ Completion criteria for stages and TaskGroups compose from three independent dim
 
 **Requirements:**
 
-- [ ] **FR-7.33**: When a stage's completion criteria are evaluated, the system checks three dimensions simultaneously: (1) all deliverables are at the required status (default: all verified), (2) all required validators for that stage have passed, and (3) the required approval authority has approved. All three must be true for the stage to be considered complete. *(PR-11)*
-- [ ] **FR-7.34**: When a stage uses the default completion criteria (all deliverables verified), every deliverable associated with that stage must have completed with all its validators passed. *(PR-11)*
-- [ ] **FR-7.35**: When a stage uses a planning-specific completion criteria (all deliverables planned), every deliverable must have an implementation plan recorded, even if not yet executed. *(PR-11)*
-- [ ] **FR-7.36**: When a required validator has not yet been evaluated (the agent that produces its input has not run), the completion check treats the validator as failing. Missing evidence is never treated as passing. *(PR-11)*
-- [ ] **FR-7.37**: When a validator is declared as advisory (not required), its result is recorded but does not block completion. Only required validators participate in the AND composition. *(PR-11)*
+- [x] **FR-7.33**: When a stage's completion criteria are evaluated, the system checks three dimensions simultaneously: (1) all deliverables are at the required status (default: all verified), (2) all required validators for that stage have passed, and (3) the required approval authority has approved. All three must be true for the stage to be considered complete. *(PR-11)*
+- [x] **FR-7.34**: When a stage uses the default completion criteria (all deliverables verified), every deliverable associated with that stage must have completed with all its validators passed. *(PR-11)*
+- [x] **FR-7.35**: When a stage uses a planning-specific completion criteria (all deliverables planned), every deliverable must have an implementation plan recorded, even if not yet executed. *(PR-11)*
+- [x] **FR-7.36**: When a required validator has not yet been evaluated (the agent that produces its input has not run), the completion check treats the validator as failing. Missing evidence is never treated as passing. *(PR-11)*
+- [x] **FR-7.37**: When a validator is declared as advisory (not required), its result is recorded but does not block completion. Only required validators participate in the AND composition. *(PR-11)*
 
 ---
 
@@ -111,18 +111,18 @@ Validators are mandatory quality gates declared in the workflow manifest. They e
 
 **Requirements:**
 
-- [ ] **FR-7.38**: When a validator is evaluated, it produces a structured result containing: the validator name, pass/fail status, machine-generated evidence (structured data supporting the determination), a human-readable message, and the evaluation timestamp. *(PR-22)*
-- [ ] **FR-7.39**: When a deterministic validator evaluates, it reads a specific state key or queries a data source. No LLM call is involved. The result is fully reproducible given the same input state. *(PR-22)*
-- [ ] **FR-7.40**: When the lint validator evaluates, it reads the lint results from the pipeline's output state. It passes if no errors are reported. Its evidence includes the error count and error details. *(PR-22)*
-- [ ] **FR-7.41**: When the test suite validator evaluates, it reads test results from the pipeline's output state. It passes if all tests pass. Its evidence includes pass and fail counts. *(PR-22)*
-- [ ] **FR-7.42**: When the regression test validator evaluates, it reads regression test results from the pipeline's output state. It passes if all regression tests pass. Its evidence includes individual test names and their results. *(PR-22)*
-- [ ] **FR-7.43**: When the code review validator evaluates, it reads the review-passed indicator from the pipeline's output state. It passes if the indicator is true. This is a deterministic check, not an LLM call. Its evidence includes the review cycle count and the reviewer's final assessment. *(PR-22)*
-- [ ] **FR-7.44**: When the dependency validation validator evaluates, it checks the deliverable dependency graph for cycles and validity. It passes if the graph is acyclic and all referenced dependencies exist. Its evidence includes a summary of the dependency graph. *(PR-22)*
-- [ ] **FR-7.45**: When the deliverable status check validator evaluates, it queries all deliverables at the relevant scope (TaskGroup, stage, or workflow). It passes if every deliverable is at the required completion status. Its evidence includes the per-deliverable status list. *(PR-22)*
-- [ ] **FR-7.46**: When a batch of validators is evaluated at a given schedule (per-deliverable, per-batch, per-TaskGroup, or per-stage), only validators matching that schedule are executed. Validators at other schedules are not evaluated. *(PR-11)*
-- [ ] **FR-7.47**: When a validator's required input state key is missing (the producing agent has not yet run), the validator returns a failing result with a clear message indicating what input is missing. *(PR-11)*
-- [ ] **FR-7.48**: When validator results are produced, they are persisted to the database for audit trail and completion report assembly. *(PR-22)*
-- [ ] **FR-7.49**: When two stub validators (integration tests [required] and architecture conformance [advisory, required: false] for the INTEGRATE stage) are evaluated, they return passing results. These are Phase 7b placeholders -- the system records their presence in evidence but does not perform real evaluation. *(PR-22)*
+- [x] **FR-7.38**: When a validator is evaluated, it produces a structured result containing: the validator name, pass/fail status, machine-generated evidence (structured data supporting the determination), a human-readable message, and the evaluation timestamp. *(PR-22)*
+- [x] **FR-7.39**: When a deterministic validator evaluates, it reads a specific state key or queries a data source. No LLM call is involved. The result is fully reproducible given the same input state. *(PR-22)*
+- [x] **FR-7.40**: When the lint validator evaluates, it reads the lint results from the pipeline's output state. It passes if no errors are reported. Its evidence includes the error count and error details. *(PR-22)*
+- [x] **FR-7.41**: When the test suite validator evaluates, it reads test results from the pipeline's output state. It passes if all tests pass. Its evidence includes pass and fail counts. *(PR-22)*
+- [x] **FR-7.42**: When the regression test validator evaluates, it reads regression test results from the pipeline's output state. It passes if all regression tests pass. Its evidence includes individual test names and their results. *(PR-22)*
+- [x] **FR-7.43**: When the code review validator evaluates, it reads the review-passed indicator from the pipeline's output state. It passes if the indicator is true. This is a deterministic check, not an LLM call. Its evidence includes the review cycle count and the reviewer's final assessment. *(PR-22)*
+- [x] **FR-7.44**: When the dependency validation validator evaluates, it checks the deliverable dependency graph for cycles and validity. It passes if the graph is acyclic and all referenced dependencies exist. Its evidence includes a summary of the dependency graph. *(PR-22)*
+- [x] **FR-7.45**: When the deliverable status check validator evaluates, it queries all deliverables at the relevant scope (TaskGroup, stage, or workflow). It passes if every deliverable is at the required completion status. Its evidence includes the per-deliverable status list. *(PR-22)*
+- [x] **FR-7.46**: When a batch of validators is evaluated at a given schedule (per-deliverable, per-batch, per-TaskGroup, or per-stage), only validators matching that schedule are executed. Validators at other schedules are not evaluated. *(PR-11)*
+- [x] **FR-7.47**: When a validator's required input state key is missing (the producing agent has not yet run), the validator returns a failing result with a clear message indicating what input is missing. *(PR-11)*
+- [x] **FR-7.48**: When validator results are produced, they are persisted to the database for audit trail and completion report assembly. *(PR-22)*
+- [x] **FR-7.49**: When two stub validators (integration tests [required] and architecture conformance [advisory, required: false] for the INTEGRATE stage) are evaluated, they return passing results. These are Phase 7b placeholders -- the system records their presence in evidence but does not perform real evaluation. *(PR-22)*
 
 ---
 
@@ -132,12 +132,12 @@ Stage and TaskGroup completions produce structured reports with configurable ver
 
 **Requirements:**
 
-- [ ] **FR-7.50**: When a stage completes, the system generates a completion report scoped to that stage. The report assembles evidence from all validator results evaluated during the stage's lifecycle. *(PR-22)*
-- [ ] **FR-7.51**: When a completion report is generated and the manifest does not specify custom verification layers, three default layers are used: functional (does it work as specified?), architectural (does the implementation match the documented design?), and contract (were all deliverables completed?). *(PR-22)*
-- [ ] **FR-7.52**: When a manifest specifies custom verification layers, the report uses those layers instead of the defaults. Each layer references specific validators as its evidence sources. *(PR-22)*
-- [ ] **FR-7.53**: When a completion report layer references a validator, the layer's pass/fail status is derived from that validator's recorded results. The layer does not independently re-evaluate -- it aggregates existing evidence. *(PR-22)*
-- [ ] **FR-7.54**: When a manifest declares additional report sections (domain-specific metadata beyond the standard layers), those sections appear in the completion report alongside the verification layers. *(PR-22)*
-- [ ] **FR-7.55**: When a completion report is generated, it includes the scope identifier (which stage or TaskGroup it covers) and the generation timestamp. *(PR-22)*
+- [x] **FR-7.50**: When a stage completes, the system generates a completion report scoped to that stage. The report assembles evidence from all validator results evaluated during the stage's lifecycle. *(PR-22)*
+- [x] **FR-7.51**: When a completion report is generated and the manifest does not specify custom verification layers, three default layers are used: functional (does it work as specified?), architectural (does the implementation match the documented design?), and contract (were all deliverables completed?). *(PR-22)*
+- [x] **FR-7.52**: When a manifest specifies custom verification layers, the report uses those layers instead of the defaults. Each layer references specific validators as its evidence sources. *(PR-22)*
+- [x] **FR-7.53**: When a completion report layer references a validator, the layer's pass/fail status is derived from that validator's recorded results. The layer does not independently re-evaluate -- it aggregates existing evidence. *(PR-22)*
+- [x] **FR-7.54**: When a manifest declares additional report sections (domain-specific metadata beyond the standard layers), those sections appear in the completion report alongside the verification layers. *(PR-22)*
+- [x] **FR-7.55**: When a completion report is generated, it includes the scope identifier (which stage or TaskGroup it covers) and the generation timestamp. *(PR-22)*
 
 ---
 
@@ -147,12 +147,12 @@ Workflows define how agents compose into executable pipelines via a standard int
 
 **Requirements:**
 
-- [ ] **FR-7.56**: When a workflow's pipeline is instantiated, the system dynamically loads the workflow's pipeline definition from its directory and invokes it with a context object containing all shared infrastructure. The pipeline definition returns a composed agent tree ready for execution. *(PR-4)*
-- [ ] **FR-7.57**: When a workflow's pipeline definition is missing from the workflow directory, the system reports a clear not-found error. When the definition is present but structurally invalid (cannot be loaded, does not export the expected interface), the system reports a clear configuration error. *(PR-4)*
-- [ ] **FR-7.58**: When a workflow declares a single-pass pipeline type, a standard single-pass composition pattern is available for the pipeline definition to use. *(PR-4)*
-- [ ] **FR-7.59**: When a workflow declares a sequential pipeline type, a standard sequential composition pattern is available for the pipeline definition to use. *(PR-4)*
-- [ ] **FR-7.60**: When a workflow declares a batch-parallel pipeline type, a standard batch-parallel composition pattern is available for the pipeline definition to use. This pattern supports the select-batch, execute-parallel, validate, checkpoint cycle. *(PR-4)*
-- [ ] **FR-7.61**: When a pipeline definition needs agents, it obtains them through the context's agent registry, which resolves agent definitions through the three-scope cascade (global, workflow, project). The pipeline definition does not directly reference agent definition files. *(PR-5)*
+- [x] **FR-7.56**: When a workflow's pipeline is instantiated, the system dynamically loads the workflow's pipeline definition from its directory and invokes it with a context object containing all shared infrastructure. The pipeline definition returns a composed agent tree ready for execution. *(PR-4)*
+- [x] **FR-7.57**: When a workflow's pipeline definition is missing from the workflow directory, the system reports a clear not-found error. When the definition is present but structurally invalid (cannot be loaded, does not export the expected interface), the system reports a clear configuration error. *(PR-4)*
+- [x] **FR-7.58**: When a workflow declares a single-pass pipeline type, a standard single-pass composition pattern is available for the pipeline definition to use. *(PR-4)*
+- [x] **FR-7.59**: When a workflow declares a sequential pipeline type, a standard sequential composition pattern is available for the pipeline definition to use. *(PR-4)*
+- [x] **FR-7.60**: When a workflow declares a batch-parallel pipeline type, a standard batch-parallel composition pattern is available for the pipeline definition to use. This pattern supports the select-batch, execute-parallel, validate, checkpoint cycle. *(PR-4)*
+- [x] **FR-7.61**: When a pipeline definition needs agents, it obtains them through the context's agent registry, which resolves agent definitions through the three-scope cascade (global, workflow, project). The pipeline definition does not directly reference agent definition files. *(PR-5)*
 
 ---
 
@@ -162,17 +162,17 @@ The auto-code workflow is the first concrete workflow implementation. It defines
 
 **Requirements:**
 
-- [ ] **FR-7.62**: When auto-code is selected, its manifest validates successfully and declares a batch-parallel pipeline type. *(PR-4)*
-- [ ] **FR-7.63**: When the auto-code manifest is loaded, it declares five stages in order: SHAPE (refine brief into specification), DESIGN (architecture and contracts), PLAN (decompose into deliverables), BUILD (implement and verify), and INTEGRATE (integration testing and final verification). *(PR-4, PR-5)*
-- [ ] **FR-7.64**: When the SHAPE stage is active, only the planner agent is eligible. An LLM-type validator evaluates specification completeness at stage end. Director approval is required to advance. *(PR-5)*
-- [ ] **FR-7.65**: When the DESIGN stage is active, the planner and reviewer agents are eligible. An LLM-type validator evaluates design consistency at stage end. Director approval is required to advance. *(PR-5)*
-- [ ] **FR-7.66**: When the PLAN stage is active, only the planner agent is eligible. A deterministic dependency validation validator runs at stage end. The completion criteria require all deliverables to have plans. The stage uses automatic approval -- it advances without Director or CEO involvement when criteria are met. *(PR-5)*
-- [ ] **FR-7.67**: When the BUILD stage is active, the full implementation agent roster is eligible (coder, reviewer, fixer, formatter, linter, tester, diagnostics). Per-deliverable validators run for lint, test, and code review. Per-batch regression tests run after each batch completes. *(PR-5, PR-11)*
-- [ ] **FR-7.68**: When the INTEGRATE stage is active, the tester, reviewer, and diagnostics agents are eligible. Integration tests and architecture conformance validators run at stage end (Phase 7b stubs returning passed). A final approval validator requires CEO approval. *(PR-5, PR-11)*
-- [ ] **FR-7.69**: When the auto-code manifest is loaded, it declares required tools for file operations, shell execution, and version control. It declares default model assignments for planning and implementation roles. *(PR-4)*
-- [ ] **FR-7.70**: When the auto-code workflow's pipeline is instantiated, it composes the agent tree using the standard batch-parallel pattern (or equivalent custom composition) and wires workflow-scope agent definitions from the registry. *(PR-4)*
-- [ ] **FR-7.71**: When the auto-code workflow directory is scanned, the system discovers it automatically alongside any other workflows in the same parent directory. No special registration or hardcoded reference is needed. *(PR-4, NFR-5)*
-- [ ] **FR-7.72**: When the auto-code workflow is active, workflow-scope agent definitions (planner, coder, reviewer with auto-code-specific instructions) override the global agent definitions of the same name for that workflow's execution. *(PR-5)*
+- [x] **FR-7.62**: When auto-code is selected, its manifest validates successfully and declares a batch-parallel pipeline type. *(PR-4)*
+- [x] **FR-7.63**: When the auto-code manifest is loaded, it declares five stages in order: SHAPE (refine brief into specification), DESIGN (architecture and contracts), PLAN (decompose into deliverables), BUILD (implement and verify), and INTEGRATE (integration testing and final verification). *(PR-4, PR-5)*
+- [x] **FR-7.64**: When the SHAPE stage is active, only the planner agent is eligible. An LLM-type validator evaluates specification completeness at stage end. Director approval is required to advance. *(PR-5)*
+- [x] **FR-7.65**: When the DESIGN stage is active, the planner and reviewer agents are eligible. An LLM-type validator evaluates design consistency at stage end. Director approval is required to advance. *(PR-5)*
+- [x] **FR-7.66**: When the PLAN stage is active, only the planner agent is eligible. A deterministic dependency validation validator runs at stage end. The completion criteria require all deliverables to have plans. The stage uses automatic approval -- it advances without Director or CEO involvement when criteria are met. *(PR-5)*
+- [x] **FR-7.67**: When the BUILD stage is active, the full implementation agent roster is eligible (coder, reviewer, fixer, formatter, linter, tester, diagnostics). Per-deliverable validators run for lint, test, and code review. Per-batch regression tests run after each batch completes. *(PR-5, PR-11)*
+- [x] **FR-7.68**: When the INTEGRATE stage is active, the tester, reviewer, and diagnostics agents are eligible. Integration tests and architecture conformance validators run at stage end (Phase 7b stubs returning passed). A final approval validator requires CEO approval. *(PR-5, PR-11)*
+- [x] **FR-7.69**: When the auto-code manifest is loaded, it declares required tools for file operations, shell execution, and version control. It declares default model assignments for planning and implementation roles. *(PR-4)*
+- [x] **FR-7.70**: When the auto-code workflow's pipeline is instantiated, it composes the agent tree using the standard batch-parallel pattern (or equivalent custom composition) and wires workflow-scope agent definitions from the registry. *(PR-4)*
+- [x] **FR-7.71**: When the auto-code workflow directory is scanned, the system discovers it automatically alongside any other workflows in the same parent directory. No special registration or hardcoded reference is needed. *(PR-4, NFR-5)*
+- [x] **FR-7.72**: When the auto-code workflow is active, workflow-scope agent definitions (planner, coder, reviewer with auto-code-specific instructions) override the global agent definitions of the same name for that workflow's execution. *(PR-5)*
 
 ---
 
@@ -182,10 +182,10 @@ Agent definitions and skills merge across three tiers when a workflow is active:
 
 **Requirements:**
 
-- [ ] **FR-7.73**: When a workflow is active and it contains workflow-specific skill definitions, the skill index is built from three tiers: global skills first, then workflow skills (overriding global by name), then project skills (overriding both by name). *(PR-5, PR-31)*
-- [ ] **FR-7.74**: When a workflow skill has a unique name not present in the global set, it is added alongside global skills (additive, not just override). *(PR-5, PR-31)*
-- [ ] **FR-7.75**: When an agent registry builds agents for a workflow pipeline, it scans agent definition files from three scopes: global definitions, then workflow-scope definitions (overriding global by name), then project-scope definitions (overriding both by name). *(PR-5)*
-- [ ] **FR-7.76**: When a project-scope agent definition would grant tool access beyond what the workflow manifest's declared tool set allows, the system logs a warning. The workflow manifest's tool declarations serve as a ceiling for project-scope tool access. *(PR-5)*
+- [x] **FR-7.73**: When a workflow is active and it contains workflow-specific skill definitions, the skill index is built from three tiers: global skills first, then workflow skills (overriding global by name), then project skills (overriding both by name). *(PR-5, PR-31)*
+- [x] **FR-7.74**: When a workflow skill has a unique name not present in the global set, it is added alongside global skills (additive, not just override). *(PR-5, PR-31)*
+- [x] **FR-7.75**: When an agent registry builds agents for a workflow pipeline, it scans agent definition files from three scopes: global definitions, then workflow-scope definitions (overriding global by name), then project-scope definitions (overriding both by name). *(PR-5)*
+- [x] **FR-7.76**: When a project-scope agent definition would grant tool access beyond what the workflow manifest's declared tool set allows, the system logs a warning. The workflow manifest's tool declarations serve as a ceiling for project-scope tool access. *(PR-5)*
 
 ---
 
@@ -195,11 +195,11 @@ Workflows declare triggers that enable deterministic matching against user reque
 
 **Requirements:**
 
-- [ ] **FR-7.77**: When a user request contains a keyword declared in a workflow's trigger list, that workflow is matched. *(PR-4)*
-- [ ] **FR-7.78**: When a user explicitly names a workflow (matching the workflow's explicit trigger), that workflow is matched with highest precedence. *(PR-4)*
-- [ ] **FR-7.79**: When a workflow declares no triggers, it is only selectable by explicit name -- it never matches via keyword. *(PR-4)*
-- [ ] **FR-7.80**: When multiple workflows match a user request via keywords, the system returns all matching workflows for the caller to resolve. *(PR-4)*
-- [ ] **FR-7.81**: When both an explicit match and keyword matches exist for the same request, the explicit match takes precedence. *(PR-4)*
+- [x] **FR-7.77**: When a user request contains a keyword declared in a workflow's trigger list, that workflow is matched. *(PR-4)*
+- [x] **FR-7.78**: When a user explicitly names a workflow (matching the workflow's explicit trigger), that workflow is matched with highest precedence. *(PR-4)*
+- [x] **FR-7.79**: When a workflow declares no triggers, it is only selectable by explicit name -- it never matches via keyword. *(PR-4)*
+- [x] **FR-7.80**: When multiple workflows match a user request via keywords, the system returns all matching workflows for the caller to resolve. *(PR-4)*
+- [x] **FR-7.81**: When both an explicit match and keyword matches exist for the same request, the explicit match takes precedence. *(PR-4)*
 
 ---
 
@@ -209,22 +209,22 @@ Five infrastructure skills are operational and teach workflow authoring patterns
 
 **Requirements:**
 
-- [ ] **FR-7.82**: When the workflow-quality skill is loaded, it provides guidance on validator types, scheduling strategies, evidence requirements, completion criteria composition, and three-layer verification report design. It applies to planner and reviewer agents. *(PR-31)*
-- [ ] **FR-7.83**: When the workflow-testing skill is loaded, it provides guidance on workflow validation approaches, stage transition testing, manifest validation, and pipeline verification. It applies to tester and coder agents. *(PR-31)*
-- [ ] **FR-7.84**: When a pipeline for auto-code scans the workflow's skill directory, the test-generation skill is discovered and available for deliverables involving test creation or test-related file patterns. *(PR-31)*
-- [ ] **FR-7.85**: When the skill index is rebuilt, the two new infrastructure skills (workflow-quality, workflow-testing) are present in the index, each with valid frontmatter and body content under 3000 words in imperative style. The three existing Phase 6 skills (workflow-authoring, agent-definition, skill-authoring) remain operational and indexed. *(PR-31)*
+- [x] **FR-7.82**: When the workflow-quality skill is loaded, it provides guidance on validator types, scheduling strategies, evidence requirements, completion criteria composition, and three-layer verification report design. It applies to planner and reviewer agents. *(PR-31)*
+- [x] **FR-7.83**: When the workflow-testing skill is loaded, it provides guidance on workflow validation approaches, stage transition testing, manifest validation, and pipeline verification. It applies to tester and coder agents. *(PR-31)*
+- [x] **FR-7.84**: When a pipeline for auto-code scans the workflow's skill directory, the test-generation skill is discovered and available for deliverables involving test creation or test-related file patterns. *(PR-31)*
+- [x] **FR-7.85**: When the skill index is rebuilt, the two new infrastructure skills (workflow-quality, workflow-testing) are present in the index, each with valid frontmatter and body content under 3000 words in imperative style. The three existing Phase 6 skills (workflow-authoring, agent-definition, skill-authoring) remain operational and indexed. *(PR-31)*
 
 ---
 
 ## Non-Functional Requirements
 
-- [ ] **NFR-7.01**: Manifest validation (parsing and field validation of a single manifest) completes in under 100 milliseconds. Full registry scan (all manifests in both directories) completes in under 2 seconds for up to 50 workflows.
-- [ ] **NFR-7.02**: Workflow trigger matching against the full registry completes in under 10 milliseconds per user request -- matching is O(n) in the number of indexed workflows with constant-time per-trigger evaluation.
-- [ ] **NFR-7.03**: Stage completion verification (deliverable status + validator results + approval status) completes in under 500 milliseconds, including any database queries.
-- [ ] **NFR-7.04**: The workflow composition system introduces no new external dependencies -- it uses only the filesystem, Redis (already available), and existing database infrastructure.
-- [ ] **NFR-7.05**: Registry cache invalidation is atomic -- at no point does a request see a partially rebuilt index. The old index serves requests until the new index is fully built.
-- [ ] **NFR-7.06**: Validator evidence is structured data (not free-form text) so that completion reports can aggregate it mechanically. Evidence schemas are consistent across all validators of the same type.
-- [ ] **NFR-7.07**: All stage state keys use the `pm:` tier prefix per the established state key authorization model. Only PM-tier agents can write stage state.
+- [x] **NFR-7.01**: Manifest validation (parsing and field validation of a single manifest) completes in under 100 milliseconds. Full registry scan (all manifests in both directories) completes in under 2 seconds for up to 50 workflows.
+- [x] **NFR-7.02**: Workflow trigger matching against the full registry completes in under 10 milliseconds per user request -- matching is O(n) in the number of indexed workflows with constant-time per-trigger evaluation.
+- [x] **NFR-7.03**: Stage completion verification (deliverable status + validator results + approval status) completes in under 500 milliseconds, including any database queries.
+- [x] **NFR-7.04**: The workflow composition system introduces no new external dependencies -- it uses only the filesystem, Redis (already available), and existing database infrastructure.
+- [x] **NFR-7.05**: Registry cache invalidation is atomic -- at no point does a request see a partially rebuilt index. The old index serves requests until the new index is fully built.
+- [x] **NFR-7.06**: Validator evidence is structured data (not free-form text) so that completion reports can aggregate it mechanically. Evidence schemas are consistent across all validators of the same type.
+- [x] **NFR-7.07**: All stage state keys use the `pm:` tier prefix per the established state key authorization model. Only PM-tier agents can write stage state.
 
 ---
 

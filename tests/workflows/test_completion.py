@@ -135,7 +135,7 @@ class TestVerifyStageCompletion:
         m = WorkflowManifest(
             name="test",
             description="T",
-            stages=[StageDef(name="a", description="A")],
+            stages=[StageDef(name="a", description="A", approval=StageApproval.AUTO)],
         )
         passed, _failures = verify_stage_completion({}, m, [])
         assert passed is False
@@ -146,7 +146,7 @@ class TestVerifyTaskgroupCompletion:
         m = WorkflowManifest(
             name="test",
             description="T",
-            stages=[StageDef(name="build", description="Build")],
+            stages=[StageDef(name="build", description="Build", approval=StageApproval.AUTO)],
         )
         state: dict[str, object] = {
             "pm:current_stage": "build",
@@ -159,7 +159,7 @@ class TestVerifyTaskgroupCompletion:
         m = WorkflowManifest(
             name="test",
             description="T",
-            stages=[StageDef(name="build", description="Build")],
+            stages=[StageDef(name="build", description="Build", approval=StageApproval.AUTO)],
         )
         state: dict[str, object] = {
             "pm:current_stage": "build",
@@ -243,10 +243,10 @@ class TestGenerateCompletionReport:
 
     def test_additional_sections(self) -> None:
         m = WorkflowManifest(name="test", description="T")
-        sections = [ReportSection(name="quality", content="All good")]
+        sections = [ReportSection(title="quality", content="All good")]
         report = generate_completion_report("stage:build", m, [], additional_sections=sections)
         assert len(report.additional_sections) == 1
-        assert report.additional_sections[0].name == "quality"
+        assert report.additional_sections[0].title == "quality"
 
     def test_multiple_evidence_sources(self) -> None:
         m = WorkflowManifest(

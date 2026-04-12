@@ -26,9 +26,9 @@ from app.workers.adk import (
     build_chat_session_agent,
     build_work_session_agents,
     create_app_container,
-    create_deliverable_pipeline_from_context,
     create_echo_agent,
     create_runner,
+    create_workflow_pipeline,
 )
 
 if TYPE_CHECKING:
@@ -37,8 +37,30 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.skills.library import SkillLibrary
+    from app.workflows.registry import WorkflowRegistry
 
 logger = get_logger("workers.tasks")
+
+
+def _resolve_workflow_stages(
+    workflow_name: str,
+) -> tuple[list[str] | None, dict[str, str] | None]:
+    """Resolve PIPELINE_STAGE_NAMES and STAGE_COMPLETION_KEYS from a loaded workflow module.
+
+    Returns (stages, stage_completion_keys). Both are None if the workflow module
+    has not been dynamically imported yet (i.e., pipeline was not created via
+    WorkflowRegistry.create_pipeline()).
+    """
+    import sys as _sys
+
+    module_name = f"_autobuilder_workflow_{workflow_name.replace('-', '_')}"
+    module = _sys.modules.get(module_name)
+    if module is None:
+        return None, None
+
+    stages: list[str] | None = getattr(module, "PIPELINE_STAGE_NAMES", None)
+    stage_keys: dict[str, str] | None = getattr(module, "STAGE_COMPLETION_KEYS", None)
+    return stages, stage_keys
 
 
 async def test_task(ctx: dict[str, object], payload: str) -> dict[str, str]:
@@ -99,8 +121,9 @@ async def run_workflow(ctx: dict[str, object], workflow_id: str) -> dict[str, st
                 agent_name="pipeline",
             )
 
+            workflow_name = str(workflow_params.get("workflow_name", "auto-code"))
             try:
-                pipeline = create_deliverable_pipeline_from_context(ctx, instruction_ctx)
+                pipeline = await create_workflow_pipeline(workflow_name, ctx, instruction_ctx)
                 app_container = create_app_container(root_agent=pipeline)
                 runner = create_runner(app_container, session_service)
 
@@ -138,6 +161,9 @@ async def run_workflow(ctx: dict[str, object], workflow_id: str) -> dict[str, st
                 )
                 from app.agents.context_recreation import recreate_context
 
+                # Resolve workflow-specific stages for recreation
+                _stages, _stage_keys = _resolve_workflow_stages(workflow_name)
+
                 recreation_result = await recreate_context(
                     session_service=session_service,
                     app_name=APP_NAME,
@@ -145,6 +171,8 @@ async def run_workflow(ctx: dict[str, object], workflow_id: str) -> dict[str, st
                     old_session_id=workflow_id,
                     publisher=publisher,
                     memory_service=None,
+                    stages=_stages,
+                    stage_completion_keys=_stage_keys,
                 )
                 logger.info(
                     "Context recreation completed for workflow %s: "
@@ -420,7 +448,8 @@ async def run_director_turn(
             router=router,
             toolset=toolset,
         )
-        registry.scan((Path("app/agents"), DefinitionScope.GLOBAL))
+        global_agents_dir = Path(__file__).resolve().parent.parent / "agents"
+        registry.scan((global_agents_dir, DefinitionScope.GLOBAL))
 
         # Resolve Director skills at build time (FR-6.46, FR-6.49)
         skill_library: SkillLibrary | None = ctx.get("skill_library")  # type: ignore[assignment]
@@ -603,7 +632,8 @@ async def run_work_session(
             router=router,
             toolset=toolset,
         )
-        registry.scan((Path("app/agents"), DefinitionScope.GLOBAL))
+        global_agents_dir = Path(__file__).resolve().parent.parent / "agents"
+        registry.scan((global_agents_dir, DefinitionScope.GLOBAL))
 
         # Create pipeline callbacks (model routing, budget monitor, system reminders)
         from app.workers.adk import create_pipeline_callbacks
@@ -614,6 +644,7 @@ async def run_work_session(
 
         # Resolve Director + PM skills at build time (FR-6.46, FR-6.47, FR-6.48)
         work_skill_library: SkillLibrary | None = ctx.get("skill_library")  # type: ignore[assignment]
+        work_workflow_registry: WorkflowRegistry | None = ctx.get("workflow_registry")  # type: ignore[assignment]
         director = await build_work_session_agents(
             registry=registry,
             ctx=instruction_ctx,
@@ -621,6 +652,7 @@ async def run_work_session(
             publisher=publisher,
             skill_library=work_skill_library,
             before_model_callback=pipeline_callbacks,
+            workflow_registry=work_workflow_registry,
         )
 
         # 5. Create App container and Runner
@@ -698,6 +730,10 @@ async def run_work_session(
             )
             from app.agents.context_recreation import recreate_context
 
+            # Resolve workflow-specific stages from the work session's workflow
+            _ws_wf_name = str(resolved_params.get("workflow_name", "auto-code"))
+            _ws_stages, _ws_stage_keys = _resolve_workflow_stages(_ws_wf_name)
+
             recreation_result = await recreate_context(
                 session_service=session_service,
                 app_name=APP_NAME,
@@ -705,6 +741,8 @@ async def run_work_session(
                 old_session_id=session_id,
                 publisher=publisher,
                 memory_service=None,
+                stages=_ws_stages,
+                stage_completion_keys=_ws_stage_keys,
             )
             # Update session_id so cleanup uses the fresh session
             session_id = recreation_result.new_session_id

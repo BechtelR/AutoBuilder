@@ -7,7 +7,6 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
-from app.agents.pipeline import PIPELINE_STAGE_NAMES
 from app.lib.exceptions import WorkerError
 from app.models.constants import DELIVERABLE_STATUS_PREFIX
 
@@ -47,22 +46,6 @@ class SessionServiceProtocol(Protocol):
         session_id: str,
     ) -> SessionProtocol | None: ...
 
-
-# Module-level alias used by this module and tests
-PIPELINE_STAGES = PIPELINE_STAGE_NAMES
-
-# Stage name -> state key that indicates completion
-STAGE_COMPLETION_KEYS: dict[str, str] = {
-    "skill_loader": "loaded_skill_names",
-    "memory_loader": "memory_context",
-    "planner": "plan_output",
-    "coder": "code_output",
-    "formatter": "formatter_output",
-    "linter": "linter_output",
-    "tester": "tester_output",
-    "diagnostics": "diagnostics_output",
-    "review_cycle": "review_passed",
-}
 
 # Key prefixes to always seed into fresh session
 _CRITICAL_KEY_PREFIXES: list[str] = [
@@ -125,18 +108,27 @@ def determine_remaining_stages(
     all_stages: list[str],
     completed_stages: list[str] | None = None,
     state: dict[str, object] | None = None,
+    *,
+    stage_completion_keys: dict[str, str] | None = None,
 ) -> list[str]:
     """Determine which pipeline stages still need to run.
 
     Uses ``completed_stages`` if provided; otherwise infers from state
     by checking for known completion keys.
+
+    Args:
+        all_stages: Ordered list of all pipeline stage names.
+        completed_stages: Explicit list of completed stage names.
+        state: Session state dict for inference-based detection.
+        stage_completion_keys: Stage->key mapping for state-based detection.
+            Required when using state-based inference.
     """
     if completed_stages is not None:
         completed = set(completed_stages)
-    elif state is not None:
+    elif state is not None and stage_completion_keys is not None:
         completed: set[str] = {
             stage
-            for stage, key in STAGE_COMPLETION_KEYS.items()
+            for stage, key in stage_completion_keys.items()
             if key in state and state[key] is not None
         }
     else:
@@ -200,6 +192,8 @@ async def recreate_context(
     *,
     memory_service: object | None = None,
     completed_stages: list[str] | None = None,
+    stages: list[str] | None = None,
+    stage_completion_keys: dict[str, str] | None = None,
 ) -> RecreationResult:
     """Orchestrate the 4-step context recreation pipeline.
 
@@ -207,6 +201,10 @@ async def recreate_context(
     2. Seed critical keys from old session
     3. Create fresh session with seed state
     4. Determine remaining stages for pipeline rebuild
+
+    Args:
+        stages: Ordered stage names for this workflow. Required.
+        stage_completion_keys: Stage->key mapping for state-based detection.
 
     Publishes audit events at start and completion/failure.
     """
@@ -241,10 +239,13 @@ async def recreate_context(
         new_session_id = await create_fresh_session(session_service, app_name, user_id, seed_state)
 
         # Step 4: Determine remaining stages
+        if stages is None:
+            raise WorkerError(message="stages parameter is required for context recreation")
         remaining = determine_remaining_stages(
-            PIPELINE_STAGES,
+            stages,
             completed_stages=completed_stages,
             state=old_state,
+            stage_completion_keys=stage_completion_keys,
         )
 
         result = RecreationResult(

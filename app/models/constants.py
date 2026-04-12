@@ -24,6 +24,7 @@ FORMATION_STATUS_KEY: str = "user:formation_status"
 # PM-tier keys
 PM_BATCH_POSITION_KEY: str = "pm:batch_position"
 PM_ESCALATION_CONTEXT_KEY: str = "pm:escalation_context"
+PM_PENDING_ESCALATIONS_KEY: str = "pm:pending_escalations"
 
 # Approval resolution pattern
 APPROVAL_RESOLUTION_PREFIX: str = "pm:approval:"
@@ -47,6 +48,8 @@ TIER_PREFIX_WRITE_ACCESS: dict[str, AgentTier] = {
 # ---------------------------------------------------------------------------
 # Stage state keys (Phase 7 — all pm: prefixed for tier authorization)
 # ---------------------------------------------------------------------------
+DELIVERABLE_STATUSES_KEY: str = "deliverable_statuses"
+
 STAGE_CURRENT: str = "pm:current_stage"
 STAGE_INDEX: str = "pm:stage_index"
 STAGE_STATUS: str = "pm:stage_status"

@@ -4,14 +4,18 @@ PM tools handle deliverable lifecycle, batching, escalation, and dependencies.
 Director tools handle project oversight, CEO escalation, and PM overrides.
 """
 
-from __future__ import annotations
-
 import json
 import tomllib
 import uuid
 from pathlib import Path
+from typing import cast
+
+from google.adk.tools.tool_context import ToolContext
 
 from app.lib.logging import get_logger
+from app.models.constants import (
+    STAGE_WORKFLOW_STAGES,
+)
 from app.models.enums import (
     CeoItemType,
     DependencyAction,
@@ -138,6 +142,97 @@ def reorder_deliverables(project_id: str, order: list[str]) -> str:
     return (
         f"Reordered {len(order)} deliverables for project {project_id} "
         "(placeholder — persistence in Phase 5)"
+    )
+
+
+def reconfigure_stage(
+    tool_context: ToolContext,
+    target_stage: str,
+    reason: str,
+) -> str:
+    """Advance the workflow to the next sequential stage.
+
+    Validates that the transition is legal (no backwards, no skipping),
+    then writes the stage state delta via ToolContext. Delegates validation
+    and delta computation to the domain function in ``app.workflows.stages``.
+
+    Args:
+        tool_context: ADK-injected session context (excluded from LLM schema).
+        target_stage: Name of the stage to transition to.
+        reason: Why the PM is transitioning to this stage.
+
+    Returns:
+        JSON string describing the transition result, or an error message.
+    """
+    from app.models.constants import (
+        STAGE_COMPLETED_LIST,
+        STAGE_CURRENT,
+        STAGE_INDEX,
+        STAGE_STATUS,
+    )
+    from app.workflows.manifest import StageDef, WorkflowManifest
+    from app.workflows.stages import reconfigure_stage as _domain_reconfigure
+
+    # Read serialized stage schema from session state
+    raw_stages: object = tool_context.state.get(STAGE_WORKFLOW_STAGES)  # type: ignore[union-attr]
+    if raw_stages is None or not isinstance(raw_stages, list):
+        return json.dumps({"error": "No workflow stages configured in session state"})
+
+    stages_data: list[dict[str, object]] = cast("list[dict[str, object]]", raw_stages)
+
+    # Reconstruct minimal manifest from serialized state for domain function
+    stage_defs = [StageDef.model_validate(s) for s in stages_data]
+    manifest = WorkflowManifest(name="__tool_ctx__", description="", stages=stage_defs)
+
+    # Build current state snapshot for domain function
+    state: dict[str, object] = {
+        STAGE_CURRENT: tool_context.state.get(STAGE_CURRENT, ""),  # type: ignore[union-attr]
+        STAGE_INDEX: tool_context.state.get(STAGE_INDEX, 0),  # type: ignore[union-attr]
+        STAGE_STATUS: tool_context.state.get(STAGE_STATUS, ""),  # type: ignore[union-attr]
+        STAGE_COMPLETED_LIST: tool_context.state.get(  # type: ignore[union-attr]
+            STAGE_COMPLETED_LIST, []
+        ),
+    }
+
+    try:
+        delta = _domain_reconfigure(state, manifest, target_stage)
+    except ValueError as exc:
+        stage_names = [s.name for s in stage_defs]
+        current_name = str(state.get(STAGE_CURRENT, ""))
+        return json.dumps(
+            {
+                "error": str(exc),
+                "current_stage": current_name,
+                "target_stage": target_stage,
+                "available_stages": stage_names,
+            }
+        )
+
+    if not delta:
+        # No-stages workflow — no-op
+        return json.dumps({"status": "ok", "message": "No stages configured (no-op)"})
+
+    # Write state delta via ToolContext (ADK pattern)
+    for key, value in delta.items():
+        tool_context.actions.state_delta[key] = value  # type: ignore[index]
+
+    previous_stage = str(state.get(STAGE_CURRENT, ""))
+    logger.info(
+        "Stage transition: %s -> %s (reason: %s)",
+        previous_stage,
+        target_stage,
+        reason[:120],
+    )
+
+    return json.dumps(
+        {
+            "status": "ok",
+            "previous_stage": previous_stage,
+            "current_stage": target_stage,
+            "stage_index": delta.get(STAGE_INDEX),
+            "completed_stages": delta.get(STAGE_COMPLETED_LIST),
+            "reason": reason,
+        }
     )
 
 
@@ -317,7 +412,7 @@ class _PackageJson:
         self.dependencies = dependencies
 
     @classmethod
-    def from_file(cls, path: Path) -> _PackageJson:
+    def from_file(cls, path: Path) -> "_PackageJson":
         raw_text = path.read_text(encoding="utf-8")
         data: dict[str, object] = json.loads(raw_text)
         name = str(data.get("name", "unknown"))

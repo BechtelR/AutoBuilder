@@ -107,7 +107,7 @@ class WorkflowRegistry:
 
             if name in self._index:
                 existing = self._index[name]
-                same_scope = existing.path.is_relative_to(directory)
+                same_scope = existing.directory.is_relative_to(directory)
                 if same_scope:
                     logger.warning(
                         "Duplicate workflow name '%s' in %s scope -- keeping first found",
@@ -124,7 +124,7 @@ class WorkflowRegistry:
             entry = WorkflowEntry(
                 name=name,
                 description=manifest.description,
-                path=child,
+                directory=child,
                 pipeline_type=manifest.pipeline_type,
                 triggers=manifest.triggers,
             )
@@ -191,11 +191,11 @@ class WorkflowRegistry:
     async def create_pipeline(
         self,
         workflow_name: str,
-        ctx: PipelineContext,
+        pipeline_ctx: PipelineContext,
     ) -> BaseAgent:
         """Dynamically import pipeline.py and invoke its create_pipeline."""
         entry = self.get(workflow_name)
-        pipeline_path = entry.path / "pipeline.py"
+        pipeline_path = entry.directory / "pipeline.py"
         if not pipeline_path.exists():
             raise NotFoundError(f"No pipeline.py found for workflow '{workflow_name}'")
 
@@ -223,7 +223,15 @@ class WorkflowRegistry:
         if not inspect.iscoroutinefunction(factory):
             raise ConfigurationError(f"create_pipeline in '{workflow_name}' must be async")
 
-        result: BaseAgent = await factory(ctx)
+        # Validate against PipelineFactory Protocol at import time (DD-4)
+        from app.workflows.context import PipelineFactory as _PipelineFactory
+
+        if not isinstance(factory, _PipelineFactory):
+            raise ConfigurationError(
+                f"create_pipeline in '{workflow_name}' does not conform to PipelineFactory Protocol"
+            )
+
+        result: BaseAgent = await factory(pipeline_ctx)
         return result
 
     # ------------------------------------------------------------------

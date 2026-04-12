@@ -70,6 +70,24 @@ async def startup(ctx: dict[str, object]) -> None:
             logger.debug("Skill index cache save skipped (non-critical)")
     ctx["skill_library"] = skill_library
 
+    # Initialize WorkflowRegistry (shared across all task invocations)
+    from app.workflows.registry import WorkflowRegistry
+
+    builtin_workflows_dir = Path(__file__).resolve().parent.parent / "workflows"
+    workflow_registry = WorkflowRegistry(
+        workflows_dir=builtin_workflows_dir,
+        user_workflows_dir=settings.workflows_dir,
+        redis=redis,
+    )
+    cache_hit = await workflow_registry.load_from_cache()
+    if not cache_hit:
+        workflow_registry.scan()
+        try:
+            await workflow_registry.save_to_cache()
+        except Exception:
+            logger.debug("Workflow index cache save skipped (non-critical)")
+    ctx["workflow_registry"] = workflow_registry
+
     # Initialize app: scope state (E14) — idempotent
 
     session_service: BaseSessionService = ctx["session_service"]  # type: ignore[assignment]

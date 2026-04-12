@@ -331,7 +331,7 @@ class TestRunWorkflowDeliverablePipeline:
 
     @pytest.mark.asyncio
     async def test_deliverable_pipeline_triggers_new_path(self) -> None:
-        """Verify pipeline_type=deliverable triggers create_deliverable_pipeline_from_context."""
+        """Verify pipeline_type=deliverable triggers create_workflow_pipeline."""
         from google.adk.agents import SequentialAgent
 
         engine = create_async_engine(TEST_DB_URL)
@@ -374,7 +374,8 @@ class TestRunWorkflowDeliverablePipeline:
 
             with (
                 patch(
-                    "app.workers.tasks.create_deliverable_pipeline_from_context",
+                    "app.workers.tasks.create_workflow_pipeline",
+                    new_callable=AsyncMock,
                     return_value=mock_pipeline,
                 ) as mock_create,
                 patch("app.workers.tasks.create_app_container") as mock_app,
@@ -459,7 +460,8 @@ class TestRunWorkflowDeliverablePipeline:
 
             with (
                 patch(
-                    "app.workers.tasks.create_deliverable_pipeline_from_context",
+                    "app.workers.tasks.create_workflow_pipeline",
+                    new_callable=AsyncMock,
                     side_effect=err,
                 ),
                 patch(

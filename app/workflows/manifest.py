@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path  # noqa: TC003 - required at runtime for Pydantic field
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import (
     CompletionCondition,
@@ -78,8 +78,8 @@ class StageDef(BaseModel):
     validators: list[ValidatorDefinition] = Field(
         default_factory=lambda: list[ValidatorDefinition]()
     )
-    completion_criteria: _CICompletionCondition | None = None
-    approval: _CIStageApproval | None = None
+    completion_criteria: _CICompletionCondition = CompletionCondition.ALL_VERIFIED
+    approval: _CIStageApproval = StageApproval.DIRECTOR
 
 
 class ResourcesDef(BaseModel):
@@ -138,6 +138,14 @@ class WorkflowManifest(BaseModel):
     director_guidance: dict[str, object] = Field(default_factory=dict)
     config: dict[str, object] = Field(default_factory=dict)
 
+    @field_validator("description")
+    @classmethod
+    def _validate_description_non_empty(cls, v: str) -> str:
+        if not v.strip():
+            msg = "Workflow description must not be empty"
+            raise ValueError(msg)
+        return v
+
     @field_validator("name")
     @classmethod
     def _validate_kebab_case(cls, v: str) -> str:
@@ -145,6 +153,33 @@ class WorkflowManifest(BaseModel):
             msg = f"Workflow name must be kebab-case (lowercase, digits, hyphens): {v}"
             raise ValueError(msg)
         return v
+
+    @model_validator(mode="after")
+    def _validate_unique_names(self) -> WorkflowManifest:
+        """Ensure stage names and validator names are unique within the manifest."""
+        # Stage name uniqueness
+        stage_names: list[str] = []
+        for stage in self.stages:
+            if stage.name in stage_names:
+                msg = f"Duplicate stage name: '{stage.name}'"
+                raise ValueError(msg)
+            stage_names.append(stage.name)
+
+        # Validator name uniqueness across all stages + top-level validators
+        validator_names: list[str] = []
+        for v in self.validators:
+            if v.name in validator_names:
+                msg = f"Duplicate validator name: '{v.name}'"
+                raise ValueError(msg)
+            validator_names.append(v.name)
+        for stage in self.stages:
+            for v in stage.validators:
+                if v.name in validator_names:
+                    msg = f"Duplicate validator name: '{v.name}' (in stage '{stage.name}')"
+                    raise ValueError(msg)
+                validator_names.append(v.name)
+
+        return self
 
 
 class WorkflowEntry(BaseModel):
@@ -154,7 +189,7 @@ class WorkflowEntry(BaseModel):
 
     name: str
     description: str
-    path: Path
+    directory: Path
     pipeline_type: _CIPipelineType = PipelineType.SINGLE_PASS
     triggers: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())
 
@@ -175,9 +210,9 @@ class CompletionCriteria(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="ignore")
 
-    deliverables: str = "all_verified"
+    deliverables: _CICompletionCondition = CompletionCondition.ALL_VERIFIED
     validators: list[str] = Field(default_factory=lambda: list[str]())
-    approval: str = "none"
+    approval: _CIStageApproval = StageApproval.DIRECTOR
 
 
 class ValidatorResult(BaseModel):
@@ -211,8 +246,7 @@ class ReportSection(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="ignore")
 
-    name: str
-    description: str = ""
+    title: str
     content: str = ""
     metadata: dict[str, object] = Field(default_factory=dict)
 

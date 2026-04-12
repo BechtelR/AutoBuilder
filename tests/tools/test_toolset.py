@@ -15,15 +15,15 @@ def make_context(agent_name: str) -> object:
 
 
 # ---------------------------------------------------------------------------
-# 1. Tool count — default role returns all 42 tools
+# 1. Tool count — default role returns all 43 tools
 # ---------------------------------------------------------------------------
 
 
 class TestToolCount:
-    async def test_default_returns_all_42_tools(self) -> None:
+    async def test_default_returns_all_43_tools(self) -> None:
         toolset = GlobalToolset()
         tools = await toolset.get_tools(None)
-        assert len(tools) == 42
+        assert len(tools) == 43
 
     async def test_all_tool_names_unique(self) -> None:
         toolset = GlobalToolset()
@@ -89,11 +89,11 @@ class TestRoleFiltering:
         forbidden = {"http_request", "git_commit", "git_branch", "git_worktree", "git_apply"}
         assert names.isdisjoint(forbidden), f"Fixer has forbidden tools: {names & forbidden}"
 
-    async def test_pm_prefix_gets_12_tools(self) -> None:
+    async def test_pm_prefix_gets_13_tools(self) -> None:
         toolset = GlobalToolset()
         tools = await toolset.get_tools(make_context("pm_project1"))  # type: ignore[arg-type]
         names = {t.name for t in tools}
-        assert len(tools) == 12
+        assert len(tools) == 13
         expected = {
             "select_ready_batch",
             "escalate_to_director",
@@ -101,6 +101,7 @@ class TestRoleFiltering:
             "query_deliverables",
             "reorder_deliverables",
             "manage_dependencies",
+            "reconfigure_stage",
             "task_create",
             "task_update",
             "task_query",
@@ -151,12 +152,12 @@ class TestExcludedTools:
         names = {t.name for t in tools}
         assert "bash_exec" not in names
         assert "http_request" not in names
-        assert len(tools) == 40  # 42 - 2
+        assert len(tools) == 41  # 43 - 2
 
     async def test_excluding_nonexistent_tool_is_harmless(self) -> None:
         toolset = GlobalToolset(excluded_tools={"nonexistent_tool"})
         tools = await toolset.get_tools(None)
-        assert len(tools) == 42
+        assert len(tools) == 43
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 **IMPORTANT: KEEP EXTREMELY COMPACT**: Loaded into context. ZERO verbose examples.
 
-## Backwards Compatibility Shims
+## Backwards Compatibility Shims = None
 Early development phase = zero regression technical debt. Don't create it. Delete when found deprecated code, obsolete elements. When in question, ask user.
 
 ## `Any` Type at Boundaries (CRITICAL)
@@ -127,3 +127,8 @@ Direct `ctx.session.state["key"] = val` does NOT persist. Only `state_delta` on 
 
 ## ADK Session State: External Mutation (CRITICAL)
 `session.state` from `get_session()` is a snapshot — mutation doesn't persist. Delete + `create_session()` with merged state.
+
+## Skill/Doc State Key Drift
+SKILL.md and code examples MUST reference exact state keys from validator/agent implementations. Never write from memory.
+- ❌ `linter_result`, `tester_result` (guessed names)
+- ✅ `lint_results`, `test_results` (actual keys in `validators.py`)

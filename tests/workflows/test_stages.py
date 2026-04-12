@@ -33,10 +33,14 @@ class TestInitializeStageState:
         assert state[STAGE_COMPLETED_LIST] == []
         assert len(state[STAGE_WORKFLOW_STAGES]) == 2  # type: ignore[arg-type]
 
-    def test_no_stages_returns_empty(self) -> None:
+    def test_no_stages_returns_minimal_state(self) -> None:
         m = WorkflowManifest(name="test", description="T")
         state = initialize_stage_state(m)
-        assert state == {}
+        assert state[STAGE_CURRENT] == ""
+        assert state[STAGE_INDEX] == 0
+        assert state[STAGE_STATUS] == StageStatus.PENDING
+        assert state[STAGE_COMPLETED_LIST] == []
+        assert state[STAGE_WORKFLOW_STAGES] == []
 
     def test_single_stage(self) -> None:
         m = WorkflowManifest(

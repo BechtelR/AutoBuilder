@@ -21,6 +21,7 @@ from app.gateway.routes.workflows import router as workflow_router
 from app.lib import get_logger, setup_logging
 from app.models.constants import APP_VERSION
 from app.skills.library import SkillLibrary
+from app.workflows.registry import WorkflowRegistry
 
 logger = get_logger("gateway")
 
@@ -65,6 +66,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception:
             logger.debug("Skill index cache save skipped (non-critical)")
     app.state.skill_library = skill_library
+
+    # Initialize WorkflowRegistry with built-in and user-level workflow directories
+    builtin_workflows_dir = Path(__file__).resolve().parent.parent / "workflows"
+    workflow_registry = WorkflowRegistry(
+        workflows_dir=builtin_workflows_dir,
+        user_workflows_dir=settings.workflows_dir,
+        redis=arq_pool,
+    )
+    cache_hit = await workflow_registry.load_from_cache()
+    if not cache_hit:
+        workflow_registry.scan()
+        try:
+            await workflow_registry.save_to_cache()
+        except Exception:
+            logger.debug("Workflow index cache save skipped (non-critical)")
+    logger.info("Workflow registry ready (%d workflows)", len(workflow_registry.list_available()))
+    app.state.workflow_registry = workflow_registry
 
     yield
 

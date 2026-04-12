@@ -11,6 +11,7 @@ from google.genai.types import Content, Part
 from app.models.constants import (
     BATCH_RESULT_KEY,
     DELIVERABLE_STATUS_PREFIX,
+    DELIVERABLE_STATUSES_KEY,
     PM_ESCALATION_CONTEXT_KEY,
 )
 from app.models.enums import DeliverableStatus, PipelineEventType, SupervisionEventType
@@ -227,7 +228,7 @@ def create_batch_verification_callback(publisher: EventPublisher) -> AgentCallba
             "total": len(batch_deliverables),
             "completed": completed,
             "failed": failed,
-            "deliverable_statuses": results,
+            DELIVERABLE_STATUSES_KEY: results,
             "all_terminal": all_terminal,
         }
 

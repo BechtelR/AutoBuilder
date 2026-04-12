@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+import types  # noqa: TC003
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 
 from app.agents.context_recreation import (
-    PIPELINE_STAGES,
-    STAGE_COMPLETION_KEYS,
     RecreationResult,
     create_fresh_session,
     determine_remaining_stages,
@@ -24,6 +26,32 @@ from app.models.constants import (
     PM_BATCH_POSITION_KEY,
     SYSTEM_USER_ID,
 )
+
+# Load auto-code pipeline constants (directory name has a hyphen, can't use normal import)
+_AUTO_CODE_PIPELINE_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "app"
+    / "workflows"
+    / "auto-code"
+    / "pipeline.py"
+)
+
+
+def _load_auto_code_pipeline() -> types.ModuleType:
+    module_name = "_test_ctx_auto_code_pipeline"
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    spec = importlib.util.spec_from_file_location(module_name, _AUTO_CODE_PIPELINE_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_auto_code_mod = _load_auto_code_pipeline()
+PIPELINE_STAGES: list[str] = _auto_code_mod.PIPELINE_STAGE_NAMES  # type: ignore[attr-defined]
+STAGE_COMPLETION_KEYS: dict[str, str] = _auto_code_mod.STAGE_COMPLETION_KEYS  # type: ignore[attr-defined]
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -179,9 +207,11 @@ class TestDetermineRemainingStages:
         state: dict[str, object] = {
             "loaded_skill_names": ["s1"],
             "memory_context": "ctx",
-            "plan_output": "plan data",
+            "implementation_plan": "plan data",
         }
-        remaining = determine_remaining_stages(PIPELINE_STAGES, state=state)
+        remaining = determine_remaining_stages(
+            PIPELINE_STAGES, state=state, stage_completion_keys=STAGE_COMPLETION_KEYS
+        )
         assert "skill_loader" not in remaining
         assert "memory_loader" not in remaining
         assert "planner" not in remaining
@@ -210,8 +240,10 @@ class TestDetermineRemainingStages:
         assert remaining == expected_order
 
     def test_none_values_in_state_not_counted(self) -> None:
-        state: dict[str, object] = {"plan_output": None}
-        remaining = determine_remaining_stages(PIPELINE_STAGES, state=state)
+        state: dict[str, object] = {"implementation_plan": None}
+        remaining = determine_remaining_stages(
+            PIPELINE_STAGES, state=state, stage_completion_keys=STAGE_COMPLETION_KEYS
+        )
         assert "planner" in remaining
 
 
@@ -313,7 +345,7 @@ class TestRecreateContext:
         svc = FakeSessionService()
         publisher = MockEventPublisher()
 
-        # Create old session with some state
+        # Create old session with some state (keys match auto-code STAGE_COMPLETION_KEYS)
         await svc.create_session(
             app_name=APP_NAME,
             user_id=SYSTEM_USER_ID,
@@ -321,7 +353,7 @@ class TestRecreateContext:
             state={
                 "workflow_id": "wf-1",
                 "project_config": {"retry_budget": 5},
-                "plan_output": "plan data",
+                "implementation_plan": "plan data",
                 "code_output": "code data",
                 "loaded_skill_names": ["s1"],
                 "memory_context": "ctx",
@@ -336,6 +368,8 @@ class TestRecreateContext:
             old_session_id="old-session",
             publisher=publisher,  # type: ignore[arg-type]
             memory_service=None,
+            stages=PIPELINE_STAGES,
+            stage_completion_keys=STAGE_COMPLETION_KEYS,
         )
 
         assert isinstance(result, RecreationResult)
@@ -343,8 +377,10 @@ class TestRecreateContext:
         assert result.memory_available is False
         assert "workflow_id" in result.seeded_keys
         assert "project_config" in result.seeded_keys
-        # plan_output matches _output suffix -> seeded
-        assert "plan_output" in result.seeded_keys
+        # code_output matches _output suffix -> seeded
+        assert "code_output" in result.seeded_keys
+        # implementation_plan does not match _output suffix -> NOT seeded (Phase 8 gap)
+        assert "implementation_plan" not in result.seeded_keys
 
         # State-based detection: skill_loader, memory_loader, planner, coder done
         assert "skill_loader" not in result.remaining_stages
@@ -385,6 +421,7 @@ class TestRecreateContext:
                 user_id=SYSTEM_USER_ID,
                 old_session_id="nonexistent",
                 publisher=publisher,  # type: ignore[arg-type]
+                stages=PIPELINE_STAGES,
             )
 
         # Error event published
@@ -409,6 +446,7 @@ class TestRecreateContext:
             user_id=SYSTEM_USER_ID,
             old_session_id="old-session",
             completed_stages=["skill_loader", "memory_loader", "planner", "coder"],
+            stages=PIPELINE_STAGES,
         )
 
         assert "skill_loader" not in result.remaining_stages
@@ -432,6 +470,7 @@ class TestRecreateContext:
             user_id=SYSTEM_USER_ID,
             old_session_id="old-session",
             publisher=None,
+            stages=PIPELINE_STAGES,
         )
         assert isinstance(result, RecreationResult)
 
@@ -451,6 +490,7 @@ class TestRecreateContext:
             user_id=SYSTEM_USER_ID,
             old_session_id="old-session",
             memory_service=None,
+            stages=PIPELINE_STAGES,
         )
         assert result.memory_available is False
 
@@ -479,6 +519,8 @@ class TestRecreationResult:
 
 
 class TestPipelineStageConstants:
+    """Verify auto-code pipeline constants (canonical source: auto-code/pipeline.py)."""
+
     def test_stages_count(self) -> None:
         assert len(PIPELINE_STAGES) == 9
 

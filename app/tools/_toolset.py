@@ -41,6 +41,7 @@ from app.tools.management import (
     query_deliverables,
     query_dependency_graph,
     query_project_status,
+    reconfigure_stage,
     reorder_deliverables,
     select_ready_batch,
     update_deliverable,
@@ -62,7 +63,7 @@ if TYPE_CHECKING:
     from google.adk.tools.base_tool import BaseTool
 
 # ---------------------------------------------------------------------------
-# All 42 tool functions, grouped by category
+# All 43 tool functions, grouped by category
 # ---------------------------------------------------------------------------
 
 _FILESYSTEM_TOOLS: list[Callable[..., object]] = [
@@ -123,6 +124,7 @@ _PM_MANAGEMENT_TOOLS: list[Callable[..., object]] = [
     query_deliverables,
     reorder_deliverables,
     manage_dependencies,
+    reconfigure_stage,
 ]
 
 _DIRECTOR_MANAGEMENT_TOOLS: list[Callable[..., object]] = [

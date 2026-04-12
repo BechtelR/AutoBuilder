@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.skills.library import SkillLibrary
+from app.workflows.registry import WorkflowRegistry
 
 
 async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
@@ -33,3 +34,9 @@ def get_skill_library(request: Request) -> SkillLibrary:
     """Return the shared SkillLibrary instance from app.state."""
     library: SkillLibrary = request.app.state.skill_library
     return library
+
+
+def get_workflow_registry(request: Request) -> WorkflowRegistry:
+    """Return the shared WorkflowRegistry instance from app.state."""
+    registry: WorkflowRegistry = request.app.state.workflow_registry
+    return registry

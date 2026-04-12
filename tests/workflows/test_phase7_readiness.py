@@ -176,12 +176,10 @@ class TestWorkflowDirectoryStructure:
     def test_auto_code_dir_exists(self) -> None:
         assert (WORKFLOWS_DIR / "auto-code").exists(), "Missing: app/workflows/auto-code/"
 
-    def test_auto_code_has_no_pipeline_yet(self) -> None:
-        """Pipeline.py does not exist yet — Phase 7 creates it."""
+    def test_auto_code_has_pipeline(self) -> None:
+        """Pipeline.py exists for the auto-code workflow."""
         pipeline = WORKFLOWS_DIR / "auto-code" / "pipeline.py"
-        assert not pipeline.exists(), (
-            f"auto-code/pipeline.py already exists at {pipeline}. Phase 7 should create this file."
-        )
+        assert pipeline.exists(), f"Missing: {pipeline}"
 
 
 # ===========================================================================
@@ -224,16 +222,42 @@ class TestInfrastructureReadiness:
 
         assert InstructionContext is not None
 
-    def test_existing_pipeline_exists(self) -> None:
-        """The old pipeline.py exists (Phase 7 will migrate it)."""
+    def test_old_pipeline_deleted(self) -> None:
+        """The old pipeline.py has been migrated and deleted (Phase 7)."""
         pipeline = AGENTS_DIR / "pipeline.py"
-        assert pipeline.exists(), "app/agents/pipeline.py should exist (Phase 7 migrates it)"
+        assert not pipeline.exists(), "app/agents/pipeline.py should have been deleted in Phase 7"
 
-    def test_existing_pipeline_has_stage_names(self) -> None:
-        from app.agents.pipeline import PIPELINE_STAGE_NAMES
+    def test_auto_code_pipeline_exists(self) -> None:
+        """The new auto-code pipeline exists."""
+        pipeline = WORKFLOWS_DIR / "auto-code" / "pipeline.py"
+        assert pipeline.exists(), "app/workflows/auto-code/pipeline.py should exist"
 
-        assert isinstance(PIPELINE_STAGE_NAMES, list)
-        assert len(PIPELINE_STAGE_NAMES) > 0
+    def test_context_recreation_no_shims(self) -> None:
+        """context_recreation.py has no backward-compat shims (zero shim standard)."""
+        import app.agents.context_recreation as ctx_mod
+
+        assert not hasattr(ctx_mod, "PIPELINE_STAGE_NAMES"), (
+            "Shim PIPELINE_STAGE_NAMES should be removed"
+        )
+        assert not hasattr(ctx_mod, "PIPELINE_STAGES"), "Shim PIPELINE_STAGES should be removed"
+        assert not hasattr(ctx_mod, "STAGE_COMPLETION_KEYS"), (
+            "Shim STAGE_COMPLETION_KEYS should be removed"
+        )
+
+    def test_pipeline_stage_names_in_auto_code(self) -> None:
+        """Canonical PIPELINE_STAGE_NAMES lives in auto-code pipeline module."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "auto_code_pipeline",
+            WORKFLOWS_DIR / "auto-code" / "pipeline.py",
+        )
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        stage_names: list[str] = mod.PIPELINE_STAGE_NAMES  # type: ignore[attr-defined]
+        assert isinstance(stage_names, list)
+        assert len(stage_names) == 9
 
     def test_review_cycle_agent_exists(self) -> None:
         from app.agents.custom.review_cycle import ReviewCycleAgent
@@ -348,8 +372,7 @@ class TestSkillsReadiness:
         assert len(skills) > 0, "No global skills found"
 
     def test_skill_library_constructor_signature(self) -> None:
-        """SkillLibrary.__init__ currently takes global_dir and project_dir.
-        Phase 7 adds workflow_dir parameter."""
+        """SkillLibrary.__init__ takes global_dir, workflow_dir, and project_dir."""
         import inspect
 
         from app.skills.library import SkillLibrary
@@ -357,6 +380,5 @@ class TestSkillsReadiness:
         sig = inspect.signature(SkillLibrary.__init__)
         params = list(sig.parameters.keys())
         assert "global_dir" in params
+        assert "workflow_dir" in params
         assert "project_dir" in params
-        # workflow_dir will be added by Phase 7 Batch 5
-        # (not yet added at this point in the validation pipeline)

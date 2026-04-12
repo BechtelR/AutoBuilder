@@ -188,8 +188,8 @@ class TestStageDef:
         s = StageDef(name="build", description="Build stage")
         assert s.agents == []
         assert s.validators == []
-        assert s.approval is None
-        assert s.completion_criteria is None
+        assert s.approval == StageApproval.DIRECTOR
+        assert s.completion_criteria == CompletionCondition.ALL_VERIFIED
 
     def test_stage_with_all_fields(self) -> None:
         s = StageDef(
@@ -282,9 +282,9 @@ class TestValidatorResult:
 class TestCompletionModels:
     def test_completion_criteria_defaults(self) -> None:
         c = CompletionCriteria()
-        assert c.deliverables == "all_verified"
+        assert c.deliverables == CompletionCondition.ALL_VERIFIED
         assert c.validators == []
-        assert c.approval == "none"
+        assert c.approval == StageApproval.DIRECTOR
 
     def test_verification_layer(self) -> None:
         v = VerificationLayer(name="functional", description="Does it work?", passed=True)
@@ -301,8 +301,8 @@ class TestCompletionModels:
         assert r.generated_at is not None
 
     def test_report_section(self) -> None:
-        s = ReportSection(name="code_quality", description="Quality metrics", content="All good")
-        assert s.name == "code_quality"
+        s = ReportSection(title="code_quality", content="All good")
+        assert s.title == "code_quality"
 
 
 class TestResourceModels:
@@ -359,7 +359,7 @@ class TestRunConfig:
 
 class TestWorkflowEntry:
     def test_minimal(self, tmp_path: Path) -> None:
-        e = WorkflowEntry(name="test", description="Test", path=tmp_path / "test")
+        e = WorkflowEntry(name="test", description="Test", directory=tmp_path / "test")
         assert e.pipeline_type == PipelineType.SINGLE_PASS
         assert e.triggers == []
 
@@ -367,7 +367,7 @@ class TestWorkflowEntry:
         e = WorkflowEntry(
             name="test",
             description="Test",
-            path=tmp_path / "test",
+            directory=tmp_path / "test",
             triggers=[{"keywords": ["build"]}],
         )
         assert len(e.triggers) == 1
@@ -378,7 +378,14 @@ class TestEnumValuesMatchNames:
 
     @pytest.mark.parametrize(
         "enum_cls",
-        [PipelineType, StageStatus, ValidatorType, ValidatorSchedule],
+        [
+            PipelineType,
+            StageStatus,
+            ValidatorType,
+            ValidatorSchedule,
+            StageApproval,
+            CompletionCondition,
+        ],
     )
     def test_values_match_names(self, enum_cls: type[enum.StrEnum]) -> None:
         for member in enum_cls:

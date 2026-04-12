@@ -2,7 +2,7 @@
 
 import uuid
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from google.adk.agents import LlmAgent
@@ -463,14 +463,18 @@ class TestBuildWorkSessionAgentsSkills:
         mock_publisher = MagicMock()
         base_ctx = InstructionContext()
 
-        with patch("app.agents.pipeline.create_deliverable_pipeline", return_value=MagicMock()):
-            await build_work_session_agents(
-                registry=mock_registry,
-                ctx=base_ctx,
-                project_id="test-project",
-                publisher=mock_publisher,
-                skill_library=lib,
-            )
+        mock_wf_registry = MagicMock()
+        mock_wf_registry.get_manifest.return_value = MagicMock()
+        mock_wf_registry.create_pipeline = AsyncMock(return_value=MagicMock())
+
+        await build_work_session_agents(
+            registry=mock_registry,
+            ctx=base_ctx,
+            project_id="test-project",
+            publisher=mock_publisher,
+            skill_library=lib,
+            workflow_registry=mock_wf_registry,
+        )
 
         # registry.build called twice: once for director, once for PM
         assert mock_registry.build.call_count == 2
@@ -521,14 +525,18 @@ class TestBuildWorkSessionAgentsSkills:
         mock_registry.build.return_value = MagicMock()
         mock_publisher = MagicMock()
 
-        with patch("app.agents.pipeline.create_deliverable_pipeline", return_value=MagicMock()):
-            await build_work_session_agents(
-                registry=mock_registry,
-                ctx=InstructionContext(),
-                project_id="proj",
-                publisher=mock_publisher,
-                skill_library=lib,
-            )
+        mock_wf_registry = MagicMock()
+        mock_wf_registry.get_manifest.return_value = MagicMock()
+        mock_wf_registry.create_pipeline = AsyncMock(return_value=MagicMock())
+
+        await build_work_session_agents(
+            registry=mock_registry,
+            ctx=InstructionContext(),
+            project_id="proj",
+            publisher=mock_publisher,
+            skill_library=lib,
+            workflow_registry=mock_wf_registry,
+        )
 
         # Director build has the skill
         director_ctx = mock_registry.build.call_args_list[0][0][1]
@@ -557,14 +565,18 @@ class TestBuildWorkSessionAgentsSkills:
         mock_registry.build.return_value = MagicMock()
         mock_publisher = MagicMock()
 
-        with patch("app.agents.pipeline.create_deliverable_pipeline", return_value=MagicMock()):
-            await build_work_session_agents(
-                registry=mock_registry,
-                ctx=InstructionContext(),
-                project_id="proj",
-                publisher=mock_publisher,
-                skill_library=lib,
-            )
+        mock_wf_registry = MagicMock()
+        mock_wf_registry.get_manifest.return_value = MagicMock()
+        mock_wf_registry.create_pipeline = AsyncMock(return_value=MagicMock())
+
+        await build_work_session_agents(
+            registry=mock_registry,
+            ctx=InstructionContext(),
+            project_id="proj",
+            publisher=mock_publisher,
+            skill_library=lib,
+            workflow_registry=mock_wf_registry,
+        )
 
         # Both Director and PM should have the universal skill
         director_ctx = mock_registry.build.call_args_list[0][0][1]

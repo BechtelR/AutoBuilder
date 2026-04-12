@@ -1,6 +1,13 @@
 """Workflow composition -- registry, manifest, pipeline context."""
 
-from app.workflows.context import PipelineContext, PipelineFactory
+from app.workflows.context import (
+    BeforeModelCallback,
+    PipelineContext,
+    PipelineFactory,
+    batch_parallel_pipeline,
+    sequential_pipeline,
+    single_pass_pipeline,
+)
 from app.workflows.manifest import (
     CompletionCriteria,
     CompletionLayerDef,
@@ -29,6 +36,7 @@ from app.workflows.validators import (
 )
 
 __all__ = [
+    "BeforeModelCallback",
     "CompletionCriteria",
     "CompletionLayerDef",
     "CompletionReport",
@@ -49,9 +57,12 @@ __all__ = [
     "WorkflowEntry",
     "WorkflowManifest",
     "WorkflowRegistry",
+    "batch_parallel_pipeline",
     "generate_completion_report",
     "initialize_stage_state",
     "reconfigure_stage",
+    "sequential_pipeline",
+    "single_pass_pipeline",
     "verify_stage_completion",
     "verify_taskgroup_completion",
 ]

@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 2.0.0*
+*Version: 2.2.0*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -34,13 +34,13 @@ Source: `architecture/gateway.md`
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
 | G01 | `GET /health` | route | ✓ | gateway.md §Route Structure | — |
-| G02 | `POST /specs` | route | 8 | gateway.md §Route Structure | Spec decomposition |
-| G03 | `POST /workflows/{id}/run` | route | 8 | gateway.md §Route Structure | ARQ worker, WorkflowRegistry |
-| G04 | `GET /workflows/{id}/status` | route | 8 | gateway.md §Route Structure | `workflows` table |
+| G02 | `POST /specs` (brief submission) | route | 8a | gateway.md §Route Structure | WorkflowRegistry, X01 |
+| G03 | `POST /workflows/{id}/run` | route | 8a | gateway.md §Route Structure | ARQ worker, WorkflowRegistry |
+| G04 | `GET /workflows/{id}/status` | route | 8a | gateway.md §Route Structure | `workflows` table |
 | G05 | `GET /workflows` | route | 10 | gateway.md §Route Structure | WorkflowRegistry |
-| G06 | `POST /workflows/{id}/intervene` | route | 8 | gateway.md §Route Structure | ADK session, PM agent |
-| G07 | `GET /deliverables` | route | 8 | gateway.md §Route Structure | `deliverables` table |
-| G08 | `GET /deliverables/{id}` | route | 8 | gateway.md §Route Structure | `deliverables` table |
+| G06 | `POST /workflows/{id}/intervene` | route | 8b | gateway.md §Route Structure | ADK session, PM agent, X09 |
+| G07 | `GET /deliverables` | route | 8a | gateway.md §Route Structure | `deliverables` table |
+| G08 | `GET /deliverables/{id}` | route | 8a | gateway.md §Route Structure | `deliverables` table |
 | G09 | `GET /events/stream` | endpoint | 10 | gateway.md §Route Structure | Redis Streams, SSE |
 | G10 | `POST /chat/{session_id}/messages` | route | 5b | gateway.md §Route Structure | Director agent, `runner.run_async` |
 | G11 | `GET /chat/{session_id}/messages` | route | 5b | gateway.md §Route Structure | ADK session / DB |
@@ -159,7 +159,7 @@ Source: `architecture/events.md`
 | V15 | CEO queue status enum (`PENDING`, `SEEN`, `RESOLVED`, `DISMISSED`) | config | 5a | events.md §Unified CEO Queue | — |
 | V17 | CEO queue Redis Stream trigger consumer | mechanism | DROP | events.md §Unified CEO Queue | `escalate_to_ceo` FunctionTool is the write path; second write path via stream consumer is over-engineering |
 | V18 | CEO resolved approval → session state writeback | mechanism | 5b | events.md §Unified CEO Queue | CEO queue, ADK session |
-| V19 | Batch completion event publishing | mechanism | 8 | events.md §Unified CEO Queue | Redis Streams |
+| V19 | Batch completion event publishing | mechanism | 8a | events.md §Unified CEO Queue | Redis Streams — see also §14.2 |
 | V20 | Director queue type enum (`ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT`) | config | 4 | events.md §Director Queue | — |
 | V21 | Director queue priority enum (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`) | config | 4 | events.md §Director Queue | — |
 | V22 | Director queue status enum (`PENDING`, `IN_PROGRESS`, `RESOLVED`, `FORWARDED_TO_CEO`) | config | 4 | events.md §Director Queue | — |
@@ -252,8 +252,8 @@ Source: `architecture/agents.md`, `architecture/execution.md`
 |---|-----------|------|-------|--------|--------------|
 | A60 | `DeliverablePipeline` (SequentialAgent) | workflow | 5a | agents.md §How Workers Compose | All worker agents |
 | A61 | `ReviewCycle` (LoopAgent, max=3) | workflow | 5a | agents.md §How Workers Compose | review, fix, lint, test agents |
-| A62 | Parallel batch execution (ParallelAgent) | workflow | 8 | execution.md §PM loop | `DeliverablePipeline`, git worktrees |
-| A63 | PM outer loop (batch management) | workflow | 8 | execution.md §PM loop | PM agent, `select_ready_batch` |
+| A62 | Parallel batch execution (ParallelAgent) | workflow | 8b | execution.md §PM loop | See §14.3 |
+| A63 | PM outer loop (sequential batch management) | workflow | 8a | execution.md §PM loop | See §14.2 |
 
 ### 6.7 Session Model
 
@@ -536,7 +536,7 @@ Source: `architecture/context.md`
 |---|-----------|------|-------|--------|--------------|
 | CT01 | Context compression (sliding window summarization) | mechanism | 3 | context.md §Context Recreation | `EventsCompactionConfig` |
 | CT02 | Skill pruning (reactive context response) | mechanism | 11 | context.md §Context Budget Monitoring | Context budget monitor |
-| CT03 | Artifact storage (`save_artifact`/`load_artifact`) | mechanism | 8 | context.md §Knowledge Loading Layers | ADK artifacts API |
+| CT03 | Artifact storage (`save_artifact`/`load_artifact`) | mechanism | 8a | context.md §Knowledge Loading Layers | ADK artifacts API |
 | CT04 | `ContextBudgetMonitor` (`before_model_callback`) | module | 5a | context.md §Context Budget Monitoring | LiteLLM `token_counter`, LlmRequest |
 | CT05 | Context recreation pipeline (persist → seed → fresh session → reassemble) | mechanism | 5b | context.md §Context Recreation | InstructionAssembler, MemoryService, SkillLoaderAgent |
 | CT06 | `ContextRecreationRequired` exception | module | 5a | context.md §Trigger Mechanics | ContextBudgetMonitor |
@@ -558,23 +558,47 @@ Source: `architecture/observability.md`
 
 ---
 
-## 14. Spec Pipeline & Execution
+## 14. Autonomous Execution Engine
 
 Source: `architecture/execution.md`
 
+### 14.1 Submission & Orchestration (Phase 8a)
+
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| X01 | Spec submission + decomposition | mechanism | 8 | execution.md §Director loop | `specifications` table |
-| X02 | Deliverable status tracking | mechanism | 8 | execution.md §PM loop | `deliverables` table |
-| X03 | Director execution loop | workflow | 8 | execution.md §Director loop | Director agent, PM agents |
-| X04 | PM batch loop (autonomous) | workflow | 8 | execution.md §PM loop | PM agent, `select_ready_batch` |
-| X05 | Git worktree creation per deliverable | mechanism | 8 | execution.md §PM loop | Git |
-| X06 | Git worktree merge on completion | mechanism | 8 | execution.md §PM loop | Git |
-| X07 | Git worktree cleanup | mechanism | 8 | execution.md §PM loop | Git |
-| X08 | Autonomous failure handling (retry/reorder/skip) | mechanism | 8 | execution.md §PM loop | PM agent |
-| X09 | Human-in-the-loop pause at batch boundary | mechanism | 8 | execution.md §PM loop | Intervention API |
-| X10 | Concurrency limits (configurable, cascaded) | config | 8 | execution.md §PM loop | `project_configs` |
-| X11 | Batch failure threshold (consecutive failures → Director suspension) | mechanism | 8 | execution.md §PM loop | PM agent, Director queue, `project_configs` |
+| X01 | Brief submission + project creation + work session enqueueing | mechanism | 8a | execution.md §Director loop | `specifications` table, WorkflowRegistry |
+| X02 | Deliverable status tracking (lifecycle management via management tools) | mechanism | 8a | execution.md §PM loop | `deliverables` table |
+| X03 | Director execution loop (backlog processing, PM delegation, escalation forwarding) | workflow | 8a | execution.md §Director loop | Director agent, PM agents, V23, X13, CEO queue |
+| X04 | PM batch loop (autonomous, stage-driven, sequential) | workflow | 8a | execution.md §PM loop | PM agent, `select_ready_batch`, F25, F26, F27 |
+| X12 | Management tool DB wiring (replace placeholder strings with real persistence) | mechanism | 8a | tools.md §3.7, §3.8 | DB session, `deliverables`/`director_queue`/`ceo_queue` tables |
+| X13 | `escalate_to_director` real implementation (write to `director_queue` table) | mechanism | 8a | tools.md §3.7 | V23, T31 |
+| X18 | Brief validation against workflow `brief_template` | mechanism | 8a | workflows.md §Workflow Manifest | F19, G02 |
+| X19 | Pre-execution resource validation (credentials, services, knowledge) | mechanism | 8a | workflows.md §Resources | F43, CEO queue |
+| G28 | `GET /director/queue` (list Director queue items) | route | 8a | events.md §Director Queue | V23 |
+| G29 | `PATCH /director/queue/{id}` (resolve/forward Director queue item) | route | 8a | events.md §Director Queue | V23, CEO queue |
+
+### 14.2 Failure Handling & Completion (Phase 8a)
+
+| # | Component | Type | Phase | Source | Dependencies |
+|---|-----------|------|-------|--------|--------------|
+| A63 | *(cross-ref §6.6 Pipelines)* PM outer loop (sequential batch management) | workflow | 8a | execution.md §PM loop | PM agent, `select_ready_batch` |
+| X08 | Autonomous failure handling (retry/reorder/skip) | mechanism | 8a | execution.md §PM loop | PM agent |
+| X11 | Batch failure threshold (consecutive failures → Director suspension) | mechanism | 8a | execution.md §PM loop | PM agent, Director queue, `project_configs` |
+| X14 | Three-layer completion report wiring into INTEGRATE validators | mechanism | 8a | workflows.md §Completion Criteria & Reports | F38, F27 |
+| V19 | *(cross-ref §5 Events)* Batch completion event publishing | mechanism | 8a | events.md §Unified CEO Queue | Redis Streams |
+
+### 14.3 Parallel Execution & Isolation (Phase 8b)
+
+| # | Component | Type | Phase | Source | Dependencies |
+|---|-----------|------|-------|--------|--------------|
+| A62 | *(cross-ref §6.6 Pipelines)* Parallel batch execution (ParallelAgent) | workflow | 8b | execution.md §PM loop | `DeliverablePipeline`, git worktrees, X10, X15 |
+| X05 | Git worktree creation per deliverable | mechanism | 8b | execution.md §PM loop | Git |
+| X06 | Git worktree merge on completion (dependency order) | mechanism | 8b | execution.md §PM loop | Git |
+| X07 | Git worktree cleanup | mechanism | 8b | execution.md §PM loop | Git |
+| X15 | Parallel worker state key namespacing (`worker:{deliverable_id}:*`) | mechanism | 8b | execution.md §PM loop | E13, A62 |
+| X16 | Deterministic merge conflict resolution strategy | mechanism | 8b | execution.md §PM loop | X05, X06 |
+| X10 | Concurrency limits (configurable, cascaded) | config | 8b | execution.md §PM loop | `project_configs` |
+| X09 | Human-in-the-loop proactive intervention at batch boundary | mechanism | 8b | execution.md §PM loop | Intervention API |
 
 ---
 
@@ -635,6 +659,7 @@ See component entries above for current counts. Use `grep -c '| [0-9]' 07-COMPON
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 2.2.0 | 2026-04-12 | Phase 8 split into 8a (Autonomous Execution Loop) + 8b (Parallel Execution & Isolation): Section 14 reorganized into phase-aligned subsections (14.1-14.2 = 8a, 14.3 = 8b); G02/G03/G04/G07/G08/V19/A63/CT03 → 8a; G06/A62 → 8b; 9 new components (X12-X16, X18-X19, G28-G29); management tool DB wiring (X12) and backlog orchestration (X03/X13) identified as critical gaps |
 | 2.0.0 | 2026-03-12 | Phase 7 expansion (Decisions #70-77): 44 new workflow components (F19-F57, S37-S41); Phase 7b added (Director authoring); statistics updated (Total 331→375, Active 329→373, Phase 7 21→48, Phase 7b 17) |
 | 1.9.0 | 2026-03-11 | Phase 6 FRD back-propagation: S16-S17 added (supervision-tier resolution, skill validation); S33-S36 added (4 authoring skills); S32 moved 13+→6 (Director/PM role-bound skills); S12 updated (adds `applies_to` filtering); statistics updated (Total 325→331, Active 323→329, Phase 6 24→31, Phase 13+/14 6→5) |
 | 1.8.1 | 2026-03-10 | Fix Phase 3 count 36→37 (A72 move was not reflected in statistics) |
@@ -653,5 +678,5 @@ See component entries above for current counts. Use `grep -c '| [0-9]' 07-COMPON
 
 ---
 
-*Document Version: 2.0.0*
-*Last Updated: 2026-03-12*
+*Document Version: 2.2.0*
+*Last Updated: 2026-04-12*

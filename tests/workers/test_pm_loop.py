@@ -537,7 +537,7 @@ class TestPipelineWiring:
     @pytest.mark.asyncio
     async def test_pipeline_is_pm_sub_agent(self) -> None:
         """build_work_session_agents wires pipeline as PM sub_agent."""
-        from unittest.mock import patch
+        from unittest.mock import AsyncMock
 
         from app.workers.adk import build_work_session_agents
 
@@ -563,16 +563,17 @@ class TestPipelineWiring:
         ctx = MagicMock()
         publisher = MockEventPublisher()
 
-        with patch(
-            "app.agents.pipeline.create_deliverable_pipeline",
-            return_value=pipeline_mock,
-        ):
-            result = await build_work_session_agents(
-                registry=registry,
-                ctx=ctx,
-                project_id="proj1",
-                publisher=publisher,  # type: ignore[arg-type]
-            )
+        mock_wf_registry = MagicMock()
+        mock_wf_registry.get_manifest.return_value = MagicMock()
+        mock_wf_registry.create_pipeline = AsyncMock(return_value=pipeline_mock)
+
+        result = await build_work_session_agents(
+            registry=registry,
+            ctx=ctx,
+            project_id="proj1",
+            publisher=publisher,  # type: ignore[arg-type]
+            workflow_registry=mock_wf_registry,
+        )
 
         # Director is root
         assert result is director_mock

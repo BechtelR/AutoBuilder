@@ -19,6 +19,7 @@ from app.models.enums import (
     EscalationPriority,
     EscalationRequestType,
     SpecificationStatus,
+    StageStatus,
     WorkflowStatus,
 )
 
@@ -207,3 +208,83 @@ class ProjectConfig(TimestampMixin, Base):
     project_name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     config: Mapped[dict[str, object]] = mapped_column(JSONB, server_default="{}", default=dict)
     active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"), default=True)
+
+
+class StageExecution(TimestampMixin, Base):
+    """Tracks stage lifecycle within a workflow execution."""
+
+    __tablename__ = "stage_executions"
+
+    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflows.id"), index=True)
+    stage_name: Mapped[str] = mapped_column(String(255), index=True)
+    stage_index: Mapped[int]
+    status: Mapped[StageStatus] = mapped_column(
+        SqlEnum(StageStatus, native_enum=False),
+        default=StageStatus.PENDING,
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    completion_report: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB, nullable=True, default=None
+    )
+
+    workflow: Mapped[Workflow] = relationship(lazy="raise")
+    taskgroups: Mapped[list["TaskGroupExecution"]] = relationship(
+        back_populates="stage_execution", lazy="raise"
+    )
+    validator_results: Mapped[list["ValidatorResult"]] = relationship(
+        back_populates="stage_execution", lazy="raise"
+    )
+
+
+class TaskGroupExecution(TimestampMixin, Base):
+    """PM TaskGroup tracking -- runtime planning units within a stage."""
+
+    __tablename__ = "taskgroup_executions"
+
+    stage_execution_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("stage_executions.id"), index=True
+    )
+    taskgroup_number: Mapped[int]
+    status: Mapped[StageStatus] = mapped_column(
+        SqlEnum(StageStatus, native_enum=False),
+        default=StageStatus.PENDING,
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    deliverable_count: Mapped[int] = mapped_column(default=0)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+
+    stage_execution: Mapped[StageExecution] = relationship(
+        back_populates="taskgroups", lazy="raise"
+    )
+
+
+class ValidatorResult(TimestampMixin, Base):
+    """Validator evidence persistence."""
+
+    __tablename__ = "validator_results"
+
+    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflows.id"), index=True)
+    stage_execution_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("stage_executions.id"), nullable=True, default=None, index=True
+    )
+    validator_name: Mapped[str] = mapped_column(String(255), index=True)
+    passed: Mapped[bool]
+    evidence: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True, default=None)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    evaluated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    workflow: Mapped[Workflow] = relationship(lazy="raise")
+    stage_execution: Mapped[StageExecution | None] = relationship(
+        back_populates="validator_results", lazy="raise"
+    )

@@ -1,6 +1,7 @@
 """Pydantic Settings for AutoBuilder configuration."""
 
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import urlparse
 
 from arq.connections import RedisSettings
@@ -19,6 +20,13 @@ class Settings(BaseSettings):
     default_plan_model: str = "anthropic/claude-opus-4-6"
     default_review_model: str = "anthropic/claude-sonnet-4-6"
     default_fast_model: str = "anthropic/claude-haiku-4-5-20251001"
+
+    workflows_dir: Path = Path.home() / ".autobuilder" / "workflows"
+
+    @field_validator("workflows_dir")
+    @classmethod
+    def _expand_workflows_dir(cls, v: Path) -> Path:
+        return v.expanduser()
 
     search_provider: str = "tavily"
     context_budget_threshold: int = 80

@@ -21,12 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 def initialize_stage_state(manifest: WorkflowManifest) -> dict[str, object]:
-    """Build initial state delta for a staged workflow.
+    """Build initial state delta for a workflow's stage system.
 
-    Returns empty dict for stageless workflows (no-op).
+    For stageless workflows, returns minimal state with empty current stage
+    so downstream consumers can distinguish "no stages" from "not initialized".
     """
     if not manifest.stages:
-        return {}
+        return {
+            STAGE_CURRENT: "",
+            STAGE_INDEX: 0,
+            STAGE_STATUS: StageStatus.PENDING,
+            STAGE_COMPLETED_LIST: [],
+            STAGE_WORKFLOW_STAGES: [],
+        }
 
     first = manifest.stages[0]
     return {

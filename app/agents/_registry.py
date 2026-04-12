@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.agents.assembler import InstructionAssembler, InstructionContext
     from app.router.router import LlmRouter
     from app.tools._toolset import GlobalToolset
+    from app.workflows.manifest import WorkflowManifest
 
 logger = logging.getLogger(__name__)
 
@@ -387,6 +388,38 @@ class AgentRegistry:
         agent_kwargs.update(overrides)
 
         return cls(**agent_kwargs)  # type: ignore[arg-type]
+
+    def validate_project_scope(self, manifest: WorkflowManifest) -> list[str]:
+        """Validate that PROJECT-scope agents' tool_roles don't exceed manifest tool set.
+
+        Compares each PROJECT-scope entry's tool_role permissions against the
+        manifest's required_tools + optional_tools. Emits a warning for each
+        agent that requests tools beyond the manifest's declared set.
+
+        Returns list of warning messages (empty = all valid).
+        """
+        from app.tools._toolset import ROLE_PERMISSIONS
+
+        manifest_tools = set(manifest.required_tools) | set(manifest.optional_tools)
+        if not manifest_tools:
+            return []
+
+        warnings: list[str] = []
+        for name, entry in self._scoped_entries[DefinitionScope.PROJECT].items():
+            if entry.tool_role is None:
+                continue
+            role_tools = ROLE_PERMISSIONS.get(entry.tool_role, set())
+            excess = role_tools - manifest_tools
+            if excess:
+                msg = (
+                    f"Project-scope agent '{name}' has tool_role '{entry.tool_role}' "
+                    f"granting tools beyond manifest '{manifest.name}': "
+                    f"{sorted(excess)}"
+                )
+                logger.warning(msg)
+                warnings.append(msg)
+
+        return warnings
 
     def get_resolution_sources(self) -> dict[str, AgentResolutionEntry]:
         """Return resolution audit map."""

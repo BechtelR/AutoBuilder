@@ -5,9 +5,9 @@ All ADK interaction is encapsulated here. Gateway code never imports from this m
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from google.adk.agents import BaseAgent, LlmAgent, SequentialAgent
+from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.agents.context_cache_config import ContextCacheConfig
 from google.adk.apps import App
 from google.adk.apps.app import EventsCompactionConfig, ResumabilityConfig
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from app.events.publisher import EventPublisher
     from app.router.router import LlmRouter
     from app.skills.library import SkillLibrary
+    from app.workflows.registry import WorkflowRegistry
 
 logger = get_logger("engine")
 _plugin_logger = get_logger("engine.plugins")
@@ -267,26 +268,29 @@ async def build_work_session_agents(
     publisher: EventPublisher,
     *,
     skill_library: SkillLibrary | None = None,
-    memory_service: object | None = None,
     before_model_callback: (
         Callable[[CallbackContext, LlmRequest], LlmResponse | None] | None
     ) = None,
+    workflow_registry: WorkflowRegistry | None = None,
+    workflow_name: str = "auto-code",
 ) -> BaseAgent:
     """Build Director with PM sub_agent for a work session.
 
     Director is root_agent. PM is sub_agent with supervision callbacks.
     DeliverablePipeline is PM's sub_agent for dispatching deliverables.
     Director and PM each get independently resolved skills at build time.
-    """
-    from google.adk.memory import InMemoryMemoryService
 
-    from app.agents.pipeline import create_deliverable_pipeline
+    Pipeline creation is delegated to the WorkflowRegistry via create_pipeline().
+    """
     from app.agents.protocols import NullSkillLibrary
     from app.agents.supervision import (
         create_after_pm_callback,
         create_before_pm_callback,
         create_checkpoint_callback,
     )
+    from app.tools._toolset import GlobalToolset
+    from app.workflows.context import PipelineContext
+    from app.workflows.registry import WorkflowRegistry
 
     # Resolve Director-specific skills at build time
     director_ctx = _resolve_skills_for_agent(skill_library, "director", "director", ctx)
@@ -297,18 +301,29 @@ async def build_work_session_agents(
     pm_ctx = _resolve_skills_for_agent(skill_library, "pm", pm_name, ctx)
     pm = registry.build(pm_name, pm_ctx, definition="pm")
 
-    # Build DeliverablePipeline as PM sub_agent
-    # Pipeline still receives skill_library for runtime matching by SkillLoaderAgent
+    # Build DeliverablePipeline as PM sub_agent via WorkflowRegistry
     resolved_skill_lib = NullSkillLibrary() if skill_library is None else skill_library
-    resolved_memory = InMemoryMemoryService() if memory_service is None else memory_service
 
-    pipeline = create_deliverable_pipeline(
+    wf_registry = workflow_registry
+
+    if wf_registry is None:
+        # Construct a default WorkflowRegistry from the built-in workflows directory
+        from pathlib import Path
+
+        builtin_dir = Path(__file__).resolve().parent.parent / "workflows"
+        wf_registry = WorkflowRegistry(builtin_dir)
+        wf_registry.scan()
+
+    manifest = wf_registry.get_manifest(workflow_name)
+    pipeline_ctx = PipelineContext(
         registry=registry,
-        ctx=ctx,
+        instruction_ctx=ctx,
+        manifest=manifest,
         skill_library=resolved_skill_lib,  # type: ignore[arg-type]
-        memory_service=resolved_memory,  # type: ignore[arg-type]
+        toolset=GlobalToolset(),
         before_model_callback=before_model_callback,
     )
+    pipeline = await wf_registry.create_pipeline(workflow_name, pipeline_ctx)
 
     # Wire pipeline checkpoint callback
     pipeline.after_agent_callback = create_checkpoint_callback(publisher)  # type: ignore[reportAttributeAccessIssue]
@@ -341,28 +356,29 @@ def build_chat_session_agent(
 
 
 # ---------------------------------------------------------------------------
-# Deliverable Pipeline Factory
+# Workflow Pipeline Factory
 # ---------------------------------------------------------------------------
 
 
-def create_deliverable_pipeline_from_context(
+async def create_workflow_pipeline(
+    workflow_name: str,
     worker_ctx: dict[str, object],
     instruction_ctx: InstructionContext,
-) -> SequentialAgent:
-    """Create a DeliverablePipeline from worker context.
+) -> BaseAgent:
+    """Create a workflow pipeline via WorkflowRegistry.
 
-    Uses worker_ctx dependencies: llm_router, toolset, etc.
+    Builds the full infrastructure (registry, callbacks, skill library)
+    from worker_ctx and delegates pipeline creation to the WorkflowRegistry.
     """
     from pathlib import Path
 
-    from google.adk.memory import InMemoryMemoryService
-
     from app.agents._registry import AgentRegistry
     from app.agents.assembler import InstructionAssembler
-    from app.agents.pipeline import create_deliverable_pipeline
-    from app.agents.protocols import NullSkillLibrary, SkillLibraryProtocol
+    from app.agents.protocols import NullSkillLibrary
     from app.config import get_settings
     from app.models.enums import DefinitionScope
+    from app.workflows.context import PipelineContext
+    from app.workflows.registry import WorkflowRegistry
 
     settings = get_settings()
     router: LlmRouter = worker_ctx["llm_router"]  # type: ignore[assignment]
@@ -382,22 +398,42 @@ def create_deliverable_pipeline_from_context(
         toolset=toolset,  # type: ignore[arg-type]
     )
 
-    # Scan agent definition directories
-    registry.scan((Path("app/agents"), DefinitionScope.GLOBAL))
+    # Scan agent definition directories (workflow-scope agents merged when present)
+    global_agents_dir = Path(__file__).resolve().parent.parent / "agents"
+    wf_registry: WorkflowRegistry | None = cast(
+        "WorkflowRegistry | None", worker_ctx.get("workflow_registry")
+    )
+
+    scan_dirs: list[tuple[Path, DefinitionScope]] = [(global_agents_dir, DefinitionScope.GLOBAL)]
+    if wf_registry is not None:
+        entry = wf_registry.get(workflow_name)
+        wf_agents_dir = entry.directory / "agents"
+        if wf_agents_dir.is_dir():
+            scan_dirs.append((wf_agents_dir, DefinitionScope.WORKFLOW))
+    registry.scan(*scan_dirs)
 
     # Create callbacks
     callbacks = create_pipeline_callbacks(router, float(settings.context_budget_threshold))
 
     # Use real SkillLibrary from worker context when available
     raw_skill_lib = worker_ctx.get("skill_library")
-    skill_lib: SkillLibraryProtocol = (  # type: ignore[assignment]
-        raw_skill_lib if raw_skill_lib is not None else NullSkillLibrary()
-    )
+    skill_lib = raw_skill_lib if raw_skill_lib is not None else NullSkillLibrary()
 
-    return create_deliverable_pipeline(
+    # Build WorkflowRegistry and create pipeline
+    if wf_registry is None:
+        builtin_dir = Path(__file__).resolve().parent.parent / "workflows"
+        wf_registry = WorkflowRegistry(builtin_dir)
+        wf_registry.scan()
+
+    manifest = wf_registry.get_manifest(workflow_name)
+
+    pipeline_ctx = PipelineContext(
         registry=registry,
-        ctx=instruction_ctx,
-        skill_library=skill_lib,
-        memory_service=InMemoryMemoryService(),
+        instruction_ctx=instruction_ctx,
+        manifest=manifest,
+        skill_library=skill_lib,  # type: ignore[arg-type]
+        toolset=toolset,  # type: ignore[arg-type]
         before_model_callback=callbacks,
     )
+
+    return await wf_registry.create_pipeline(workflow_name, pipeline_ctx)

@@ -77,7 +77,7 @@ class TestScan:
         registry = WorkflowRegistry(tmp_path)
         registry.scan()
         entry = registry.get("path-test")
-        assert entry.path == wf_dir
+        assert entry.directory == wf_dir
 
 
 # ---------------------------------------------------------------------------

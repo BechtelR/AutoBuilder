@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+from collections import deque
 from collections.abc import Callable
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from app.models.constants import STAGE_CURRENT
+from app.models.constants import DELIVERABLE_STATUSES_KEY, PM_PENDING_ESCALATIONS_KEY, STAGE_CURRENT
 from app.models.enums import (
     CompletionCondition,
     DeliverableStatus,
@@ -25,6 +26,9 @@ from app.workflows.manifest import (
     WorkflowManifest,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -39,7 +43,22 @@ _ValidatorFunc = Callable[[dict[str, object]], ValidatorResult]
 
 
 def lint_check(state: dict[str, object]) -> ValidatorResult:
-    """Check lint results from state. Passes if lint_passed is True."""
+    """Check lint results from state.
+
+    Primary key: ``lint_results`` (structured dict with ``passed`` field).
+    Fallback key: ``lint_passed`` (boolean written by LinterAgent alongside lint_results).
+    """
+    lint_results_raw = state.get("lint_results")
+    if isinstance(lint_results_raw, dict) and "passed" in lint_results_raw:
+        lint_results = cast("dict[str, object]", lint_results_raw)
+        passed = lint_results["passed"] is True
+        return ValidatorResult(
+            validator_name="lint_check",
+            passed=passed,
+            evidence={"lint_results": lint_results, "lint_passed": state.get("lint_passed")},
+            message="" if passed else "Lint check failed",
+        )
+    # Fallback: read boolean key written by LinterAgent
     lint_passed = state.get("lint_passed")
     if lint_passed is None:
         return ValidatorResult(
@@ -50,13 +69,28 @@ def lint_check(state: dict[str, object]) -> ValidatorResult:
     return ValidatorResult(
         validator_name="lint_check",
         passed=bool(lint_passed),
-        evidence={"lint_passed": lint_passed, "lint_results": state.get("lint_results", {})},
+        evidence={"lint_passed": lint_passed},
         message="" if lint_passed else "Lint check failed",
     )
 
 
 def test_suite(state: dict[str, object]) -> ValidatorResult:
-    """Check test results from state. Passes if tests_passed is True."""
+    """Check test results from state.
+
+    Primary key: ``test_results`` (structured dict with ``passed`` field).
+    Fallback key: ``tests_passed`` (boolean written by TestRunnerAgent alongside test_results).
+    """
+    test_results_raw = state.get("test_results")
+    if isinstance(test_results_raw, dict) and "passed" in test_results_raw:
+        test_results = cast("dict[str, object]", test_results_raw)
+        passed = test_results["passed"] is True
+        return ValidatorResult(
+            validator_name="test_suite",
+            passed=passed,
+            evidence={"test_results": test_results, "tests_passed": state.get("tests_passed")},
+            message="" if passed else "Test suite failed",
+        )
+    # Fallback: read boolean key written by TestRunnerAgent
     tests_passed = state.get("tests_passed")
     if tests_passed is None:
         return ValidatorResult(
@@ -67,10 +101,7 @@ def test_suite(state: dict[str, object]) -> ValidatorResult:
     return ValidatorResult(
         validator_name="test_suite",
         passed=bool(tests_passed),
-        evidence={
-            "tests_passed": tests_passed,
-            "test_results": state.get("test_results", {}),
-        },
+        evidence={"tests_passed": tests_passed},
         message="" if tests_passed else "Test suite failed",
     )
 
@@ -118,23 +149,138 @@ def code_review(state: dict[str, object]) -> ValidatorResult:
             passed=False,
             message="No review result found in state",
         )
+    evidence: dict[str, object] = {"review_passed": review_passed}
+    # Include review cycle count and reviewer assessment when available
+    review_iterations = state.get("review_iterations")
+    if review_iterations is not None:
+        evidence["review_iterations"] = review_iterations
+    review_result = state.get("review_result")
+    if review_result is not None:
+        evidence["review_result"] = review_result
     return ValidatorResult(
         validator_name="code_review",
         passed=bool(review_passed),
-        evidence={"review_passed": review_passed},
+        evidence=evidence,
         message="" if review_passed else "Code review failed",
     )
 
 
+def integration_tests(state: dict[str, object]) -> ValidatorResult:
+    """Check integration test results. Passes if integration_tests_passed is True."""
+    passed = state.get("integration_tests_passed")
+    if passed is None:
+        return ValidatorResult(
+            validator_name="integration_tests",
+            passed=False,
+            message="No integration test results found in state",
+        )
+    return ValidatorResult(
+        validator_name="integration_tests",
+        passed=bool(passed),
+        evidence={
+            "integration_tests_passed": passed,
+            "integration_test_results": state.get("integration_test_results", {}),
+        },
+        message="" if passed else "Integration tests failed",
+    )
+
+
 def dependency_validation(state: dict[str, object]) -> ValidatorResult:
-    """Check dependency graph for validity. Passes if dependency_order exists."""
+    """Check dependency graph for acyclicity and reference validity.
+
+    Reads ``dependency_graph`` (dict mapping deliverable → list of dependencies)
+    and ``dependency_order`` (topological sort result) from state.
+    Passes if graph is acyclic and all referenced dependencies exist.
+    """
+    graph_raw = state.get("dependency_graph")
     order = state.get("dependency_order")
-    if order is None:
+
+    # If only order exists (legacy), accept if it's a valid list
+    if graph_raw is None and order is None:
         return ValidatorResult(
             validator_name="dependency_validation",
             passed=False,
-            message="No dependency order found in state",
+            message="No dependency graph or order found in state",
         )
+
+    # Validate graph structure if present
+    if graph_raw is not None:
+        if not isinstance(graph_raw, dict):
+            return ValidatorResult(
+                validator_name="dependency_validation",
+                passed=False,
+                evidence={"raw": str(graph_raw)},
+                message="Dependency graph is not a dict",
+            )
+        graph: dict[str, object] = cast("dict[str, object]", graph_raw)
+        all_nodes = set(graph.keys())
+
+        def _as_str_list(val: object) -> list[str] | None:
+            """Return val as list[str] if it is one, else None."""
+            if not isinstance(val, list):
+                return None
+            raw: list[object] = cast("list[object]", val)
+            return [item for item in raw if isinstance(item, str)]
+
+        # Check all referenced dependencies exist as nodes
+        invalid_refs: list[str] = []
+        for node, deps_raw in graph.items():
+            deps = _as_str_list(deps_raw)
+            if deps is None:
+                continue
+            for dep in deps:
+                if dep not in all_nodes:
+                    invalid_refs.append(f"{node} -> {dep}")
+
+        # Cycle detection via topological sort (Kahn's algorithm)
+        in_degree: dict[str, int] = {n: 0 for n in all_nodes}
+        for deps_raw in graph.values():
+            deps = _as_str_list(deps_raw)
+            if deps is None:
+                continue
+            for dep in deps:
+                if dep in in_degree:
+                    in_degree[dep] += 1
+
+        queue = deque(n for n, d in in_degree.items() if d == 0)
+        sorted_nodes: list[str] = []
+        while queue:
+            node = queue.popleft()
+            sorted_nodes.append(node)
+            node_deps = _as_str_list(graph.get(node))
+            if node_deps is None:
+                continue
+            for dep in node_deps:
+                if dep in in_degree:
+                    in_degree[dep] -= 1
+                    if in_degree[dep] == 0:
+                        queue.append(dep)
+
+        has_cycle = len(sorted_nodes) != len(all_nodes)
+        failures: list[str] = []
+        if has_cycle:
+            cycle_nodes = [n for n in all_nodes if n not in sorted_nodes]
+            failures.append(f"Cycle detected involving: {', '.join(cycle_nodes)}")
+        if invalid_refs:
+            failures.append(f"Invalid references: {', '.join(invalid_refs)}")
+
+        graph_summary: dict[str, list[str]] = {
+            k: cast("list[str]", v) for k, v in graph.items() if isinstance(v, list)
+        }
+        return ValidatorResult(
+            validator_name="dependency_validation",
+            passed=len(failures) == 0,
+            evidence={
+                "node_count": len(all_nodes),
+                "has_cycle": has_cycle,
+                "invalid_references": invalid_refs,
+                "topological_order": sorted_nodes,
+                "dependency_graph_summary": graph_summary,
+            },
+            message="; ".join(failures) if failures else "",
+        )
+
+    # Fallback: only dependency_order available (no graph to validate)
     if not isinstance(order, list):
         return ValidatorResult(
             validator_name="dependency_validation",
@@ -142,16 +288,18 @@ def dependency_validation(state: dict[str, object]) -> ValidatorResult:
             evidence={"raw": str(order)},
             message="Dependency order is not a list",
         )
+    order_raw: list[object] = cast("list[object]", order)
+    order_list: list[str] = [item for item in order_raw if isinstance(item, str)]
     return ValidatorResult(
         validator_name="dependency_validation",
         passed=True,
-        evidence={"dependency_order": order},
+        evidence={"dependency_order": order_list, "node_count": len(order_list)},
     )
 
 
 def deliverable_status_check(state: dict[str, object]) -> ValidatorResult:
     """Check that all deliverables are at required status."""
-    statuses = state.get("deliverable_statuses")
+    statuses = state.get(DELIVERABLE_STATUSES_KEY)
     if statuses is None:
         return ValidatorResult(
             validator_name="deliverable_status_check",
@@ -168,10 +316,18 @@ def deliverable_status_check(state: dict[str, object]) -> ValidatorResult:
     completed = DeliverableStatus.COMPLETED
     all_done = all(v == completed for v in sd.values())
     incomplete = [k for k, v in sd.items() if v != completed]
+    # Per-deliverable status map as required by spec
+    per_deliverable: dict[str, str] = {
+        k: str(v) if not isinstance(v, str) else v for k, v in sd.items()
+    }
     return ValidatorResult(
         validator_name="deliverable_status_check",
         passed=all_done,
-        evidence={"total": len(sd), "incomplete": incomplete},
+        evidence={
+            "total": len(sd),
+            "incomplete": incomplete,
+            "per_deliverable_status": per_deliverable,
+        },
         message="" if all_done else f"{len(incomplete)} deliverables not completed",
     )
 
@@ -184,6 +340,7 @@ _STANDARD_VALIDATORS: dict[str, _ValidatorFunc] = {
     "lint_check": lint_check,
     "test_suite": test_suite,
     "regression_tests": regression_tests,
+    "integration_tests": integration_tests,
     "code_review": code_review,
     "dependency_validation": dependency_validation,
     "deliverable_status_check": deliverable_status_check,
@@ -200,48 +357,55 @@ class ValidatorRunner:
 
     def evaluate(
         self,
-        validator_def: ValidatorDefinition,
+        validator: ValidatorDefinition,
         state: dict[str, object],
+        session: AsyncSession | None = None,
     ) -> ValidatorResult:
-        """Evaluate a single validator against the given state."""
-        if validator_def.type == ValidatorType.DETERMINISTIC:
-            func = _STANDARD_VALIDATORS.get(validator_def.name)
+        """Evaluate a single validator against the given state.
+
+        Args:
+            validator: Validator definition from the manifest.
+            state: Pipeline session state snapshot.
+            session: Optional DB session for validators needing data access.
+        """
+        if validator.type == ValidatorType.DETERMINISTIC:
+            func = _STANDARD_VALIDATORS.get(validator.name)
             if func is not None:
                 return func(state)
             return ValidatorResult(
-                validator_name=validator_def.name,
+                validator_name=validator.name,
                 passed=False,
-                message=f"Unknown validator: {validator_def.name}",
+                message=f"Unknown validator: {validator.name}",
             )
 
-        if validator_def.type == ValidatorType.APPROVAL:
-            approved = state.get(f"approval:{validator_def.name}")
+        if validator.type == ValidatorType.APPROVAL:
+            approved = state.get(f"approval:{validator.name}")
             return ValidatorResult(
-                validator_name=validator_def.name,
+                validator_name=validator.name,
                 passed=bool(approved),
                 evidence={"approved": approved},
                 message="" if approved else "Approval not yet granted",
             )
 
-        if validator_def.type == ValidatorType.LLM:
-            result_key = f"llm_validator:{validator_def.name}"
+        if validator.type == ValidatorType.LLM:
+            result_key = f"llm_validator:{validator.name}"
             result = state.get(result_key)
             if result is None:
                 return ValidatorResult(
-                    validator_name=validator_def.name,
+                    validator_name=validator.name,
                     passed=False,
-                    message=(f"LLM validator '{validator_def.name}' has not produced results"),
+                    message=(f"LLM validator '{validator.name}' has not produced results"),
                 )
             return ValidatorResult(
-                validator_name=validator_def.name,
+                validator_name=validator.name,
                 passed=bool(result),
                 evidence={"llm_result": result},
             )
 
         return ValidatorResult(
-            validator_name=validator_def.name,
+            validator_name=validator.name,
             passed=False,
-            message=f"Unknown validator type: {validator_def.type}",
+            message=f"Unknown validator type: {validator.type}",
         )
 
     def evaluate_batch(
@@ -249,12 +413,13 @@ class ValidatorRunner:
         validators: list[ValidatorDefinition],
         schedule: ValidatorSchedule,
         state: dict[str, object],
+        session: AsyncSession | None = None,
     ) -> list[ValidatorResult]:
         """Evaluate all validators matching the given schedule."""
         results: list[ValidatorResult] = []
         for v in validators:
             if v.schedule == schedule:
-                results.append(self.evaluate(v, state))
+                results.append(self.evaluate(v, state, session=session))
         return results
 
 
@@ -265,7 +430,7 @@ class ValidatorRunner:
 
 def _check_deliverable_statuses(state: dict[str, object]) -> tuple[bool, list[str]]:
     """Check deliverable_statuses state key. Returns (all_done, incomplete_names)."""
-    statuses = state.get("deliverable_statuses")
+    statuses = state.get(DELIVERABLE_STATUSES_KEY)
     if statuses is None:
         return (False, [])
     if not isinstance(statuses, dict):
@@ -323,7 +488,7 @@ def verify_stage_completion(
         CompletionCondition.ALL_VERIFIED,
         CompletionCondition.ALL_DELIVERABLES_PLANNED,
     ):
-        if state.get("deliverable_statuses") is None:
+        if state.get(DELIVERABLE_STATUSES_KEY) is None:
             failures.append("No deliverable statuses found")
         else:
             all_done, incomplete = _check_deliverable_statuses(state)
@@ -354,12 +519,21 @@ def verify_taskgroup_completion(
     failures: list[str] = []
 
     # Check deliverable statuses at taskgroup scope
-    if state.get("deliverable_statuses") is None:
+    if state.get(DELIVERABLE_STATUSES_KEY) is None:
         failures.append("No deliverable statuses found")
     else:
         all_done, incomplete = _check_deliverable_statuses(state)
         if not all_done:
             failures.append(f"{len(incomplete)} deliverables not completed")
+
+    # Check pending escalations (hard gate -- spec requires zero unresolved)
+    pending_escalations = state.get(PM_PENDING_ESCALATIONS_KEY, 0)
+    if isinstance(pending_escalations, int) and pending_escalations > 0:
+        failures.append(f"{pending_escalations} pending escalation(s) unresolved")
+    elif isinstance(pending_escalations, list):
+        esc_list = cast("list[object]", pending_escalations)
+        if len(esc_list) > 0:
+            failures.append(f"{len(esc_list)} pending escalation(s) unresolved")
 
     # Check required validators
     current_stage_name = state.get(STAGE_CURRENT)
@@ -388,16 +562,28 @@ def verify_taskgroup_completion(
 # ---------------------------------------------------------------------------
 
 DEFAULT_VERIFICATION_LAYERS: list[CompletionLayerDef] = [
-    CompletionLayerDef(name="functional", description="Does it work as specified?"),
-    CompletionLayerDef(name="architectural", description="Does implementation match design?"),
-    CompletionLayerDef(name="contract", description="Were all deliverables completed?"),
+    CompletionLayerDef(
+        name="functional",
+        description="Does it work as specified?",
+        evidence_sources=["lint_check", "test_suite", "regression_tests", "integration_tests"],
+    ),
+    CompletionLayerDef(
+        name="architectural",
+        description="Does implementation match design?",
+        evidence_sources=["code_review", "architecture_conformance"],
+    ),
+    CompletionLayerDef(
+        name="contract",
+        description="Were all deliverables completed?",
+        evidence_sources=["deliverable_status_check", "dependency_validation"],
+    ),
 ]
 
 
 def generate_completion_report(
     scope: str,
     manifest: WorkflowManifest,
-    results: list[ValidatorResult],
+    validator_results: list[ValidatorResult],
     additional_sections: list[ReportSection] | None = None,
 ) -> CompletionReport:
     """Generate a completion report from validator results.
@@ -422,7 +608,7 @@ def generate_completion_report(
     for layer_def in layer_defs:
         matching_results: list[ValidatorResult] = []
         for source in layer_def.evidence_sources:
-            for r in results:
+            for r in validator_results:
                 if r.validator_name == source:
                     matching_results.append(r)
 

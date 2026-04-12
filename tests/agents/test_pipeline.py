@@ -1,7 +1,14 @@
-"""Tests for DeliverablePipeline factory."""
+"""Tests for auto-code DeliverablePipeline factory (migrated from app.agents.pipeline).
+
+The pipeline creation logic now lives in app/workflows/auto-code/pipeline.py
+and is invoked via WorkflowRegistry.create_pipeline() or directly.
+"""
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
@@ -10,16 +17,57 @@ from google.adk.agents import BaseAgent, SequentialAgent
 
 from app.agents.assembler import InstructionContext
 from app.agents.custom.review_cycle import ReviewCycleAgent
-from app.agents.pipeline import create_deliverable_pipeline
 from app.agents.protocols import NullSkillLibrary
+from app.models.enums import PipelineType
+from app.workflows.context import PipelineContext
+from app.workflows.manifest import WorkflowManifest
 
 if TYPE_CHECKING:
+    import types
     from collections.abc import AsyncGenerator
 
     from google.adk.agents.invocation_context import InvocationContext
     from google.adk.events import Event
 
     from app.agents._registry import AgentRegistry
+
+# ---------------------------------------------------------------------------
+# Load the auto-code pipeline module (directory name has a hyphen)
+# ---------------------------------------------------------------------------
+
+_AUTO_CODE_PIPELINE_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "app"
+    / "workflows"
+    / "auto-code"
+    / "pipeline.py"
+)
+
+
+def _load_auto_code_pipeline() -> types.ModuleType:
+    """Dynamically load the auto-code pipeline module."""
+    module_name = "_test_auto_code_pipeline"
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    spec = importlib.util.spec_from_file_location(module_name, _AUTO_CODE_PIPELINE_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+async def _create_pipeline(ctx: PipelineContext) -> BaseAgent:
+    """Call create_pipeline from the auto-code pipeline module."""
+    mod = _load_auto_code_pipeline()
+    factory = mod.create_pipeline  # type: ignore[attr-defined]
+    result: BaseAgent = await factory(ctx)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 
 class _StubAgent(BaseAgent):
@@ -52,78 +100,64 @@ def _make_mock_registry() -> AgentRegistry:
     return registry  # type: ignore[return-value]
 
 
+def _make_pipeline_context(
+    registry: AgentRegistry | None = None,
+    manifest: WorkflowManifest | None = None,
+) -> PipelineContext:
+    """Create a PipelineContext with sensible defaults for testing."""
+    if registry is None:
+        registry = _make_mock_registry()
+    if manifest is None:
+        manifest = WorkflowManifest(
+            name="auto-code",
+            description="test auto-code workflow",
+            pipeline_type=PipelineType.SEQUENTIAL,
+        )
+    return PipelineContext(
+        registry=registry,
+        instruction_ctx=InstructionContext(agent_name="pipeline"),
+        manifest=manifest,
+        skill_library=NullSkillLibrary(),  # type: ignore[arg-type]
+        toolset=MagicMock(),
+    )
+
+
 @pytest.fixture
 def mock_registry() -> AgentRegistry:
     return _make_mock_registry()
 
 
 @pytest.fixture
-def instruction_ctx() -> InstructionContext:
-    return InstructionContext(agent_name="pipeline")
+def pipeline_ctx(mock_registry: AgentRegistry) -> PipelineContext:
+    return _make_pipeline_context(mock_registry)
 
 
-@pytest.fixture
-def mock_memory_service() -> MagicMock:
-    return MagicMock()
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
 
 
-class TestCreateDeliverablePipeline:
-    def test_returns_sequential_agent(
-        self,
-        mock_registry: AgentRegistry,
-        instruction_ctx: InstructionContext,
-        mock_memory_service: MagicMock,
-    ) -> None:
-        pipeline = create_deliverable_pipeline(
-            mock_registry,
-            instruction_ctx,
-            skill_library=NullSkillLibrary(),
-            memory_service=mock_memory_service,
-        )
+class TestCreateAutoCodePipeline:
+    @pytest.mark.asyncio
+    async def test_returns_sequential_agent(self, pipeline_ctx: PipelineContext) -> None:
+        pipeline = await _create_pipeline(pipeline_ctx)
         assert isinstance(pipeline, SequentialAgent)
 
-    def test_pipeline_name(
-        self,
-        mock_registry: AgentRegistry,
-        instruction_ctx: InstructionContext,
-        mock_memory_service: MagicMock,
-    ) -> None:
-        pipeline = create_deliverable_pipeline(
-            mock_registry,
-            instruction_ctx,
-            skill_library=NullSkillLibrary(),
-            memory_service=mock_memory_service,
-        )
+    @pytest.mark.asyncio
+    async def test_pipeline_name(self, pipeline_ctx: PipelineContext) -> None:
+        pipeline = await _create_pipeline(pipeline_ctx)
         assert pipeline.name == "deliverable_pipeline"
 
-    def test_pipeline_sub_agent_count(
-        self,
-        mock_registry: AgentRegistry,
-        instruction_ctx: InstructionContext,
-        mock_memory_service: MagicMock,
-    ) -> None:
+    @pytest.mark.asyncio
+    async def test_pipeline_sub_agent_count(self, pipeline_ctx: PipelineContext) -> None:
         """Pipeline has 9 sub_agents: 8 agents + review_cycle."""
-        pipeline = create_deliverable_pipeline(
-            mock_registry,
-            instruction_ctx,
-            skill_library=NullSkillLibrary(),
-            memory_service=mock_memory_service,
-        )
+        pipeline = await _create_pipeline(pipeline_ctx)
         assert len(pipeline.sub_agents) == 9
 
-    def test_pipeline_agent_order(
-        self,
-        mock_registry: AgentRegistry,
-        instruction_ctx: InstructionContext,
-        mock_memory_service: MagicMock,
-    ) -> None:
+    @pytest.mark.asyncio
+    async def test_pipeline_agent_order(self, pipeline_ctx: PipelineContext) -> None:
         """Sub_agents in correct order."""
-        pipeline = create_deliverable_pipeline(
-            mock_registry,
-            instruction_ctx,
-            skill_library=NullSkillLibrary(),
-            memory_service=mock_memory_service,
-        )
+        pipeline = await _create_pipeline(pipeline_ctx)
         names = [a.name for a in pipeline.sub_agents]
         expected = [
             "skill_loader",
@@ -138,67 +172,37 @@ class TestCreateDeliverablePipeline:
         ]
         assert names == expected
 
-    def test_review_cycle_is_loop_agent(
-        self,
-        mock_registry: AgentRegistry,
-        instruction_ctx: InstructionContext,
-        mock_memory_service: MagicMock,
-    ) -> None:
-        pipeline = create_deliverable_pipeline(
-            mock_registry,
-            instruction_ctx,
-            skill_library=NullSkillLibrary(),
-            memory_service=mock_memory_service,
-        )
+    @pytest.mark.asyncio
+    async def test_review_cycle_is_loop_agent(self, pipeline_ctx: PipelineContext) -> None:
+        pipeline = await _create_pipeline(pipeline_ctx)
         review_cycle = pipeline.sub_agents[-1]
         assert isinstance(review_cycle, ReviewCycleAgent)
 
-    def test_review_cycle_max_iterations(
-        self,
-        mock_registry: AgentRegistry,
-        instruction_ctx: InstructionContext,
-        mock_memory_service: MagicMock,
-    ) -> None:
-        pipeline = create_deliverable_pipeline(
-            mock_registry,
-            instruction_ctx,
-            skill_library=NullSkillLibrary(),
-            memory_service=mock_memory_service,
-        )
+    @pytest.mark.asyncio
+    async def test_review_cycle_max_iterations(self, pipeline_ctx: PipelineContext) -> None:
+        pipeline = await _create_pipeline(pipeline_ctx)
         review_cycle = pipeline.sub_agents[-1]
         assert isinstance(review_cycle, ReviewCycleAgent)
         assert review_cycle.max_iterations == 3
 
-    def test_review_cycle_sub_agents(
-        self,
-        mock_registry: AgentRegistry,
-        instruction_ctx: InstructionContext,
-        mock_memory_service: MagicMock,
-    ) -> None:
-        pipeline = create_deliverable_pipeline(
-            mock_registry,
-            instruction_ctx,
-            skill_library=NullSkillLibrary(),
-            memory_service=mock_memory_service,
-        )
+    @pytest.mark.asyncio
+    async def test_review_cycle_sub_agents(self, pipeline_ctx: PipelineContext) -> None:
+        pipeline = await _create_pipeline(pipeline_ctx)
         review_cycle = pipeline.sub_agents[-1]
         assert isinstance(review_cycle, ReviewCycleAgent)
         review_names = [a.name for a in review_cycle.sub_agents]
         assert review_names == ["reviewer", "fixer", "review_linter", "review_tester"]
 
-    def test_pipeline_with_custom_max_review(
-        self,
-        mock_registry: AgentRegistry,
-        instruction_ctx: InstructionContext,
-        mock_memory_service: MagicMock,
-    ) -> None:
-        pipeline = create_deliverable_pipeline(
-            mock_registry,
-            instruction_ctx,
-            skill_library=NullSkillLibrary(),
-            memory_service=mock_memory_service,
-            max_review_iterations=5,
+    @pytest.mark.asyncio
+    async def test_pipeline_with_custom_max_review(self, mock_registry: AgentRegistry) -> None:
+        manifest = WorkflowManifest(
+            name="auto-code",
+            description="test auto-code workflow",
+            pipeline_type=PipelineType.SEQUENTIAL,
+            config={"max_review_cycles": 5},
         )
+        ctx = _make_pipeline_context(mock_registry, manifest)
+        pipeline = await _create_pipeline(ctx)
         review_cycle = pipeline.sub_agents[-1]
         assert isinstance(review_cycle, ReviewCycleAgent)
         assert review_cycle.max_iterations == 5

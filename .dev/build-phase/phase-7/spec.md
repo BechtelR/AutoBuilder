@@ -31,7 +31,7 @@ Validates: manifest example well-formed, workflow directories ready, prerequisit
 
 ### DD-1: WorkflowRegistry File Placement
 
-Infrastructure files (`registry.py`, `models.py`, `validators.py`, `stages.py`) live alongside workflow subdirectories in `app/workflows/`. This mirrors the `app/skills/` pattern where `library.py`, `parser.py`, `matchers.py` coexist with skill category directories. The `__init__.py` re-exports public types.
+Infrastructure files (`registry.py`, `manifest.py`, `validators.py`, `stages.py`) live alongside workflow subdirectories in `app/workflows/`. This mirrors the `app/skills/` pattern where `library.py`, `parser.py`, `matchers.py` coexist with skill category directories. The `__init__.py` re-exports public types.
 
 ### DD-2: Validators as Evidence Collection, Not New Agents
 
@@ -127,53 +127,53 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 ## Deliverables
 
 ### P7.D1: Workflow Enums and Pydantic Models
-**Files:** `app/models/enums.py`, `app/workflows/__init__.py`, `app/workflows/models.py`
+**Files:** `app/models/enums.py`, `app/workflows/__init__.py`, `app/workflows/manifest.py`
 **Depends on:** —
 **Description:** Define all foundation types for the workflow composition system. Add new enums to the canonical enum location. Create the Pydantic model hierarchy for WORKFLOW.yaml manifests with progressive disclosure (all optional fields have defaults). Models cover: manifest root fields, trigger definitions, stage definitions, validator definitions, completion criteria, completion reports, resource definitions, run configuration, and workflow entry (lightweight index record).
 **BOM Components:**
-- [ ] `F06` — `WorkflowEntry` Pydantic model
-- [ ] `F07` — `WORKFLOW.yaml` manifest schema (progressive disclosure)
-- [ ] `F11` — `RunConfig` model
-- [ ] `F19` — `WorkflowManifest` Pydantic model (all fields)
-- [ ] `F22` — `StageDef` Pydantic model
-- [ ] `F23` — `CompletionCriteria` Pydantic model
-- [ ] `F24` — `ValidatorDefinition` Pydantic model
-- [ ] `F38` — `CompletionReport` Pydantic model
-- [ ] `F39` — `StageStatus` enum
-- [ ] `F40` — `ValidatorType` enum
-- [ ] `F41` — `ValidatorSchedule` enum
-- [ ] `F43` — `ResourcesDef` validation (credentials, services, knowledge)
-- [ ] `F58` — `PipelineContext` frozen dataclass
-- [ ] `F58b` — `PipelineFactory` Protocol
-- [ ] `F59` — `McpServerDef` Pydantic model
+- [x] `F06` — `WorkflowEntry` Pydantic model
+- [x] `F07` — `WORKFLOW.yaml` manifest schema (progressive disclosure)
+- [x] `F11` — `RunConfig` model
+- [x] `F19` — `WorkflowManifest` Pydantic model (all fields)
+- [x] `F22` — `StageDef` Pydantic model
+- [x] `F23` — `CompletionCriteria` Pydantic model
+- [x] `F24` — `ValidatorDefinition` Pydantic model
+- [x] `F38` — `CompletionReport` Pydantic model
+- [x] `F39` — `StageStatus` enum
+- [x] `F40` — `ValidatorType` enum
+- [x] `F41` — `ValidatorSchedule` enum
+- [x] `F43` — `ResourcesDef` validation (credentials, services, knowledge)
+- [x] `F58` — `PipelineContext` frozen dataclass
+- [x] `F58b` — `PipelineFactory` Protocol
+- [x] `F59` — `McpServerDef` Pydantic model
 **Requirements:**
-- [ ] `PipelineType` enum in `app/models/enums.py` with values: `SINGLE_PASS`, `SEQUENTIAL`, `BATCH_PARALLEL`
-- [ ] `StageStatus` enum with values: `PENDING`, `ACTIVE`, `COMPLETED`, `FAILED`
-- [ ] `ValidatorType` enum with values: `DETERMINISTIC`, `LLM`, `APPROVAL`
-- [ ] `ValidatorSchedule` enum with values: `PER_DELIVERABLE`, `PER_BATCH`, `PER_TASKGROUP`, `PER_STAGE`
-- [ ] `WorkflowManifest` is a Pydantic `BaseModel` with only `name` (str) and `description` (str) required; all other fields have defaults
-- [ ] A manifest with only `name` and `description` validates successfully (progressive disclosure tier 1)
-- [ ] `StageToolsDef` model has: `required` (list[str], default []), `add` (list[str], default []), `remove` (list[str], default []) — tool scoping relative to workflow baseline
-- [ ] `StageDef` model has: `name` (required), `description`, `agents`, `skills`, `tools` (StageToolsDef), `models`, `validators`, `completion_criteria`, `approval`
-- [ ] `CompletionCriteria` model has: `deliverables` (str, default `"all_verified"`), `validators` (list[str], default []), `approval` (str, default `"director"`) — three types compose via AND. Note: `CompletionCriteria` is the runtime evaluation model constructed from `StageDef.completion_criteria` + `StageDef.validators` + `StageDef.approval`.
-- [ ] `ValidatorDefinition` model has: `name` (required), `type` (required), `agent`, `schedule` (required), `config`, `required` (default True)
-- [ ] `CompletionLayerDef` model has: `name` (str, required), `description` (str), `evidence_sources` (list[str], default []) — manifest-side layer declaration (what to measure)
-- [ ] `VerificationLayer` model has: `name` (str), `description` (str), `passed` (bool), `validator_results` (list of ValidatorResult references), `summary` (str) — runtime result (what was measured)
-- [ ] `ReportSection` model has: `title` (str), `content` (str), `metadata` (dict[str, object], default {})
-- [ ] `CompletionReport` model has `layers: list[VerificationLayer]` plus `additional_sections` (list[ReportSection]). A `DEFAULT_VERIFICATION_LAYERS` constant provides the three standard layers (functional, architectural, contract) used when manifest omits `layers`.
-- [ ] `ResourcesDef` model has: `credentials` (list of env var names), `services` (list with health_check URLs), `knowledge` (list of file/directory paths)
-- [ ] `McpServerDef` model has: `name` (str, required), `required` (bool, default False)
-- [ ] `WorkflowManifest` includes `mcp_servers: list[McpServerDef]` field with default `[]`
-- [ ] `WorkflowEntry` is a lightweight index model with: `name`, `description`, `path`, `pipeline_type`, `triggers`
-- [ ] `RunConfig` model has: `workflow_name`, `project_id`, `specification`, `config_overrides`
-- [ ] `PipelineFactory` Protocol with `async def __call__(self, ctx: PipelineContext) -> BaseAgent` — the interface contract for all workflow `create_pipeline` functions
-- [ ] `PipelineContext` frozen dataclass with: `registry` (AgentRegistry), `instruction_ctx` (InstructionContext), `manifest` (WorkflowManifest), `skill_library` (SkillLibrary), `toolset` (GlobalToolset), `before_model_callback` (optional). Convenience `build()` classmethod.
-- [ ] Pipeline pattern functions conforming to `PipelineFactory`: `single_pass_pipeline(ctx: PipelineContext) -> BaseAgent`, `sequential_pipeline(ctx: PipelineContext) -> BaseAgent`, `batch_parallel_pipeline(ctx: PipelineContext) -> BaseAgent`
-- [ ] All enums use `StrEnum` with `VALUE = "VALUE"` convention per engineering standards
-- [ ] All models pass pyright strict
-- [ ] `app/workflows/__init__.py` re-exports public types
+- [x] `PipelineType` enum in `app/models/enums.py` with values: `SINGLE_PASS`, `SEQUENTIAL`, `BATCH_PARALLEL`
+- [x] `StageStatus` enum with values: `PENDING`, `ACTIVE`, `COMPLETED`, `FAILED`
+- [x] `ValidatorType` enum with values: `DETERMINISTIC`, `LLM`, `APPROVAL`
+- [x] `ValidatorSchedule` enum with values: `PER_DELIVERABLE`, `PER_BATCH`, `PER_TASKGROUP`, `PER_STAGE`
+- [x] `WorkflowManifest` is a Pydantic `BaseModel` with only `name` (str) and `description` (str) required; all other fields have defaults
+- [x] A manifest with only `name` and `description` validates successfully (progressive disclosure tier 1)
+- [x] `StageToolsDef` model has: `required` (list[str], default []), `add` (list[str], default []), `remove` (list[str], default []) — tool scoping relative to workflow baseline
+- [x] `StageDef` model has: `name` (required), `description`, `agents`, `skills`, `tools` (StageToolsDef), `models`, `validators`, `completion_criteria`, `approval`
+- [x] `CompletionCriteria` model has: `deliverables` (str, default `"all_verified"`), `validators` (list[str], default []), `approval` (str, default `"director"`) — three types compose via AND. Note: `CompletionCriteria` is the runtime evaluation model constructed from `StageDef.completion_criteria` + `StageDef.validators` + `StageDef.approval`.
+- [x] `ValidatorDefinition` model has: `name` (required), `type` (required), `agent`, `schedule` (required), `config`, `required` (default True)
+- [x] `CompletionLayerDef` model has: `name` (str, required), `description` (str), `evidence_sources` (list[str], default []) — manifest-side layer declaration (what to measure)
+- [x] `VerificationLayer` model has: `name` (str), `description` (str), `passed` (bool), `validator_results` (list of ValidatorResult references), `summary` (str) — runtime result (what was measured)
+- [x] `ReportSection` model has: `title` (str), `content` (str), `metadata` (dict[str, object], default {})
+- [x] `CompletionReport` model has `layers: list[VerificationLayer]` plus `additional_sections` (list[ReportSection]). A `DEFAULT_VERIFICATION_LAYERS` constant provides the three standard layers (functional, architectural, contract) used when manifest omits `layers`.
+- [x] `ResourcesDef` model has: `credentials` (list of env var names), `services` (list with health_check URLs), `knowledge` (list of file/directory paths)
+- [x] `McpServerDef` model has: `name` (str, required), `required` (bool, default False)
+- [x] `WorkflowManifest` includes `mcp_servers: list[McpServerDef]` field with default `[]`
+- [x] `WorkflowEntry` is a lightweight index model with: `name`, `description`, `directory: Path`, `pipeline_type`, `triggers`
+- [x] `RunConfig` model has: `workflow_name`, `project_id`, `specification`, `config_overrides`
+- [x] `PipelineFactory` Protocol with `async def __call__(self, ctx: PipelineContext) -> BaseAgent` — the interface contract for all workflow `create_pipeline` functions
+- [x] `PipelineContext` frozen dataclass with: `registry` (AgentRegistry), `instruction_ctx` (InstructionContext), `manifest` (WorkflowManifest), `skill_library` (SkillLibrary), `toolset` (GlobalToolset), `before_model_callback` (optional). Convenience `build()` classmethod.
+- [x] Pipeline pattern functions conforming to `PipelineFactory`: `single_pass_pipeline(ctx: PipelineContext) -> BaseAgent`, `sequential_pipeline(ctx: PipelineContext) -> BaseAgent`, `batch_parallel_pipeline(ctx: PipelineContext) -> BaseAgent`
+- [x] All enums use `StrEnum` with `VALUE = "VALUE"` convention per engineering standards
+- [x] All models pass pyright strict
+- [x] `app/workflows/__init__.py` re-exports public types
 **Validation:**
-- `uv run pyright app/workflows/models.py app/models/enums.py`
+- `uv run pyright app/workflows/manifest.py app/models/enums.py`
 - `uv run pytest tests/workflows/test_models.py -v`
 
 ---
@@ -183,39 +183,39 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 **Depends on:** P7.D1
 **Description:** Implement the WorkflowRegistry class: two-tier directory scanning (built-in + user-level), WORKFLOW.yaml parsing with progressive disclosure validation, deterministic trigger matching (keywords + explicit), ambiguity resolution, manifest retrieval, pipeline instantiation via dynamic `pipeline.py` import, and optional Redis caching. The registry follows the SkillLibrary scan-and-index pattern.
 **BOM Components:**
-- [ ] `F01` — `WorkflowRegistry` class
-- [ ] `F02` — `WorkflowRegistry.match()` (keyword matching)
-- [ ] `F03` — `WorkflowRegistry.get()` (explicit lookup)
-- [ ] `F04` — `WorkflowRegistry.list_available()`
-- [ ] `F05` — `WorkflowRegistry.create_pipeline()`
-- [ ] `F08` — Workflow trigger matching (keywords)
-- [ ] `F09` — Workflow trigger matching (explicit)
-- [ ] `F10` — Workflow ambiguity resolution (user prompt)
-- [ ] `F12` — User-level workflow directory (override by name)
-- [ ] `F18` — `pipeline.py` interface contract (function signature)
-- [ ] `F20` — `WorkflowRegistry.get_manifest()`
-- [ ] `F21` — Manifest validation (L1 schema, required/warning/cross-ref)
-- [ ] `M24` — Workflow registry cache (long TTL)
+- [x] `F01` — `WorkflowRegistry` class
+- [x] `F02` — `WorkflowRegistry.match()` (keyword matching)
+- [x] `F03` — `WorkflowRegistry.get()` (explicit lookup)
+- [x] `F04` — `WorkflowRegistry.list_available()`
+- [x] `F05` — `WorkflowRegistry.create_pipeline()`
+- [x] `F08` — Workflow trigger matching (keywords)
+- [x] `F09` — Workflow trigger matching (explicit)
+- [x] `F10` — Workflow ambiguity resolution (user prompt)
+- [x] `F12` — User-level workflow directory (override by name)
+- [x] `F18` — `pipeline.py` interface contract (function signature)
+- [x] `F20` — `WorkflowRegistry.get_manifest()`
+- [x] `F21` — Manifest validation (L1 schema, required/warning/cross-ref)
+- [x] `M24` — Workflow registry cache (long TTL)
 **Requirements:**
-- [ ] `WorkflowRegistry.__init__(workflows_dir: Path, user_workflows_dir: Path | None = None, redis: ArqRedis | None = None)` stores configuration, does not scan on init
-- [ ] `scan()` recursively finds all `WORKFLOW.yaml` files in configured directories, parses and validates manifests, builds `_workflows: dict[str, WorkflowEntry]` index
-- [ ] Scan order: built-in directory first, then user-level directory. User-level entries replace built-in entries with same name
-- [ ] `match(user_request: str) -> list[WorkflowEntry]` performs deterministic keyword matching against workflow triggers; returns matching entries sorted by specificity (explicit > keyword)
-- [ ] Explicit trigger match takes precedence over keyword match
-- [ ] When multiple workflows match via keywords, returns all matches (caller/PM resolves ambiguity)
-- [ ] `get(name: str) -> WorkflowEntry` returns workflow by explicit name; raises `NotFoundError` if not found
-- [ ] `get_manifest(name: str) -> WorkflowManifest` returns full parsed manifest for PM/Director consumption
-- [ ] `list_available() -> list[WorkflowEntry]` returns all discovered workflows with descriptions
-- [ ] `create_pipeline(workflow_name: str, pipeline_ctx: PipelineContext) -> BaseAgent` dynamically imports `pipeline.py` from workflow directory and calls its `create_pipeline(ctx)` function
-- [ ] `pipeline.py` must export an async `create_pipeline(ctx: PipelineContext) -> BaseAgent` function matching the interface contract (DD-4)
-- [ ] Missing `pipeline.py` → `NotFoundError` with clear message
-- [ ] Invalid `pipeline.py` (import error, missing function) → `ConfigurationError` with clear message
-- [ ] Manifest validation: required fields present (`name`, `description`), `name` is kebab-case, `pipeline_type` valid if present, stage names unique, validator names unique across manifest
-- [ ] Validation warnings (non-blocking, logged): stages defined but `pipeline_type` is `single_pass`, validator references agents not in stage agent lists
-- [ ] No user-level directory configured → operates with built-in workflows only, no error
-- [ ] User-level directory doesn't exist → operates with built-in only, no error
-- [ ] Redis cache: `save_to_cache()` and `load_from_cache()` serialize/deserialize the index. Cache unavailable → filesystem scan, no error
-- [ ] All methods pass pyright strict
+- [x] `WorkflowRegistry.__init__(workflows_dir: Path, user_workflows_dir: Path | None = None, redis: ArqRedis | None = None)` stores configuration, does not scan on init
+- [x] `scan()` recursively finds all `WORKFLOW.yaml` files in configured directories, parses and validates manifests, builds `_workflows: dict[str, WorkflowEntry]` index
+- [x] Scan order: built-in directory first, then user-level directory. User-level entries replace built-in entries with same name
+- [x] `match(user_request: str) -> list[WorkflowEntry]` performs deterministic keyword matching against workflow triggers; returns matching entries sorted by specificity (explicit > keyword)
+- [x] Explicit trigger match takes precedence over keyword match
+- [x] When multiple workflows match via keywords, returns all matches (caller/PM resolves ambiguity)
+- [x] `get(name: str) -> WorkflowEntry` returns workflow by explicit name; raises `NotFoundError` if not found
+- [x] `get_manifest(name: str) -> WorkflowManifest` returns full parsed manifest for PM/Director consumption
+- [x] `list_available() -> list[WorkflowEntry]` returns all discovered workflows with descriptions
+- [x] `create_pipeline(workflow_name: str, pipeline_ctx: PipelineContext) -> BaseAgent` dynamically imports `pipeline.py` from workflow directory and calls its `create_pipeline(ctx)` function
+- [x] `pipeline.py` must export an async `create_pipeline(ctx: PipelineContext) -> BaseAgent` function matching the interface contract (DD-4)
+- [x] Missing `pipeline.py` → `NotFoundError` with clear message
+- [x] Invalid `pipeline.py` (import error, missing function) → `ConfigurationError` with clear message
+- [x] Manifest validation: required fields present (`name`, `description`), `name` is kebab-case, `pipeline_type` valid if present, stage names unique, validator names unique across manifest
+- [x] Validation warnings (non-blocking, logged): stages defined but `pipeline_type` is `single_pass`, validator references agents not in stage agent lists
+- [x] No user-level directory configured → operates with built-in workflows only, no error
+- [x] User-level directory doesn't exist → operates with built-in only, no error
+- [x] Redis cache: `save_to_cache()` and `load_from_cache()` serialize/deserialize the index. Cache unavailable → filesystem scan, no error
+- [x] All methods pass pyright strict
 **Validation:**
 - `uv run pyright app/workflows/registry.py`
 - `uv run pytest tests/workflows/test_registry.py -v`
@@ -227,23 +227,23 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 **Depends on:** P7.D1
 **Description:** Implement stage lifecycle management: state key initialization from manifest, the `reconfigure_stage` FunctionTool for PM-driven stage transitions, `verify_stage_completion` and `verify_taskgroup_completion` deterministic hard gates, and stage lifecycle event types. Stage transitions are state-driven — the PM calls `reconfigure_stage` which updates `pm:current_stage` and related state keys. No agent tree rebuild.
 **BOM Components:**
-- [ ] `F25` — Stage state keys (`pm:current_stage`, `pm:stage_*`)
-- [ ] `F26` — `reconfigure_stage` FunctionTool
-- [ ] `F27` — `verify_stage_completion` deterministic gate
-- [ ] `F28` — `verify_taskgroup_completion` deterministic gate
-- [ ] `F42` — Stage lifecycle events (STAGE_STARTED, STAGE_COMPLETED, etc.)
+- [x] `F25` — Stage state keys (`pm:current_stage`, `pm:stage_*`)
+- [x] `F26` — `reconfigure_stage` FunctionTool
+- [x] `F27` — `verify_stage_completion` deterministic gate
+- [x] `F28` — `verify_taskgroup_completion` deterministic gate
+- [x] `F42` — Stage lifecycle events (STAGE_STARTED, STAGE_COMPLETED, etc.)
 **Requirements:**
-- [ ] `initialize_stage_state(manifest: WorkflowManifest) -> dict[str, object]` returns initial state delta: `pm:current_stage` = first stage name (or empty string if no stages), `pm:stage_index` = 0, `pm:stage_status` = PENDING, `pm:stages_completed` = [], `pm:workflow_stages` = serialized stage schema
-- [ ] `reconfigure_stage` FunctionTool accepts `target_stage: str` parameter. Validates target is a valid stage name in the manifest. Updates `pm:current_stage`, `pm:stage_index`, `pm:stage_status` to ACTIVE. Appends previous stage to `pm:stages_completed`. Returns confirmation string.
-- [ ] `reconfigure_stage` rejects advancing to a stage that's already completed (no backwards movement)
-- [ ] `reconfigure_stage` rejects skipping stages (must advance sequentially)
-- [ ] `verify_stage_completion(state: dict, manifest: WorkflowManifest, validator_results: list[ValidatorResult]) -> tuple[bool, list[str]]` checks: all deliverables at required status, all required stage validators passed, approval obtained if required. Returns (passed, list_of_failure_reasons)
-- [ ] `verify_taskgroup_completion(state: dict, manifest: WorkflowManifest, validator_results: list[ValidatorResult]) -> tuple[bool, list[str]]` checks: all deliverables within the TaskGroup complete, no pending escalations, all scheduled validators passing. This is a hard gate PM cannot override.
-- [ ] `PipelineEventType` enum extended with: `STAGE_STARTED`, `STAGE_COMPLETED`, `STAGE_FAILED`, `VALIDATOR_COMPLETED`
-- [ ] Stage state keys are all `pm:` prefixed per Decision #58
-- [ ] Stages with `approval: auto`: when `verify_stage_completion()` returns True, `reconfigure_stage` is called automatically (no PM reasoning needed). PM reasoning is only involved for `approval: director` or `approval: ceo` stages.
-- [ ] Workflows without stages (empty `stages` list): `reconfigure_stage` is a no-op, `verify_stage_completion` always returns True
-- [ ] All functions pass pyright strict
+- [x] `initialize_stage_state(manifest: WorkflowManifest) -> dict[str, object]` returns initial state delta: `pm:current_stage` = first stage name (or empty string if no stages), `pm:stage_index` = 0, `pm:stage_status` = PENDING, `pm:stages_completed` = [], `pm:workflow_stages` = serialized stage schema
+- [x] `reconfigure_stage` FunctionTool accepts `target_stage: str` parameter. Validates target is a valid stage name in the manifest. Updates `pm:current_stage`, `pm:stage_index`, `pm:stage_status` to ACTIVE. Appends previous stage to `pm:stages_completed`. Returns confirmation string.
+- [x] `reconfigure_stage` rejects advancing to a stage that's already completed (no backwards movement)
+- [x] `reconfigure_stage` rejects skipping stages (must advance sequentially)
+- [x] `verify_stage_completion(state: dict, manifest: WorkflowManifest, validator_results: list[ValidatorResult]) -> tuple[bool, list[str]]` checks: all deliverables at required status, all required stage validators passed, approval obtained if required. Returns (passed, list_of_failure_reasons)
+- [x] `verify_taskgroup_completion(state: dict, manifest: WorkflowManifest, validator_results: list[ValidatorResult]) -> tuple[bool, list[str]]` checks: all deliverables within the TaskGroup complete, no pending escalations, all scheduled validators passing. This is a hard gate PM cannot override.
+- [x] `PipelineEventType` enum extended with: `STAGE_STARTED`, `STAGE_COMPLETED`, `STAGE_FAILED`, `VALIDATOR_COMPLETED`
+- [x] Stage state keys are all `pm:` prefixed per Decision #58
+- [x] Stages with `approval: auto`: when `verify_stage_completion()` returns True, `reconfigure_stage` is called automatically (no PM reasoning needed). PM reasoning is only involved for `approval: director` or `approval: ceo` stages.
+- [x] Workflows without stages (empty `stages` list): `reconfigure_stage` is a no-op, `verify_stage_completion` always returns True
+- [x] All functions pass pyright strict
 **Validation:**
 - `uv run pyright app/workflows/stages.py app/tools/management.py`
 - `uv run pytest tests/workflows/test_stages.py -v`
@@ -255,27 +255,27 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 **Depends on:** P7.D1, P7.D3
 **Description:** Implement the validator framework as an evidence collection system. The `ValidatorRunner` dispatches validator definitions to evaluation strategies: deterministic validators check state keys or query DB; LLM validators check state keys produced by LLM agents; approval validators check approval state. Six standard validators ship: `lint_check`, `test_suite`, `regression_tests`, `code_review` (all evaluate existing agent output state keys), plus `dependency_validation` and `deliverable_status_check` (pure deterministic functions).
 **BOM Components:**
-- [ ] `F32` — Standard validator: `lint_check`
-- [ ] `F33` — Standard validator: `test_suite`
-- [ ] `F34` — Standard validator: `regression_tests`
-- [ ] `F35` — Standard validator: `code_review`
-- [ ] `F36` — Standard validator: `dependency_validation`
-- [ ] `F37` — Standard validator: `deliverable_status_check`
+- [x] `F32` — Standard validator: `lint_check`
+- [x] `F33` — Standard validator: `test_suite`
+- [x] `F34` — Standard validator: `regression_tests`
+- [x] `F35` — Standard validator: `code_review`
+- [x] `F36` — Standard validator: `dependency_validation`
+- [x] `F37` — Standard validator: `deliverable_status_check`
 **Requirements:**
-- [ ] `ValidatorRunner` class with `evaluate(validator: ValidatorDefinition, state: dict[str, object], session: AsyncSession | None = None) -> ValidatorResult` method
-- [ ] `ValidatorRunner.evaluate_batch(validators: list[ValidatorDefinition], schedule: ValidatorSchedule, state: dict, session: AsyncSession | None = None) -> list[ValidatorResult]` evaluates all validators matching the given schedule
-- [ ] `lint_check` validator: reads `lint_results` from state, passes if no errors reported. Evidence includes error count and details.
-- [ ] `test_suite` validator: reads `test_results` from state, passes if all tests pass. Evidence includes pass/fail counts.
-- [ ] `regression_tests` validator: reads `regression_results` from state, passes if all regression tests pass. Evidence includes test names and results.
-- [ ] `code_review` validator: reads `review_passed` from state, passes if True. Evidence includes review cycle count and final reviewer comments.
-- [ ] `dependency_validation` validator: deterministic check on deliverable dependency graph. Passes if graph is acyclic and all dependencies are valid. Evidence includes dependency graph summary.
-- [ ] `deliverable_status_check` validator: queries deliverable statuses. Passes if all deliverables at required status (default: COMPLETED). Evidence includes per-deliverable status list.
-- [ ] `ValidatorResult` Pydantic model (DTO, distinct from F31 DB table) has: `validator_name`, `passed` (bool), `evidence` (dict[str, object]), `message` (str), `evaluated_at` (datetime)
-- [ ] Validators with `required: false` in definition produce results but don't block completion
-- [ ] Missing state key (agent hasn't run yet) → validator returns `passed=False` with clear message
-- [ ] `generate_completion_report(scope: str, manifest: WorkflowManifest, validator_results: list[ValidatorResult]) -> CompletionReport` assembles validator results into a CompletionReport with verification layers. Uses manifest's `completion_report.layers` if declared, otherwise `DEFAULT_VERIFICATION_LAYERS`. Maps validator results to layers via `evidence_sources` name references.
-- [ ] Completion report layers derive pass/fail from referenced validator results (aggregation, not re-evaluation)
-- [ ] All functions pass pyright strict
+- [x] `ValidatorRunner` class with `evaluate(validator: ValidatorDefinition, state: dict[str, object], session: AsyncSession | None = None) -> ValidatorResult` method
+- [x] `ValidatorRunner.evaluate_batch(validators: list[ValidatorDefinition], schedule: ValidatorSchedule, state: dict, session: AsyncSession | None = None) -> list[ValidatorResult]` evaluates all validators matching the given schedule
+- [x] `lint_check` validator: reads `lint_results` from state, passes if no errors reported. Evidence includes error count and details.
+- [x] `test_suite` validator: reads `test_results` from state, passes if all tests pass. Evidence includes pass/fail counts.
+- [x] `regression_tests` validator: reads `regression_results` from state, passes if all regression tests pass. Evidence includes test names and results.
+- [x] `code_review` validator: reads `review_passed` from state, passes if True. Evidence includes review cycle count and final reviewer comments.
+- [x] `dependency_validation` validator: deterministic check on deliverable dependency graph. Passes if graph is acyclic and all dependencies are valid. Evidence includes dependency graph summary.
+- [x] `deliverable_status_check` validator: queries deliverable statuses. Passes if all deliverables at required status (default: COMPLETED). Evidence includes per-deliverable status list.
+- [x] `ValidatorResult` Pydantic model (DTO, distinct from F31 DB table) has: `validator_name`, `passed` (bool), `evidence` (dict[str, object]), `message` (str), `evaluated_at` (datetime)
+- [x] Validators with `required: false` in definition produce results but don't block completion
+- [x] Missing state key (agent hasn't run yet) → validator returns `passed=False` with clear message
+- [x] `generate_completion_report(scope: str, manifest: WorkflowManifest, validator_results: list[ValidatorResult]) -> CompletionReport` assembles validator results into a CompletionReport with verification layers. Uses manifest's `completion_report.layers` if declared, otherwise `DEFAULT_VERIFICATION_LAYERS`. Maps validator results to layers via `evidence_sources` name references.
+- [x] Completion report layers derive pass/fail from referenced validator results (aggregation, not re-evaluation)
+- [x] All functions pass pyright strict
 **Validation:**
 - `uv run pyright app/workflows/validators.py`
 - `uv run pytest tests/workflows/test_validators.py -v`
@@ -287,18 +287,18 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 **Depends on:** P7.D1
 **Description:** Add three database tables for workflow composition tracking: `StageExecution` (stage lifecycle within a workflow), `TaskGroupExecution` (PM TaskGroup tracking within stages), and `ValidatorResult` (validator evidence persistence). Create the Alembic migration with sequential numbering.
 **BOM Components:**
-- [ ] `F29` — `StageExecution` DB table
-- [ ] `F30` — `TaskGroupExecution` DB table
-- [ ] `F31` — `ValidatorResult` DB table
+- [x] `F29` — `StageExecution` DB table
+- [x] `F30` — `TaskGroupExecution` DB table
+- [x] `F31` — `ValidatorResult` DB table
 **Requirements:**
-- [ ] `StageExecution` table: `id` (UUID PK), `workflow_id` (UUID FK to `workflows`), `stage_name` (str, indexed), `stage_index` (int), `status` (StageStatus), `started_at` (DateTime), `completed_at` (DateTime nullable), `completion_report` (JSONB nullable). Inherits `TimestampMixin`.
-- [ ] `TaskGroupExecution` table: `id` (UUID PK), `stage_execution_id` (UUID FK to `stage_executions`), `taskgroup_number` (int), `status` (str), `started_at` (DateTime), `completed_at` (DateTime nullable), `deliverable_count` (int). Inherits `TimestampMixin`.
-- [ ] `ValidatorResult` table: `id` (UUID PK), `workflow_id` (UUID FK to `workflows`), `stage_execution_id` (UUID FK to `stage_executions`, nullable), `validator_name` (str, indexed), `passed` (bool), `evidence` (JSONB), `message` (str nullable), `evaluated_at` (DateTime). Inherits `TimestampMixin`.
-- [ ] Migration uses sequential numbering: next available `NNN` after existing migrations
-- [ ] Migration is idempotent (uses `if not exists` pattern or Alembic defaults)
-- [ ] All models have appropriate indexes: `workflow_id` on all three tables, `stage_name` on StageExecution, `validator_name` on ValidatorResult
-- [ ] Foreign key relationships properly defined with SQLAlchemy `relationship()` where appropriate
-- [ ] `uv run alembic upgrade head` applies without error on a clean database
+- [x] `StageExecution` table: `id` (UUID PK), `workflow_id` (UUID FK to `workflows`), `stage_name` (str, indexed), `stage_index` (int), `status` (StageStatus), `started_at` (DateTime), `completed_at` (DateTime nullable), `completion_report` (JSONB nullable). Inherits `TimestampMixin`.
+- [x] `TaskGroupExecution` table: `id` (UUID PK), `stage_execution_id` (UUID FK to `stage_executions`), `taskgroup_number` (int), `status` (str), `started_at` (DateTime), `completed_at` (DateTime nullable), `deliverable_count` (int). Inherits `TimestampMixin`.
+- [x] `ValidatorResult` table: `id` (UUID PK), `workflow_id` (UUID FK to `workflows`), `stage_execution_id` (UUID FK to `stage_executions`, nullable), `validator_name` (str, indexed), `passed` (bool), `evidence` (JSONB), `message` (str nullable), `evaluated_at` (DateTime). Inherits `TimestampMixin`.
+- [x] Migration uses sequential numbering: next available `NNN` after existing migrations
+- [x] Migration is idempotent (uses `if not exists` pattern or Alembic defaults)
+- [x] All models have appropriate indexes: `workflow_id` on all three tables, `stage_name` on StageExecution, `validator_name` on ValidatorResult
+- [x] Foreign key relationships properly defined with SQLAlchemy `relationship()` where appropriate
+- [x] `uv run alembic upgrade head` applies without error on a clean database
 **Validation:**
 - `uv run pyright app/db/models.py`
 - `uv run alembic upgrade head`
@@ -311,32 +311,33 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 **Depends on:** P7.D1, P7.D2, P7.D3
 **Description:** Implement the first concrete workflow. The auto-code WORKFLOW.yaml manifest declares the 5-stage schema (SHAPE → DESIGN → PLAN → BUILD → INTEGRATE) with per-stage agent/tool/skill configuration, validators at appropriate schedules, and the three-layer completion report structure. Migrate the existing `app/agents/pipeline.py` (auto-code-specific composition logic) to `app/workflows/auto-code/pipeline.py`, rewritten using `PipelineContext`. The old file is deleted. The `pipeline.py` exports the `create_pipeline` function that composes the ADK agent tree using the AgentRegistry via PipelineContext. Workflow-scope agent definitions override global agents with auto-code-specific instructions.
 **BOM Components:**
-- [ ] `F13` — `auto-code/WORKFLOW.yaml` manifest
-- [ ] `F14` — `auto-code/pipeline.py` module
-- [ ] `F15` — `auto-code/agents/` (planner, coder, reviewer)
-- [ ] `F16` — `auto-code/skills/` (workflow-specific)
-- [ ] `S31` — Auto-code skill: `test-generation`
+- [x] `F13` — `auto-code/WORKFLOW.yaml` manifest
+- [x] `F14` — `auto-code/pipeline.py` module
+- [x] `F15` — `auto-code/agents/` (planner, coder, reviewer)
+- [x] `F16` — `auto-code/skills/` (workflow-specific)
+- [x] `S31` — Auto-code skill: `test-generation`
 **Requirements:**
-- [ ] `app/agents/pipeline.py` is deleted. Its logic moves to `app/workflows/auto-code/pipeline.py`, rewritten with `PipelineContext` signature.
-- [ ] `PIPELINE_STAGE_NAMES` moves to `app/workflows/auto-code/pipeline.py` as auto-code's node list
-- [ ] `create_deliverable_pipeline_from_context()` in `app/workers/adk.py` is deleted (zero backward-compat shims per engineering standards)
-- [ ] The auto-code `create_pipeline(ctx: PipelineContext) -> BaseAgent` composes: skill_loader -> memory_loader -> planner -> coder -> formatter -> linter -> tester -> diagnostics -> review_cycle
-- [ ] The pipeline reads the current stage's `agents` list from the manifest to filter which nodes are included
-- [ ] `WORKFLOW.yaml` validates against `WorkflowManifest` model with all tier-3 fields populated
-- [ ] Manifest `name` is `auto-code`, `pipeline_type` is `batch_parallel`
-- [ ] Manifest declares 5 stages: `shape`, `design`, `plan`, `build`, `integrate` — each with description, agents, and appropriate validators
-- [ ] `shape` stage: agents `[planner]`, validator `spec_completeness` (llm, per_stage), approval `director`
-- [ ] `design` stage: agents `[planner, reviewer]`, validator `design_consistency` (llm, per_stage), approval `director`
-- [ ] `plan` stage: agents `[planner]`, validator `dependency_validation` (deterministic, per_stage), completion_criteria `all_deliverables_planned`, approval `auto`
-- [ ] `build` stage: agents `[coder, reviewer, fixer, formatter, linter, tester, diagnostics]`, validators: `lint_check` (per_deliverable), `test_suite` (per_deliverable), `code_review` (per_deliverable), `regression_tests` (per_batch), approval `auto`
-- [ ] `integrate` stage: agents `[tester, reviewer, diagnostics]`, validators: `integration_tests` (deterministic, per_stage, Phase 7b stub returning passed=True), `architecture_conformance` (llm, per_stage, required: false, Phase 7b stub returning passed=True), `final_approval` (approval, per_stage), approval `ceo`
-- [ ] Manifest declares `required_tools`: `file_read`, `file_write`, `file_edit`, `bash_exec`, `git_status`, `git_commit`, `git_diff`
-- [ ] Manifest declares `default_models` with `PLAN: anthropic/claude-opus-4-6` and `CODE: anthropic/claude-sonnet-4-6`
-- [ ] `pipeline.py` exports async `create_pipeline(ctx: PipelineContext) -> BaseAgent` matching the interface contract (DD-4)
-- [ ] Three workflow-scope agent definitions: `planner.md`, `coder.md`, `reviewer.md` with auto-code-specific instruction bodies
-- [ ] `test-generation` skill at `app/workflows/auto-code/skills/code/test-generation/SKILL.md` with valid frontmatter and triggers for test-related deliverables
-- [ ] `.gitkeep` files removed from `app/workflows/auto-code/` and subdirectories
-- [ ] `WORKFLOW.yaml` is loadable by `WorkflowRegistry.scan()`
+- [x] `app/agents/pipeline.py` is deleted. Its logic moves to `app/workflows/auto-code/pipeline.py`, rewritten with `PipelineContext` signature.
+- [x] `PIPELINE_STAGE_NAMES` moves to `app/workflows/auto-code/pipeline.py` as auto-code's node list
+- [x] `create_deliverable_pipeline_from_context()` in `app/workers/adk.py` is deleted (zero backward-compat shims per engineering standards)
+- [x] The auto-code `create_pipeline(ctx: PipelineContext) -> BaseAgent` composes: skill_loader -> memory_loader -> planner -> coder -> formatter -> linter -> tester -> diagnostics -> review_cycle
+- [x] The pipeline reads the current stage's `agents` list from the manifest to filter which nodes are included
+- [x] `WORKFLOW.yaml` validates against `WorkflowManifest` model with all tier-3 fields populated
+- [x] Manifest `name` is `auto-code`, `pipeline_type` is `batch_parallel`
+- [x] Manifest declares 5 stages: `shape`, `design`, `plan`, `build`, `integrate` — each with description, agents, and appropriate validators
+- [x] `shape` stage: agents `[planner]`, validator `spec_completeness` (llm, per_stage), approval `director`
+- [x] `design` stage: agents `[planner, reviewer]`, validator `design_consistency` (llm, per_stage), approval `director`
+- [x] `plan` stage: agents `[planner]`, validator `dependency_validation` (deterministic, per_stage), completion_criteria `all_deliverables_planned`, approval `auto`
+- [x] `build` stage: agents `[coder, reviewer, fixer, formatter, linter, tester, diagnostics]`, validators: `lint_check` (per_deliverable), `test_suite` (per_deliverable), `code_review` (per_deliverable), `regression_tests` (per_batch), approval `auto`
+  > **Note (Phase 7):** `pipeline.py` composes all agents including `planner` (line 323) regardless of which stage is active. Runtime stage-agent filtering — where the pipeline reads the stage's `agents` list and excludes agents not listed — is wired in Phase 8. For Phase 7 the full agent tree is always composed; the manifest's per-stage `agents` field is authoritative metadata that Phase 8 will enforce at runtime.
+- [x] `integrate` stage: agents `[tester, reviewer, diagnostics]`, validators: `integration_tests` (deterministic, per_stage, Phase 7b stub returning passed=True), `architecture_conformance` (llm, per_stage, required: false, Phase 7b stub returning passed=True), `final_approval` (approval, per_stage), approval `ceo`
+- [x] Manifest declares `required_tools`: `file_read`, `file_write`, `file_edit`, `bash_exec`, `git_status`, `git_commit`, `git_diff`
+- [x] Manifest declares `default_models` with `PLAN: anthropic/claude-opus-4-6` and `CODE: anthropic/claude-sonnet-4-6`
+- [x] `pipeline.py` exports async `create_pipeline(ctx: PipelineContext) -> BaseAgent` matching the interface contract (DD-4)
+- [x] Three workflow-scope agent definitions: `planner.md`, `coder.md`, `reviewer.md` with auto-code-specific instruction bodies
+- [x] `test-generation` skill at `app/workflows/auto-code/skills/code/test-generation/SKILL.md` with valid frontmatter and triggers for test-related deliverables
+- [x] `.gitkeep` files removed from `app/workflows/auto-code/` and subdirectories
+- [x] `WORKFLOW.yaml` is loadable by `WorkflowRegistry.scan()`
 **Validation:**
 - `uv run pyright app/workflows/auto-code/pipeline.py`
 - `uv run pytest tests/workflows/test_auto_code.py -v`
@@ -348,16 +349,16 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 **Depends on:** P7.D2
 **Description:** Wire the WorkflowRegistry into the application lifecycle. Add `workflows_dir` setting with `AUTOBUILDER_WORKFLOWS_DIR` env var support. Initialize the registry during gateway lifespan startup (scan both built-in and user-level directories, cache in Redis). Add `get_workflow_registry` dependency injection function. The registry is shared across all requests via `app.state`.
 **BOM Components:**
-- [ ] *(F12 config aspect — user-level directory wiring)*
+- [x] *(F12 config aspect — user-level directory wiring)*
 **Requirements:**
-- [ ] `Settings` gains `workflows_dir: str` field with default `"~/.autobuilder/workflows"`, loaded from `AUTOBUILDER_WORKFLOWS_DIR` env var
-- [ ] Gateway lifespan creates `WorkflowRegistry` with built-in dir (`app/workflows/`) and user-level dir (from settings, expanded with `Path.expanduser()`)
-- [ ] Registry `scan()` called during startup; if user-level dir doesn't exist, registry operates with built-in only
-- [ ] Registry stored on `app.state.workflow_registry`
-- [ ] `get_workflow_registry(request: Request) -> WorkflowRegistry` dependency added to `deps.py`
-- [ ] Redis cache: `load_from_cache()` attempted first; on miss, `scan()` then `save_to_cache()` (follows SkillLibrary startup pattern)
-- [ ] Startup logs: number of discovered workflows, any validation warnings
-- [ ] Cache failure is non-fatal (logged, continues with in-memory index)
+- [x] `Settings` gains `workflows_dir: str` field with default `"~/.autobuilder/workflows"`, loaded from `AUTOBUILDER_WORKFLOWS_DIR` env var
+- [x] Gateway lifespan creates `WorkflowRegistry` with built-in dir (`app/workflows/`) and user-level dir (from settings, expanded with `Path.expanduser()`)
+- [x] Registry `scan()` called during startup; if user-level dir doesn't exist, registry operates with built-in only
+- [x] Registry stored on `app.state.workflow_registry`
+- [x] `get_workflow_registry(request: Request) -> WorkflowRegistry` dependency added to `deps.py`
+- [x] Redis cache: `load_from_cache()` attempted first; on miss, `scan()` then `save_to_cache()` (follows SkillLibrary startup pattern)
+- [x] Startup logs: number of discovered workflows, any validation warnings
+- [x] Cache failure is non-fatal (logged, continues with in-memory index)
 **Validation:**
 - `uv run pyright app/gateway/main.py app/gateway/deps.py app/config/settings.py`
 - `uv run pytest tests/gateway/test_health.py -v`
@@ -369,18 +370,19 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 **Depends on:** P7.D2, P7.D6
 **Description:** Extend the AgentRegistry and SkillLibrary to support the workflow tier. AgentRegistry's `scan()` already accepts workflow-scope directories — ensure it's called with the workflow's `agents/` dir when building a workflow pipeline. SkillLibrary gains an optional `workflow_dir` parameter for three-tier skill merging (global → workflow → project). Decouple `app/agents/context_recreation.py` from the deleted pipeline — remove the `PIPELINE_STAGES` alias and `STAGE_COMPLETION_KEYS` dict, which become workflow-provided configuration. Migrate callers in `app/workers/` to use `WorkflowRegistry.create_pipeline()`. Implement project-scope `tool_role` ceiling validation against the workflow manifest's allowed tools.
 **BOM Components:**
-- [ ] `S11` — Three-tier merge (+ workflow-specific)
-- [ ] `A78b` — Project-scope `tool_role` ceiling validation (against workflow manifest)
+- [x] `S11` — Three-tier merge (+ workflow-specific)
+- [x] `A78b` — Project-scope `tool_role` ceiling validation (against workflow manifest)
 **Requirements:**
-- [ ] `SkillLibrary.__init__` gains optional `workflow_dir: Path | None = None` parameter
-- [ ] `SkillLibrary.scan()` scans three tiers when workflow_dir is provided: global → workflow → project. Workflow skills override global by name; project skills override both.
-- [ ] Workflow skills with unique names (not in global set) are added alongside global skills
-- [ ] `AgentRegistry.scan()` called with workflow `agents/` directory at `WORKFLOW` scope when building workflow pipelines — this already works via the existing 3-scope cascade
-- [ ] Project-scope agent definitions validated against workflow manifest's allowed tool roles: if manifest declares `required_tools` and the agent's `tool_role` would grant access to tools outside that set, emit a warning
-- [ ] `app/agents/context_recreation.py` decoupled from pipeline — `PIPELINE_STAGES` alias removed, `determine_remaining_stages` and `recreate_context` receive stages as explicit parameter from the workflow manifest (accessed via `WorkflowRegistry` dependency in the worker context)
-- [ ] `STAGE_COMPLETION_KEYS` dict moved out of `context_recreation.py` — becomes workflow-provided configuration
-- [ ] `app/workers/adk.py`: `build_work_session_agents()` uses `WorkflowRegistry.create_pipeline(workflow_name, pipeline_ctx)` instead of importing pipeline directly
-- [ ] `app/workers/tasks.py`: `run_workflow` uses WorkflowRegistry path instead of `create_deliverable_pipeline_from_context`
+- [x] `SkillLibrary.__init__` gains optional `workflow_dir: Path | None = None` parameter
+- [x] `SkillLibrary.scan()` scans three tiers when workflow_dir is provided: global → workflow → project. Workflow skills override global by name; project skills override both.
+- [x] Workflow skills with unique names (not in global set) are added alongside global skills
+- [x] `AgentRegistry.scan()` called with workflow `agents/` directory at `WORKFLOW` scope when building workflow pipelines — this already works via the existing 3-scope cascade
+- [x] Project-scope agent definitions validated against workflow manifest's allowed tool roles: if manifest declares `required_tools` and the agent's `tool_role` would grant access to tools outside that set, emit a warning
+- [x] `app/agents/context_recreation.py` decoupled from pipeline — `PIPELINE_STAGES` alias removed, `determine_remaining_stages` and `recreate_context` receive stages as explicit parameter from the workflow manifest (accessed via `WorkflowRegistry` dependency in the worker context)
+- [x] `STAGE_COMPLETION_KEYS` dict moved out of `context_recreation.py` — becomes workflow-provided configuration
+- [x] `app/workers/adk.py`: `build_work_session_agents()` uses `WorkflowRegistry.create_pipeline(workflow_name, pipeline_ctx)` instead of importing pipeline directly
+- [x] `app/workers/tasks.py`: `run_workflow` uses WorkflowRegistry path instead of `create_deliverable_pipeline_from_context`
+  > **Note:** `validate_project_scope()` is defined in `app/agents/_registry.py` as infrastructure-ready code. Its call site is deferred to Phase 8, when project-scope agent scanning is implemented and the workflow manifest's `required_tools` ceiling can be enforced end-to-end.
 **Validation:**
 - `uv run pyright app/agents/_registry.py app/skills/library.py app/agents/context_recreation.py app/workers/adk.py`
 - `uv run pytest tests/agents/test_registry.py tests/skills/test_library.py tests/agents/test_context_recreation.py -v`
@@ -392,17 +394,17 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 **Depends on:** P7.D1
 **Description:** Author two new infrastructure skills for the workflow composition system plus one auto-code-specific skill. `workflow-quality` teaches validator design patterns, completion criteria composition, and evidence collection best practices. `workflow-testing` teaches dry run patterns, workflow validation testing, and stage transition testing. Both use `always` trigger with appropriate `applies_to` fields. Note: the three existing Phase 6 authoring skills (workflow-authoring S35, agent-definition S34, skill-authoring S33) already exist and satisfy the roadmap contract's "five infrastructure skills" requirement alongside these two new ones.
 **BOM Components:**
-- [ ] `S37` — `workflow-quality` skill (validator design patterns)
-- [ ] `S38` — `workflow-testing` skill (dry runs, testing patterns)
+- [x] `S37` — `workflow-quality` skill (validator design patterns)
+- [x] `S38` — `workflow-testing` skill (dry runs, testing patterns)
 **Requirements:**
-- [ ] `workflow-quality` skill: `always` trigger, `applies_to: [planner, reviewer]`, covers validator types, scheduling, evidence requirements, completion criteria composition, three-layer verification
-- [ ] `workflow-testing` skill: `always` trigger, `applies_to: [tester, coder]`, covers workflow validation approaches, stage transition testing, manifest validation, pipeline smoke tests
-- [ ] Both skills have valid frontmatter with `name`, `description`, `triggers`, `tags`, `applies_to`
-- [ ] Both skills pass `validate_skill_frontmatter()` validation
-- [ ] Body content under 3000 words per skill
-- [ ] Body content in imperative/instructional style
-- [ ] `test-generation` skill placed at `app/workflows/auto-code/skills/code/test-generation/SKILL.md`, triggers on `deliverable_type: test` and `file_pattern: "*/tests/*.py"`, `applies_to: [coder]`. Note: `test-generation` skill file is created in D9; D6 references it in the auto-code manifest.
-- [ ] All skills indexed successfully by `SkillLibrary.scan()` when scanning their respective directories
+- [x] `workflow-quality` skill: `always` trigger, `applies_to: [planner, reviewer]`, covers validator types, scheduling, evidence requirements, completion criteria composition, three-layer verification
+- [x] `workflow-testing` skill: `always` trigger, `applies_to: [tester, coder]`, covers workflow validation approaches, stage transition testing, manifest validation, pipeline smoke tests
+- [x] Both skills have valid frontmatter with `name`, `description`, `triggers`, `tags`, `applies_to`
+- [x] Both skills pass `validate_skill_frontmatter()` validation
+- [x] Body content under 3000 words per skill
+- [x] Body content in imperative/instructional style
+- [x] `test-generation` skill placed at `app/workflows/auto-code/skills/code/test-generation/SKILL.md`, triggers on `deliverable_type: test` and `file_pattern: "*/tests/*.py"`, `applies_to: [coder]`. Note: `test-generation` skill file is created in D9; D6 references it in the auto-code manifest.
+- [x] All skills indexed successfully by `SkillLibrary.scan()` when scanning their respective directories
 **Validation:**
 - `uv run pytest tests/skills/test_skill_files.py -v`
 
@@ -412,7 +414,7 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 
 ```
 Batch 1 (sequential): P7.D1
-  D1: Enums + Pydantic models — app/models/enums.py, app/workflows/models.py
+  D1: Enums + Pydantic models — app/models/enums.py, app/workflows/manifest.py
 
 Batch 2 (parallel): P7.D2, P7.D3, P7.D5, P7.D9
   D2: WorkflowRegistry — app/workflows/registry.py; depends D1

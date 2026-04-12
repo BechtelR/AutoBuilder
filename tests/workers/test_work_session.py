@@ -92,16 +92,17 @@ class TestBuildWorkSessionAgents:
         ctx = MagicMock()
         publisher = MagicMock(spec=EventPublisher)
 
-        with patch(
-            "app.agents.pipeline.create_deliverable_pipeline",
-            return_value=pipeline_mock,
-        ):
-            result = await build_work_session_agents(
-                registry=registry,
-                ctx=ctx,
-                project_id="proj1",
-                publisher=publisher,
-            )
+        mock_wf_registry = MagicMock()
+        mock_wf_registry.get_manifest.return_value = MagicMock()
+        mock_wf_registry.create_pipeline = AsyncMock(return_value=pipeline_mock)
+
+        result = await build_work_session_agents(
+            registry=registry,
+            ctx=ctx,
+            project_id="proj1",
+            publisher=publisher,
+            workflow_registry=mock_wf_registry,
+        )
 
         assert result is director_mock
         assert director_mock.sub_agents == [pm_mock]
@@ -128,16 +129,17 @@ class TestBuildWorkSessionAgents:
         ctx = MagicMock()
         publisher = MagicMock(spec=EventPublisher)
 
-        with patch(
-            "app.agents.pipeline.create_deliverable_pipeline",
-            return_value=pipeline_mock,
-        ):
-            await build_work_session_agents(
-                registry=registry,
-                ctx=ctx,
-                project_id="proj1",
-                publisher=publisher,
-            )
+        mock_wf_registry = MagicMock()
+        mock_wf_registry.get_manifest.return_value = MagicMock()
+        mock_wf_registry.create_pipeline = AsyncMock(return_value=pipeline_mock)
+
+        await build_work_session_agents(
+            registry=registry,
+            ctx=ctx,
+            project_id="proj1",
+            publisher=publisher,
+            workflow_registry=mock_wf_registry,
+        )
 
         assert pm_mock.before_agent_callback is not None
         assert pm_mock.after_agent_callback is not None
@@ -159,16 +161,17 @@ class TestBuildWorkSessionAgents:
         ctx = MagicMock()
         publisher = MagicMock(spec=EventPublisher)
 
-        with patch(
-            "app.agents.pipeline.create_deliverable_pipeline",
-            return_value=pipeline_mock,
-        ):
-            await build_work_session_agents(
-                registry=registry,
-                ctx=ctx,
-                project_id="proj1",
-                publisher=publisher,
-            )
+        mock_wf_registry = MagicMock()
+        mock_wf_registry.get_manifest.return_value = MagicMock()
+        mock_wf_registry.create_pipeline = AsyncMock(return_value=pipeline_mock)
+
+        await build_work_session_agents(
+            registry=registry,
+            ctx=ctx,
+            project_id="proj1",
+            publisher=publisher,
+            workflow_registry=mock_wf_registry,
+        )
 
         assert pipeline_mock.after_agent_callback is not None
         assert callable(pipeline_mock.after_agent_callback)
