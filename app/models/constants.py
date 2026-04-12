@@ -43,3 +43,12 @@ TIER_PREFIX_WRITE_ACCESS: dict[str, AgentTier] = {
     "temp:": AgentTier.WORKER,
 }
 # Keys with no recognized prefix -> writable by all tiers (WORKER and above)
+
+# ---------------------------------------------------------------------------
+# Stage state keys (Phase 7 — all pm: prefixed for tier authorization)
+# ---------------------------------------------------------------------------
+STAGE_CURRENT: str = "pm:current_stage"
+STAGE_INDEX: str = "pm:stage_index"
+STAGE_STATUS: str = "pm:stage_status"
+STAGE_COMPLETED_LIST: str = "pm:stages_completed"
+STAGE_WORKFLOW_STAGES: str = "pm:workflow_stages"

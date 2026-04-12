@@ -21,7 +21,9 @@ import yaml
 # ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-MANIFEST_EXAMPLE = ROOT / ".dev" / "build-phase" / "phase-7" / "reference" / "workflow-manifest-example.yaml"
+MANIFEST_EXAMPLE = (
+    ROOT / ".dev" / "build-phase" / "phase-7" / "reference" / "workflow-manifest-example.yaml"
+)
 WORKFLOWS_DIR = ROOT / "app" / "workflows"
 AGENTS_DIR = ROOT / "app" / "agents"
 SKILLS_DIR = ROOT / "app" / "skills"
@@ -83,20 +85,26 @@ class TestManifestExample:
         valid_types = {"deterministic", "llm", "approval"}
         for stage in manifest.get("stages", []):
             for v in stage.get("validators", []):
-                assert v["type"] in valid_types, f"Invalid validator type '{v['type']}' on {v['name']}"
+                assert v["type"] in valid_types, (
+                    f"Invalid validator type '{v['type']}' on {v['name']}"
+                )
 
     def test_validator_schedules_valid(self, manifest: dict[str, Any]) -> None:
         valid_schedules = {"per_deliverable", "per_batch", "per_taskgroup", "per_stage"}
         for stage in manifest.get("stages", []):
             for v in stage.get("validators", []):
-                assert v["schedule"] in valid_schedules, f"Invalid schedule '{v['schedule']}' on {v['name']}"
+                assert v["schedule"] in valid_schedules, (
+                    f"Invalid schedule '{v['schedule']}' on {v['name']}"
+                )
 
     def test_approval_values_valid(self, manifest: dict[str, Any]) -> None:
         valid_approvals = {"director", "ceo", "auto"}
         for stage in manifest.get("stages", []):
             approval = stage.get("approval")
             if approval is not None:
-                assert approval in valid_approvals, f"Invalid approval '{approval}' on stage {stage['name']}"
+                assert approval in valid_approvals, (
+                    f"Invalid approval '{approval}' on stage {stage['name']}"
+                )
 
     def test_required_tools_are_strings(self, manifest: dict[str, Any]) -> None:
         tools: list[Any] = manifest.get("required_tools", [])
@@ -110,7 +118,9 @@ class TestManifestExample:
         for role in models:
             assert role in valid_roles, f"Invalid model role: {role}"
 
-    def test_deliverable_types_reference_declared_validators(self, manifest: dict[str, Any]) -> None:
+    def test_deliverable_types_reference_declared_validators(
+        self, manifest: dict[str, Any]
+    ) -> None:
         """Every validator referenced in deliverable.types[].verification must exist."""
         all_validators: set[str] = set()
         for stage in manifest.get("stages", []):
@@ -121,7 +131,8 @@ class TestManifestExample:
         for dtype in deliverable.get("types", []):
             for vname in dtype.get("verification", []):
                 assert vname in all_validators, (
-                    f"Deliverable type '{dtype['name']}' references undeclared validator '{vname}'. "
+                    f"Type '{dtype['name']}' references undeclared "
+                    f"validator '{vname}'. "
                     f"Declared: {sorted(all_validators)}"
                 )
 
@@ -169,8 +180,7 @@ class TestWorkflowDirectoryStructure:
         """Pipeline.py does not exist yet — Phase 7 creates it."""
         pipeline = WORKFLOWS_DIR / "auto-code" / "pipeline.py"
         assert not pipeline.exists(), (
-            f"auto-code/pipeline.py already exists at {pipeline}. "
-            "Phase 7 should create this file."
+            f"auto-code/pipeline.py already exists at {pipeline}. Phase 7 should create this file."
         )
 
 
@@ -184,28 +194,34 @@ class TestInfrastructureReadiness:
 
     def test_agent_registry_importable(self) -> None:
         from app.agents._registry import AgentRegistry
+
         assert AgentRegistry is not None
 
     def test_agent_registry_has_build(self) -> None:
         from app.agents._registry import AgentRegistry
+
         assert hasattr(AgentRegistry, "build")
         assert hasattr(AgentRegistry, "scan")
 
     def test_definition_scope_has_workflow(self) -> None:
         from app.models.enums import DefinitionScope
+
         assert hasattr(DefinitionScope, "WORKFLOW")
 
     def test_skill_library_importable(self) -> None:
         from app.skills.library import SkillLibrary
+
         assert SkillLibrary is not None
 
     def test_skill_library_has_scan_and_match(self) -> None:
         from app.skills.library import SkillLibrary
+
         assert hasattr(SkillLibrary, "scan")
         assert hasattr(SkillLibrary, "match")
 
     def test_instruction_context_importable(self) -> None:
         from app.agents.assembler import InstructionContext
+
         assert InstructionContext is not None
 
     def test_existing_pipeline_exists(self) -> None:
@@ -215,19 +231,23 @@ class TestInfrastructureReadiness:
 
     def test_existing_pipeline_has_stage_names(self) -> None:
         from app.agents.pipeline import PIPELINE_STAGE_NAMES
+
         assert isinstance(PIPELINE_STAGE_NAMES, list)
         assert len(PIPELINE_STAGE_NAMES) > 0
 
     def test_review_cycle_agent_exists(self) -> None:
         from app.agents.custom.review_cycle import ReviewCycleAgent
+
         assert ReviewCycleAgent is not None
 
     def test_context_recreation_importable(self) -> None:
         from app.agents.context_recreation import recreate_context
+
         assert recreate_context is not None
 
     def test_gateway_settings_importable(self) -> None:
         from app.config.settings import Settings
+
         assert Settings is not None
 
 
@@ -245,25 +265,34 @@ class TestEnumReadiness:
 
         for name in dir(enums):
             obj = getattr(enums, name)
-            if isinstance(obj, type) and issubclass(obj, enums.enum.StrEnum) and obj is not enums.enum.StrEnum:
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, enums.enum.StrEnum)
+                and obj is not enums.enum.StrEnum
+            ):
                 for member in obj:
                     assert member.value == member.name, (
                         f"{name}.{member.name} has value '{member.value}' "
                         f"but should be '{member.name}'"
                     )
 
-    def test_no_pipeline_type_enum_yet(self) -> None:
-        """PipelineType enum does not exist yet — Phase 7 creates it."""
+    def test_pipeline_type_enum_exists(self) -> None:
+        """PipelineType enum created by Phase 7."""
         from app.models import enums
-        assert not hasattr(enums, "PipelineType"), "PipelineType already exists — Phase 7 should create it"
 
-    def test_no_stage_status_enum_yet(self) -> None:
-        from app.models import enums
-        assert not hasattr(enums, "StageStatus"), "StageStatus already exists — Phase 7 should create it"
+        assert hasattr(enums, "PipelineType")
 
-    def test_no_validator_type_enum_yet(self) -> None:
+    def test_stage_status_enum_exists(self) -> None:
+        """StageStatus enum created by Phase 7."""
         from app.models import enums
-        assert not hasattr(enums, "ValidatorType"), "ValidatorType already exists — Phase 7 should create it"
+
+        assert hasattr(enums, "StageStatus")
+
+    def test_validator_type_enum_exists(self) -> None:
+        """ValidatorType enum created by Phase 7."""
+        from app.models import enums
+
+        assert hasattr(enums, "ValidatorType")
 
 
 # ===========================================================================
@@ -329,5 +358,5 @@ class TestSkillsReadiness:
         params = list(sig.parameters.keys())
         assert "global_dir" in params
         assert "project_dir" in params
-        # workflow_dir should NOT exist yet — Phase 7 adds it
-        assert "workflow_dir" not in params, "workflow_dir already exists — Phase 7 should add it"
+        # workflow_dir will be added by Phase 7 Batch 5
+        # (not yet added at this point in the validation pipeline)

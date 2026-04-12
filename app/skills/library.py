@@ -64,10 +64,12 @@ class SkillLibrary:
     def __init__(
         self,
         global_dir: Path,
+        workflow_dir: Path | None = None,
         project_dir: Path | None = None,
         redis: ArqRedis | None = None,
     ) -> None:
         self._global_dir = global_dir
+        self._workflow_dir = workflow_dir
         self._project_dir = project_dir
         self._redis = redis
         self._index: dict[str, SkillEntry] = {}
@@ -82,6 +84,9 @@ class SkillLibrary:
         self._file_mtimes.clear()
 
         self._scan_directory(self._global_dir, scope="global")
+
+        if self._workflow_dir is not None and self._workflow_dir.is_dir():
+            self._scan_directory(self._workflow_dir, scope="workflow")
 
         if self._project_dir is not None and self._project_dir.is_dir():
             self._scan_directory(self._project_dir, scope="project")
@@ -120,10 +125,15 @@ class SkillLibrary:
                     )
                     continue
 
-            # FR-6.21: Project-local override logging
-            if scope == "project" and entry.name in self._index:
+            # FR-6.21: Override logging for workflow and project scopes
+            if scope == "workflow" and entry.name in self._index:
                 logger.info(
-                    "Project-local skill '%s' overrides global skill",
+                    "Workflow skill '%s' overrides global skill",
+                    entry.name,
+                )
+            elif scope == "project" and entry.name in self._index:
+                logger.info(
+                    "Project-local skill '%s' overrides previous skill",
                     entry.name,
                 )
 
@@ -237,7 +247,7 @@ class SkillLibrary:
 
     def _cache_key(self) -> str:
         """Deterministic cache key based on configured directory paths."""
-        scope = f"{self._global_dir}:{self._project_dir or ''}"
+        scope = f"{self._global_dir}:{self._workflow_dir or ''}:{self._project_dir or ''}"
         scope_hash = hashlib.md5(scope.encode(), usedforsecurity=False).hexdigest()[:12]
         return f"autobuilder:skill_index:{scope_hash}"
 
@@ -310,6 +320,8 @@ class SkillLibrary:
         current_files: set[str] = set()
         if self._global_dir.is_dir():
             current_files.update(str(p) for p in self._global_dir.rglob("SKILL.md"))
+        if self._workflow_dir is not None and self._workflow_dir.is_dir():
+            current_files.update(str(p) for p in self._workflow_dir.rglob("SKILL.md"))
         if self._project_dir is not None and self._project_dir.is_dir():
             current_files.update(str(p) for p in self._project_dir.rglob("SKILL.md"))
 

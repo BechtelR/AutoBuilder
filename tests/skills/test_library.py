@@ -174,7 +174,7 @@ class TestTwoTierScan:
         with caplog.at_level("INFO", logger="app.skills.library"):
             lib.scan()
 
-        assert any("overrides global" in r.message for r in caplog.records)
+        assert any("overrides previous" in r.message for r in caplog.records)
 
 
 class TestDuplicateAndMismatch:

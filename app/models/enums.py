@@ -62,6 +62,10 @@ class PipelineEventType(enum.StrEnum):
     TOOL_RESULT = "TOOL_RESULT"
     STATE_UPDATED = "STATE_UPDATED"
     ERROR = "ERROR"
+    STAGE_STARTED = "STAGE_STARTED"
+    STAGE_COMPLETED = "STAGE_COMPLETED"
+    STAGE_FAILED = "STAGE_FAILED"
+    VALIDATOR_COMPLETED = "VALIDATOR_COMPLETED"
 
 
 class GitBranchAction(enum.StrEnum):
@@ -267,3 +271,52 @@ class FormationStatus(enum.StrEnum):
     PENDING = "PENDING"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETE = "COMPLETE"
+
+
+class PipelineType(enum.StrEnum):
+    """Pipeline execution pattern for a workflow."""
+
+    SINGLE_PASS = "SINGLE_PASS"
+    SEQUENTIAL = "SEQUENTIAL"
+    BATCH_PARALLEL = "BATCH_PARALLEL"
+
+
+class StageStatus(enum.StrEnum):
+    """Status of a workflow stage."""
+
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class ValidatorType(enum.StrEnum):
+    """Execution model for a validator."""
+
+    DETERMINISTIC = "DETERMINISTIC"
+    LLM = "LLM"
+    APPROVAL = "APPROVAL"
+
+
+class ValidatorSchedule(enum.StrEnum):
+    """When a validator runs relative to workflow execution."""
+
+    PER_DELIVERABLE = "PER_DELIVERABLE"
+    PER_BATCH = "PER_BATCH"
+    PER_TASKGROUP = "PER_TASKGROUP"
+    PER_STAGE = "PER_STAGE"
+
+
+class StageApproval(enum.StrEnum):
+    """Who approves stage completion."""
+
+    DIRECTOR = "DIRECTOR"
+    CEO = "CEO"
+    AUTO = "AUTO"
+
+
+class CompletionCondition(enum.StrEnum):
+    """Structured completion condition for a stage."""
+
+    ALL_VERIFIED = "ALL_VERIFIED"
+    ALL_DELIVERABLES_PLANNED = "ALL_DELIVERABLES_PLANNED"

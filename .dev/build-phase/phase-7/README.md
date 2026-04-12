@@ -1,7 +1,7 @@
 # Phase 7: Workflow Composition System — Build Notes
 
-**Status**: Design Complete — Build Pending
-**Date**: 2026-04-11
+**Status**: Architecture Validated — Build Ready
+**Date**: 2026-04-12 (validation), 2026-04-11 (design)
 
 ---
 
@@ -66,37 +66,64 @@ Primary: `.dev/architecture/workflows.md` (v5.0)
 
 ## Pre-Build Validation
 
-Run before starting Phase 7 implementation:
+### Architecture Validation (2026-04-12) — PASSED
+
+Full validation pipeline built and executed. 208 tests across 7 modules prove the core architecture is sound. See `validation-report.md` for detailed results.
+
+```bash
+# Run the full validation suite
+uv run pytest tests/workflows/ -v --tb=short
+```
+
+**Risks retired**: progressive disclosure, registry discovery, dynamic pipeline import, stage state machine, validator evidence collection, hard completion gates, three-tier skill merge.
+
+**Production code built during validation** (minimal, reusable in full build):
+- `app/workflows/manifest.py` — 15 Pydantic models
+- `app/workflows/context.py` — PipelineContext + PipelineFactory
+- `app/workflows/registry.py` — WorkflowRegistry
+- `app/workflows/stages.py` — Stage lifecycle
+- `app/workflows/validators.py` — ValidatorRunner, 6 validators, gates, reports
+- `app/models/enums.py` — 6 new enums + PipelineEventType extension
+- `app/skills/library.py` — Three-tier merge (workflow_dir parameter)
+
+### Readiness Tests (2026-04-11)
 
 ```bash
 uv run pytest tests/workflows/test_phase7_readiness.py -v
 ```
 
-53 tests verify: manifest example is well-formed, workflow directories ready, prerequisite infrastructure (AgentRegistry, SkillLibrary, pipeline.py, agent definitions, enums) is intact and compatible. All must pass before build begins.
+53 tests verify: manifest example well-formed, workflow directories ready, prerequisite infrastructure intact.
 
 ## Reference Artifacts
 
 | Artifact | Location | Purpose |
 |----------|----------|---------|
-| Workflow manifest example | `.dev/build-phase/phase-7/reference/workflow-manifest-example.yaml` | Production-ready Tier 3 manifest (auto-code) |
-| Pre-build validation tests | `tests/workflows/test_phase7_readiness.py` | 53 tests verifying design artifacts and infrastructure readiness |
+| Workflow manifest example | `reference/workflow-manifest-example.yaml` | Production-ready Tier 3 manifest (auto-code) |
+| Validation report | `validation-report.md` | Architecture validation results and findings |
+| Pre-build validation tests | `tests/workflows/test_phase7_readiness.py` | 53 readiness tests |
+| Architecture validation tests | `tests/workflows/test_manifest.py` + 6 more | 208 architecture validation tests |
 
 ## Open Questions for Build Phase
 
 1. ~~Validator agents vs validator functions~~ — **Resolved (DD-2)**: ValidatorRunner with evaluation functions, not CustomAgent classes.
-2. Stage-scoped skills — additive only (no remove mechanism). If needed, use `applies_to` instead.
-3. `allow_stage_overlap` — deferred to Phase 8+ (concurrency optimization).
+2. ~~Case-insensitive YAML enums~~ — **Resolved**: `BeforeValidator(_upper)` on manifest-facing enum fields.
+3. ~~Stage status on advance~~ — **Resolved**: ACTIVE (not PENDING) when PM explicitly advances.
+4. Stage-scoped skills — additive only (no remove mechanism). If needed, use `applies_to` instead.
+5. `allow_stage_overlap` — deferred to Phase 8+ (concurrency optimization).
 
-## Build Order Suggestion
+## Build Order (Updated Post-Validation)
 
-1. WorkflowManifest Pydantic model (all fields + validation)
-2. WorkflowRegistry (directory scanning, manifest parsing, override model)
-3. Stage schema models (StageDefinition, CompletionCriteria, ValidatorDefinition, etc.)
-4. New enums (StageStatus, ValidatorType, ValidatorSchedule, new PipelineEventType values)
-5. Stage state keys and reconfiguration tool
-6. Standard validator implementations (lint, test, regression, review, deliverable_status_check, dependency_validation)
+Validation pipeline built the types + core logic. Full build completes wiring:
+
+1. ~~Enums + Pydantic models~~ — DONE (validation)
+2. ~~WorkflowRegistry~~ — DONE (validation)
+3. ~~Stage lifecycle functions~~ — DONE (validation)
+4. ~~Standard validators + completion gates~~ — DONE (validation)
+5. ~~Three-tier skill merge~~ — DONE (validation)
+6. Database tables (StageExecution, TaskGroupExecution, ValidatorResult) + migration
 7. auto-code WORKFLOW.yaml manifest (with full stage schema)
-8. auto-code pipeline.py (stage-aware composition; includes migration from `app/agents/pipeline.py` — old file deleted)
-9. Completion report models
-10. Infrastructure skills (5)
-11. Database tables (StageExecution, TaskGroupExecution, ValidatorResult)
+8. auto-code pipeline.py (migration from `app/agents/pipeline.py`)
+9. `reconfigure_stage` as FunctionTool + event publishing
+10. Gateway endpoints + config wiring
+11. Infrastructure skills (5)
+12. Three-tier agent cascade (workflow-scope agent definitions)
