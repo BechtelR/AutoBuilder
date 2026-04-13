@@ -237,9 +237,9 @@ interfaces:
 types:
   - name: WorkflowManifest
     kind: model
-    fields: [name, description, version, triggers, pipeline_type, required_tools, optional_tools, default_models, stages, validators, resources, deliverable, outputs, completion_report, brief_template, conventions, director_guidance, mcp_servers, config]
+    fields: [name, description, version, triggers, pipeline_type, required_tools, optional_tools, default_models, stages, validators, resources, deliverable, outputs, completion_report, brief_template, conventions, director_guidance, mcp_servers, edit_operations, config]
     used_by: [WorkflowRegistry, PipelineContext, AgentRegistry]
-    note: "See workflows.md §Root Fields for full field definitions"
+    note: "See workflows.md §Root Fields for full field definitions. edit_operations added per PRD v7.3 back-propagation."
 
   - name: StageDef
     kind: model
@@ -270,6 +270,12 @@ types:
     kind: model
     fields: [name, description, pipeline_type(PipelineType), directory(Path), triggers]
     used_by: [WorkflowRegistry]
+
+  - name: EditOperationDef
+    kind: model
+    fields: [name, description, entry_stage, requires_approval]
+    used_by: [WorkflowManifest]
+    note: "Added per PRD v7.3 back-propagation. Schema-only in Phase 7; runtime consumer is Phase 8a (X27)."
 
   - name: PipelineType
     kind: enum

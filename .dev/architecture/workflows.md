@@ -138,6 +138,7 @@ stages:
 | `conventions` | list[string] | No | `[]` | Workflow-wide rules injected as GOVERNANCE fragments. |
 | `director_guidance` | DirectorGuidanceDef | No | `{}` | Guidance the Director needs for this workflow type. |
 | `mcp_servers` | list[McpServerDef] | No | `[]` | MCP servers this workflow can use. McpServerDef has name (str) and required (bool, default false). |
+| `edit_operations` | list[EditOperationDef] | No | `[]` | Permitted edit operations — any-time, any-state project modifications (Decision D5). |
 | `config` | dict[string, object] | No | `{}` | Pipeline-specific configuration consumed by `pipeline.py`. |
 
 ### Manifest Type Definitions
@@ -185,6 +186,15 @@ Each trigger entry contains ONE of `keywords` or `explicit`, not both.
 |-------|------|-------------|
 | `stage_transition_notes` | dict[string, string] | Per-stage guidance keyed by stage name |
 | `escalation_hints` | list[string] | Conditions that should trigger CEO escalation |
+
+#### EditOperationDef
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Operation identifier (e.g., `add_endpoint`, `refactor_module`) |
+| `description` | string | What this edit operation does |
+| `entry_stage` | string | Which stage the edit begins at (e.g., `plan` or `build`) |
+| `requires_approval` | bool | Whether CEO/Director approval is needed before execution |
 
 ### Trigger Matching
 
@@ -578,9 +588,9 @@ Full authoring detail: see [director-authoring-design.md](../.notes/260312_direc
 
 Workflows execute inside ARQ worker processes, not the gateway. The execution lifecycle:
 
-1. **Client request** -- CLI or dashboard sends `POST /workflows/run` with spec and workflow name
+1. **Director-mediated entry** -- Director validates brief, creates project, resolves workflow (see [execution.md](./execution.md#director-mediated-entry))
 2. **Gateway validation** -- validates request, resolves workflow via WorkflowRegistry, creates job record
-3. **Job enqueueing** -- gateway enqueues ARQ job with workflow name, spec, and session ID
+3. **Job enqueueing** -- gateway enqueues ARQ work session job for the project
 4. **Worker pickup** -- ARQ worker dequeues job, instantiates ADK pipeline via `WorkflowRegistry.create_pipeline()`
 5. **Pipeline execution** -- ADK agents execute in worker process. State flows through database. Events publish to Redis Streams.
 6. **Stage transitions** -- PM drives stage advancement (if multi-stage). Reconfiguration is state-driven within the same session.
@@ -588,6 +598,38 @@ Workflows execute inside ARQ worker processes, not the gateway. The execution li
 8. **Completion** -- worker marks job complete, publishes completion event with three-layer verification report
 
 The gateway never runs ADK pipelines. It is a job broker and event proxy. Workers scale independently, crashed workers do not take down the gateway, and ADK remains an internal engine behind the anti-corruption layer.
+
+---
+
+## Living Projects & Edit Operations (Decision D5)
+
+Projects are living entities. They persist after completion and remain available for further work via edit, extend, and workstream entry modes (see [execution.md](./execution.md#seven-universal-entry-modes)).
+
+Each workflow defines its permitted edit operations in the manifest's `edit_operations` field. Edits are a continuous, any-time capability — not limited to post-completion. The CEO can issue edits through the Director regardless of project state (SHAPING, ACTIVE, PAUSED, SUSPENDED, COMPLETED). Edits create new TaskGroups within the existing project — they do not create new projects.
+
+**Edit flow:** CEO issues edit → Director validates against permitted operations → Director creates TaskGroup(s) in project → PM incorporates into batch selection. During active execution, new edit TaskGroups queue alongside in-progress work. During paused/suspended state, they queue for when execution resumes. Batch edits (multiple operations at once) are a single Director action producing appropriately ordered TaskGroups.
+
+```yaml
+edit_operations:
+  - name: add_feature
+    description: Add new functionality to the existing codebase
+    entry_stage: plan
+    requires_approval: false
+  - name: refactor
+    description: Restructure existing code without changing behavior
+    entry_stage: design
+    requires_approval: true
+  - name: fix_bug
+    description: Fix a reported defect
+    entry_stage: build
+    requires_approval: false
+```
+
+If `edit_operations` is omitted, the workflow does not support edits. The Director checks available operations before accepting an edit request.
+
+### Project-Workflow Relationship
+
+Projects are first-order entities (Decision D3) bound to a workflow type at creation time. The `projects` table tracks workflow type, brief content, status, current stage, active TaskGroup, and accumulated cost. All deliverables, queue items, stage executions, and TaskGroup executions reference a project. See [data.md](./data.md) for schema details.
 
 ---
 
@@ -731,6 +773,6 @@ It does not define how tools work, how skills load, how models are selected, how
 
 ---
 
-**Document Version:** 5.1
-**Last Updated:** 2026-04-11
-**Status:** Phase 7 Design Complete -- Build Pending
+**Document Version:** 5.2
+**Last Updated:** 2026-04-12
+**Status:** Phase 7 Design Complete -- Phase 8a Shaping

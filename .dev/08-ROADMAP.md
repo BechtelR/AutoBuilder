@@ -8,7 +8,7 @@ Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0-10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention -- through a production-grade API gateway with async worker execution.
 
-**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: DONE | Phase 6: DONE | Phase 7: DONE | Phase 8a: NEXT**
+**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: DONE | Phase 6: DONE | Phase 7: DONE | Phase 8a: SHAPING**
 
 ---
 
@@ -274,29 +274,35 @@ Director workflow authoring via 6-phase lifecycle (requirements → discovery �
 
 ---
 
-## Phase 8a: Autonomous Execution Loop `L`
+## Phase 8a: Autonomous Execution Engine `L`
 
 **Goal**: End-to-end autonomous execution — brief in, verified code out, sequential batches. Connects Phase 7's workflow framework, Phase 5b's supervision hierarchy, and Phase 4's toolset into a working autonomous loop. This phase proves the core thesis: specification to verified deliverables with minimal human intervention. PM IS the outer loop.
-**Status**: PLANNED
+**Status**: SHAPING
 **Prerequisites**: Phase 7 (workflow composition operational)
 
 ### Scope Summary
-Brief/spec submission endpoint with workflow resolution, project creation, and work session enqueueing. Management tool DB wiring — the critical infrastructure gap: replace placeholder strings in `select_ready_batch`, `update_deliverable`, `query_deliverables`, `escalate_to_director`, `escalate_to_ceo` (tool version), `list_projects`, `query_project_status`, `override_pm`, `manage_dependencies`, `query_dependency_graph`, `task_create`, `task_update`, and `task_query` with real DB persistence via ToolContext. Deliverable lifecycle expansion: dependency graph resolution, topological sort into sequential batches. Director execution loop with backlog queue orchestration — connecting the Director queue and CEO queue DB infrastructure from Phase 5b into the flow described in `architecture/execution.md`: brief → Director triage → PM delegation → autonomous execution. Director queue gateway routes for observability and processing. PM batch loop running sequentially through dependency-ordered batches with stage-driven transitions, deterministic safety mechanisms (RegressionTestAgent, checkpoint_project), and inter-batch reasoning (retry/reorder/skip/escalate). Autonomous failure handling with batch failure threshold triggering Director suspension. Three-layer completion report wiring into INTEGRATE stage validators. Brief validation against workflow `brief_template`. Pre-execution resource validation (credentials, services, knowledge).
+Director-mediated project creation through the supervision hierarchy — all work enters via Director chat sessions supporting seven universal entry modes (new, new-with-materials, extend, edit, re-run, direct execution, workstream). Director validates briefs against workflow `brief_template`, checks pre-execution resources (credentials, services, knowledge), creates project entities (new first-order `projects` table), and delegates to PMs by enqueueing work sessions. Management tool DB wiring — the critical infrastructure gap: replace placeholder strings in all PM tools (`select_ready_batch`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `query_dependency_graph`, `escalate_to_director`, `checkpoint_project`) and Director tools (`escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`) plus shared tools (`task_create`, `task_update`, `task_query`) with real DB persistence via ToolContext. New Director tools: `create_project`, `validate_brief`, `check_resources`, `delegate_to_pm`. Deliverable lifecycle expansion: dependency graph resolution, topological sort into sequential batches. Director execution loop with backlog queue orchestration — connecting the Director queue and CEO queue DB infrastructure from Phase 5b: Director triages escalations, resolves within authority, forwards to CEO queue. Director queue gateway routes for observability and processing. PM stage-driven sequential batch loop: Stage → TaskGroup → Batch → Deliverable hierarchy with stage transitions gated by `verify_stage_completion`, TaskGroup completion triggering Director approval and completion reports, and deterministic safety mechanisms (validators, regression tests, checkpoints). Autonomous failure handling with retry/skip/reorder/escalate and batch failure threshold triggering Director suspension. Three-layer completion report wiring at TaskGroup and Stage levels into INTEGRATE stage validators. Context recreation and resume at TaskGroup boundaries — save critical state, fresh session, resume without re-executing verified work. Artifact storage for deliverable outputs and completion reports. Project continuity with workflow-defined edit operations (living entities). Execution and system observability: deliverable status routes, workflow status, queue monitoring.
 
 ### Completion Contract
 
 | Status | Contract Item | PRD |
 |--------|--------------|-----|
-| | Can submit a brief, have it routed to the correct workflow, create a project, and enqueue a work session | PR-1, PR-8 |
+| | Director creates projects through conversation supporting seven entry modes (new, new-with-materials, extend, edit, re-run, direct execution, workstream) — validates brief, checks resources, creates project entity, delegates to PM via work session | PR-1, PR-8, PR-13 |
 | | Brief validated against workflow's `brief_template` before acceptance; pre-execution resource validation checks credentials, services, and knowledge availability | PR-8 |
-| | Management tools (`select_ready_batch`, `update_deliverable`, `query_deliverables`, `escalate_to_director`, etc.) write to and read from the database — no placeholder strings remain | PR-10 |
-| | `escalate_to_director` writes real `DirectorQueueItem` rows; Director queue gateway routes (`GET /director/queue`, `PATCH /director/queue/{id}`) operational | PR-14 |
-| | Director execution loop processes backlog: reads Director queue, delegates projects to PM, forwards unresolvable items to CEO queue | PR-14 |
-| | PM drives sequential batch loop autonomously: `select_ready_batch()` returns dependency-ordered batches, PM executes deliverables one batch at a time with deterministic safety mechanisms | PR-10, PR-14 |
-| | Loop continues autonomously until all deliverables complete or escalated | PR-10 |
+| | Projects are first-order DB entities tracking workflow type, status, stage, deliverables, escalations, and cost | PR-2 |
+| | Management tools (all PM, Director, and shared tools) write to and read from the database — no placeholder strings remain | PR-10 |
+| | `escalate_to_director` writes real `DirectorQueueItem` rows; `escalate_to_ceo` writes real `CeoQueueItem` rows; Director queue gateway routes (`GET /director/queue`, `PATCH /director/queue/{id}`) operational | PR-14 |
+| | Director execution loop processes backlog: reads Director queue, triages items within authority, forwards unresolvable items to CEO queue | PR-14 |
+| | PM drives sequential execution through Stage → TaskGroup → Batch → Deliverable hierarchy: creates TaskGroups, selects dependency-ordered batches, executes one batch at a time, stage transitions gated by `verify_stage_completion` | PR-10, PR-14 |
+| | Loop continues autonomously until all stages complete or work escalated | PR-10 |
 | | Failed deliverables don't block independent work — PM skips/reorders around failures | PR-12, PR-25 |
 | | Consecutive batch failures trigger Director suspension of project (batch failure threshold) | PR-16 |
-| | Three-layer completion report (functional/architectural/contract) generated at INTEGRATE stage with machine evidence from validators | PR-22 |
+| | Three-layer completion report (functional/architectural/contract) generated at TaskGroup and Stage completion with machine evidence from validators | PR-22 |
+| | Context recreation at TaskGroup boundaries — save critical state, create fresh session, resume without re-executing verified work | PR-15a |
+| | Deliverable outputs and completion reports stored as persistent, retrievable artifacts | PR-24 |
+| | Projects support workflow-defined edit operations at any time regardless of project state — single and batch edits queue as new TaskGroups | PR-3, PR-4 |
+| | Deliverable and workflow status query routes operational; Director queue, PM queue, and system observability accessible via API | PR-34 |
+| | Every work layer (project, all-projects, Director) supports explicit Pause (save state, log, stop) and Start (load resources, rebuild context, resume) lifecycle operations | PR-3 |
 
 ---
 
@@ -518,7 +524,7 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 6: Skills System | `M` | SkillLibrary, three-layer loading, supervision-tier resolution, 11 initial skills |
 | 7: Workflow Composition | `L` | WorkflowRegistry, manifest, stage schema, validators, auto-code 5-stage |
 | 7b: Director Authoring | `M` | Director workflow creation, resource discovery, staging gate |
-| 8a: Autonomous Execution Loop | `L` | Brief submission, management tool DB wiring, Director backlog loop, sequential batch execution, failure handling, completion wiring |
+| 8a: Autonomous Execution Engine | `L` | Brief submission, management tool DB wiring, Director backlog loop, sequential batch execution, failure handling, completion wiring |
 | 8b: Parallel Execution & Isolation | `M` | ParallelAgent, git worktree lifecycle, merge conflict strategy, concurrency limits, intervention API |
 | 9: Memory Service | `M` | PostgresMemoryService, cross-session search |
 | 10: Events, CLI, Observability | `L` | SSE, webhooks, typer CLI, OpenTelemetry |
@@ -545,9 +551,9 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 2026-03-11 | Phase 6 scope updated from FRD: three-layer loading model, supervision-tier resolution, autonomous creation, `applies_to` filtering, 11 initial skills; completion contract expanded from 5→8 items |
 | 2026-03-11 | All open questions resolved (Decisions #59-67); migrated to `.decision-log.md` |
 | 2026-03-12 | Phase 7 scope expanded (Decisions #70-77): manifest, stage schema, validators, quality framework, directory override model. Phase 7b added (Director workflow authoring). Effort upgraded S→L. |
-| 2026-04-12 | Phase 8 re-scoped and split: renamed "Spec Pipeline & Autonomous Loop" → "Autonomous Execution Loop" (8a) + "Parallel Execution & Isolation" (8b). 8a owns end-to-end sequential autonomous loop (brief submission, management tool DB wiring, Director backlog orchestration, sequential batch execution, failure handling, completion report wiring). 8b owns parallel upgrade (ParallelAgent, git worktrees, merge conflict strategy, concurrency limits, intervention API). Split justified by clean dependency boundary — sequential loop must work before adding filesystem concurrency. Architecture audit added 9 new BOM components (X12-X16, X18-X19, G28-G29). Phases 9/10 prerequisites updated to 8a. |
+| 2026-04-12 | Phase 8 re-scoped and split: renamed "Spec Pipeline & Autonomous Loop" → "Autonomous Execution Engine" (8a) + "Parallel Execution & Isolation" (8b). 8a owns end-to-end sequential autonomous loop (brief submission, management tool DB wiring, Director backlog orchestration, sequential batch execution, failure handling, completion report wiring). 8b owns parallel upgrade (ParallelAgent, git worktrees, merge conflict strategy, concurrency limits, intervention API). Split justified by clean dependency boundary — sequential loop must work before adding filesystem concurrency. Architecture audit added 9 new BOM components (X12-X16, X18-X19, G28-G29). Phases 9/10 prerequisites updated to 8a. |
 | 2026-04-12 | Phases 7b-14 audit against Phase 7 design artifacts and architecture: Phase 7b scope expanded with import-level sandboxing and real INTEGRATE validator implementations (deferred from Phase 7); Phase 8 scope clarified sequential→parallel upgrade and concurrency limits; Phase 9 pgvector removed (deferred to Phase 11 semantic memory upgrade, Phase 9 uses tsvector only); Phase 10 scope corrected (EventPublisher is Phase 3, Phase 10 adds consumer infrastructure) and workflow gateway routes added; Phase 11 removed already-completed "agent role-based tool restrictions" and clarified compound workflow and pgvector scope |
 
 ---
 
-*Last Updated: 2026-04-12 (Phase 8 split)*
+*Last Updated: 2026-04-12 (Phase 8a shaping)*

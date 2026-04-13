@@ -60,7 +60,7 @@ Each of these is a thin Python function (~5-30 lines) that ADK auto-wraps via `F
 
 All FunctionTools execute inside worker processes. They have direct access to the worker's filesystem and subprocess environment. The gateway never calls these tools directly -- it only enqueues workflow jobs that workers execute.
 
-**42 tools across 8 categories.**
+**46 tools across 8 categories.**
 
 ### 3.1 Filesystem Tools (10 tools)
 
@@ -263,10 +263,14 @@ def manage_dependencies(action: DependencyAction, source_id: str, target_id: str
 
 **Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment. `checkpoint_project` is an `after_agent_callback` on DeliverablePipeline that fires after each deliverable completes, persisting state via `CallbackContext`. `run_regression_tests` is a `RegressionTestAgent` (CustomAgent) wired into the pipeline after each batch -- it reads the PM's regression policy from session state, runs tests when the policy says to, and no-ops otherwise. Always present in the pipeline, policy-aware. See [Agents](./agents.md) for details.
 
-### 3.8 Director Management Tools (6 tools)
+### 3.8 Director Management Tools (10 tools)
 
 | Tool | Status | Purpose |
 |------|--------|---------|
+| `validate_brief(brief, workflow_name?)` | **New** (D10) | Validate CEO brief against workflow requirements |
+| `create_project(workflow_name, brief, entry_mode)` | **New** (D10) | Create project record bound to workflow type |
+| `check_resources(workflow_name, project_id?)` | **New** (D10) | Verify resource availability before execution |
+| `delegate_to_pm(project_id)` | **New** (D10) | Delegate project to PM for autonomous execution |
 | `escalate_to_ceo(type: CeoItemType, priority: EscalationPriority, message, metadata)` | Keep (Director-only now) | Director → CEO queue |
 | `list_projects(status?)` | **New** | Cross-project visibility |
 | `query_project_status(project_id)` | **New** | PM status, batch progress, cost |
@@ -275,6 +279,23 @@ def manage_dependencies(action: DependencyAction, source_id: str, target_id: str
 | `query_dependency_graph(project_id, deliverable_id?)` | **New** | Query/visualize dependency graph |
 
 ```python
+def validate_brief(brief: str, workflow_name: str | None = None) -> str:
+    """Validate a CEO brief against workflow requirements. Returns validation
+    result with any missing fields or ambiguities. If workflow_name is omitted,
+    also resolves the best-matching workflow type."""
+
+def create_project(workflow_name: str, brief: str, entry_mode: EntryMode) -> str:
+    """Create a new project record bound to a workflow type. Sets initial status
+    to SHAPING. Returns the project ID."""
+
+def check_resources(workflow_name: str, project_id: str | None = None) -> str:
+    """Verify that all required resources (credentials, services, knowledge)
+    declared in the workflow manifest are available before execution begins."""
+
+def delegate_to_pm(project_id: str) -> str:
+    """Delegate a project to a PM agent for autonomous execution. The PM
+    receives the project context and begins the execution loop."""
+
 def escalate_to_ceo(item_type: CeoItemType, priority: EscalationPriority, message: str, metadata: str) -> str:
     """Push a notification, approval request, escalation, or task to the unified
     CEO queue. Director-only — PM uses escalate_to_director instead."""
@@ -485,7 +506,7 @@ Within each tier, individual agents have scoping based on their role. The table 
 | `reviewer` | Read-only | Full | -- | Read-only | Full | Session todos | -- |
 | `fixer` | Full | Full | `bash_exec` only | Read-only (no commit) | Full | Session todos | -- |
 | PM | -- | -- | -- | -- | -- | Shared tasks | PM tools (6) |
-| Director | -- | -- | -- | -- | -- | Shared tasks | Director tools (6) |
+| Director | -- | -- | -- | -- | -- | Shared tasks | Director tools (10) |
 
 **Detailed per-role breakdown:**
 
@@ -527,4 +548,4 @@ Director can author new tools (writes Python functions to the tools module). **C
 ---
 
 *Document Version: 4.1*
-*Last Updated: 2026-02-18*
+*Last Updated: 2026-04-12*

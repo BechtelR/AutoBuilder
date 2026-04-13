@@ -106,6 +106,8 @@ Execute the Build Order from spec.md batch-by-batch. Each batch is one cycle:
 
 1. **Delegate** — assign deliverables to subagents per `<delegation>`. Parallel batches → launch subagents in parallel. Sequential batches → one at a time.
 
+   **USE sufficient agent pool size.** Not utilizing enough agents for the work creates more errors + incompletions resulting in additional downstream rework and cost.
+
    **Context injection per subagent** (progressive disclosure — give each agent only what it needs):
    - The deliverable's spec section (ID, files, description, BOM components, requirements, validation)
    - Relevant model.md interfaces/types for that deliverable (if model.md exists)

@@ -157,7 +157,7 @@ If AutoBuilder were primarily an LLM-centric application where agents were the m
 
 ## 6. Core Architecture
 
-### The Autonomous Execution Loop
+### The Autonomous Execution Engine
 
 ```
 1. Load spec → generate deliverables (spec-to-deliverable pipeline)

@@ -21,9 +21,11 @@ No separate dashboard database. No separate session database. One schema, one mi
 
 | Table | Purpose |
 |-------|---------|
-| `specifications` | Submitted specs and their decomposition status |
+| `projects` | First-order project entities (Decision D3). Tracks workflow type, brief content, status, current stage, active TaskGroup, accumulated cost. All deliverables, queue items, stage/TaskGroup executions reference a project. |
+| `specifications` | Shaped specifications and their decomposition status |
 | `workflows` | Workflow execution records (status, params, timestamps) |
-| `deliverables` | Individual deliverable records within a workflow |
+| `deliverables` | Individual deliverable records within a workflow, referencing a project |
+| `task_groups` | PM-created runtime planning units (~1h work). Checkpoint/resume boundary (Decision D4). References a project and stage. |
 | `project_configs` | Per-project configuration (limits, conventions, model overrides) -- DB entity, not state |
 | `sessions` | ADK session state (persisted via DatabaseSessionService adapter) |
 | `chats` | Chat sessions — Settings (formation/evolution), Director conversations, and project-scoped chats (session_id, type, status, title) |
@@ -32,6 +34,17 @@ No separate dashboard database. No separate session database. One schema, one mi
 | `events` | Audit log (subset of events written by audit consumer) |
 | `webhook_listeners` | Registered webhook endpoints and filters |
 | `skills` | Skill index and metadata |
+
+### Project Status Lifecycle (Decision D3)
+
+| Status | Description |
+|--------|-------------|
+| `SHAPING` | Brief is being refined into a specification |
+| `ACTIVE` | PM is executing deliverables |
+| `PAUSED` | Execution paused at a TaskGroup boundary (resumable) |
+| `SUSPENDED` | Blocked on external dependency or escalation |
+| `COMPLETED` | All stages finished, project remains available for edits |
+| `ABORTED` | Terminated by CEO or Director |
 
 ---
 
@@ -78,4 +91,4 @@ Redis serves four distinct roles from day one. This is fundamental infrastructur
 ---
 
 *Extracted from 02-ARCHITECTURE.md v2.9*
-*Last Updated: 2026-02-28*
+*Last Updated: 2026-04-12*

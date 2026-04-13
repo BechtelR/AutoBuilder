@@ -214,10 +214,10 @@ Your instinct about Google is valid but nuanced: the code is genuinely open, but
 
 ### How AutoBuilder's Core Loop Maps to Each Framework
 
-**The Autonomous Execution Loop** (AutoBuilder's defining feature):
+**The Autonomous Execution Engine** (AutoBuilder's defining feature):
 
 ```
-1. Load spec → generate deliverables
+1. Load workflow → generate deliverables
 2. Resolve dependencies (topological sort)
 3. While incomplete deliverables exist:
    a. Select next batch (respecting deps + concurrency)

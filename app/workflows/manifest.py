@@ -111,6 +111,17 @@ class DeliverableTypeDef(BaseModel):
     verification: list[str] = Field(default_factory=lambda: list[str]())
 
 
+class EditOperationDef(BaseModel):
+    """Definition of a workflow-specific edit operation."""
+
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    name: str
+    description: str = ""
+    entry_stage: str = ""  # Which stage to enter on edit; empty = first stage
+    requires_approval: bool = True
+
+
 class WorkflowManifest(BaseModel):
     """Root model for WORKFLOW.yaml -- progressive disclosure (only name + description required)."""
 
@@ -136,6 +147,9 @@ class WorkflowManifest(BaseModel):
     brief_template: dict[str, object] = Field(default_factory=dict)
     conventions: list[str] = Field(default_factory=lambda: list[str]())
     director_guidance: dict[str, object] = Field(default_factory=dict)
+    edit_operations: list[EditOperationDef] = Field(
+        default_factory=lambda: list[EditOperationDef]()
+    )
     config: dict[str, object] = Field(default_factory=dict)
 
     @field_validator("description")

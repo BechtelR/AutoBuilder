@@ -1,0 +1,62 @@
+# Context Optimizer — Index
+
+*Source document: `context-optimizer-research.md` — split 2026-04-12*
+
+---
+
+## [01 — Research & Algorithm](./01-research-and-algorithm.md)
+
+- [1. Problem Statement](./01-research-and-algorithm.md#1-problem-statement)
+- [2. Research Summary](./01-research-and-algorithm.md#2-research-summary)
+  - [2.1 Optimization Algorithm Landscape](./01-research-and-algorithm.md#21-optimization-algorithm-landscape)
+  - [2.2 Recommendation: GEPA](./01-research-and-algorithm.md#22-recommendation-gepa-genetic-pareto)
+  - [2.3 DSPy Integration Path](./01-research-and-algorithm.md#23-dspy-integration-path)
+
+## [02 — Architecture, API & Data Model](./02-architecture-api-data-model.md)
+
+- [3. Architecture](./02-architecture-api-data-model.md#3-architecture)
+  - [3.1 Design Principles](./02-architecture-api-data-model.md#31-design-principles)
+  - [3.2 Evaluation Modes: Intrinsic vs. Extrinsic](./02-architecture-api-data-model.md#32-evaluation-modes-intrinsic-vs-extrinsic)
+  - [3.3 System Context](./02-architecture-api-data-model.md#33-system-context)
+  - [3.4 Component Overview](./02-architecture-api-data-model.md#34-component-overview)
+- [4. API Design](./02-architecture-api-data-model.md#4-api-design)
+  - [4.1 Eval Suite Endpoints](./02-architecture-api-data-model.md#41-eval-suite-endpoints)
+  - [4.2 Campaign Endpoints](./02-architecture-api-data-model.md#42-campaign-endpoints)
+  - [4.3 Result Endpoints](./02-architecture-api-data-model.md#43-result-endpoints)
+- [5. Data Model](./02-architecture-api-data-model.md#5-data-model)
+  - [5.1 Eval Suite](./02-architecture-api-data-model.md#51-eval-suite)
+  - [5.2 Eval Case](./02-architecture-api-data-model.md#52-eval-case)
+  - [5.3 Campaign](./02-architecture-api-data-model.md#53-campaign)
+  - [5.4 Optimized Result](./02-architecture-api-data-model.md#54-optimized-result)
+- [6. Worker Implementation](./02-architecture-api-data-model.md#6-worker-implementation)
+  - [6.1 Campaign Execution](./02-architecture-api-data-model.md#61-campaign-execution)
+  - [6.2 Validation Pipeline](./02-architecture-api-data-model.md#62-validation-pipeline)
+  - [6.3 Cost Tracking](./02-architecture-api-data-model.md#63-cost-tracking)
+  - [6.4 Concrete Examples](./02-architecture-api-data-model.md#64-concrete-examples)
+
+## [03 — Eval Suite Design, Operations & References](./03-eval-suite-operations-references.md)
+
+- [7. Optimization Goal](./03-eval-suite-operations-references.md#7-optimization-goal)
+  - [7.1 Evaluation Dimensions](./03-eval-suite-operations-references.md#71-evaluation-dimensions)
+- [8. Eval Suite Design Patterns](./03-eval-suite-operations-references.md#8-eval-suite-design-patterns)
+  - [8.1 Pattern 1: Contrastive Boundary Pairs](./03-eval-suite-operations-references.md#81-pattern-1-contrastive-boundary-pairs)
+  - [8.2 Pattern 2: Adaptive Difficulty Calibration](./03-eval-suite-operations-references.md#82-pattern-2-adaptive-difficulty-calibration-irt-inspired)
+  - [8.3 Pattern 3: Adversarial-Discriminative Cycling](./03-eval-suite-operations-references.md#83-pattern-3-adversarial-discriminative-cycling)
+  - [8.4 The Hybrid: Recommended Suite Structure](./03-eval-suite-operations-references.md#84-the-hybrid-recommended-suite-structure)
+  - [8.5 Hybrid Suite — Implementation Pseudocode](./03-eval-suite-operations-references.md#85-hybrid-suite--implementation-pseudocode)
+- [9. Eval Suite Generation](./03-eval-suite-operations-references.md#9-eval-suite-generation)
+  - [9.1 Generation Flow](./03-eval-suite-operations-references.md#91-generation-flow)
+  - [9.2 Generation Model Selection](./03-eval-suite-operations-references.md#92-generation-model-selection)
+  - [9.3 Generation Endpoint](./03-eval-suite-operations-references.md#93-generation-endpoint)
+- [10. CLI Interface](./03-eval-suite-operations-references.md#10-cli-interface)
+- [11. Codebase Location](./03-eval-suite-operations-references.md#11-codebase-location)
+- [12. Cost Model](./03-eval-suite-operations-references.md#12-cost-model)
+- [13. Integration Points](./03-eval-suite-operations-references.md#13-integration-points)
+  - [13.1 Triggered by AutoBuilder](./03-eval-suite-operations-references.md#131-triggered-by-autobuilder)
+  - [13.2 Results Applied to AutoBuilder](./03-eval-suite-operations-references.md#132-results-applied-to-autobuilder)
+  - [13.3 Observability](./03-eval-suite-operations-references.md#133-observability)
+- [14. Phase Placement](./03-eval-suite-operations-references.md#14-phase-placement)
+- [15. Open Questions](./03-eval-suite-operations-references.md#15-open-questions)
+- [16. Key Dependencies](./03-eval-suite-operations-references.md#16-key-dependencies)
+- [17. Risk Assessment](./03-eval-suite-operations-references.md#17-risk-assessment)
+- [18. References](./03-eval-suite-operations-references.md#18-references)

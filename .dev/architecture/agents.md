@@ -530,6 +530,10 @@ A "Main" project acts as the permanent default -- the Director's home context. M
 
 | Tool | Purpose |
 |------|---------|
+| `validate_brief` | Validate a CEO brief against workflow requirements (Decision D10) |
+| `create_project` | Create a new project record bound to a workflow type (Decision D10) |
+| `check_resources` | Verify resource availability before execution (Decision D10) |
+| `delegate_to_pm` | Delegate a project to a PM for execution (Decision D10) |
 | `escalate_to_ceo` | Push items to CEO queue (Director-only) |
 | `list_projects` | Cross-project visibility |
 | `query_project_status` | PM status, batch progress, cost |
@@ -553,6 +557,10 @@ director_agent = LlmAgent(
                 "Manage PMs via transfer_to_agent, allocate resources, "
                 "enforce hard limits, intervene when patterns go wrong.",
     tools=[
+        FunctionTool(validate_brief),
+        FunctionTool(create_project),
+        FunctionTool(check_resources),
+        FunctionTool(delegate_to_pm),
         FunctionTool(escalate_to_ceo),
         FunctionTool(list_projects),
         FunctionTool(query_project_status),
@@ -1168,5 +1176,5 @@ The four state-based mechanisms are distinct: `output_key` writes data, `{key}` 
 ---
 
 **Document Version:** 5.4
-**Last Updated:** 2026-03-11
-**Status:** Framework Validated -- Phase 6 FRD Findings Propagated
+**Last Updated:** 2026-04-12
+**Status:** Phase 8a Shaping -- Director-Mediated Entry Propagated

@@ -164,6 +164,8 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 - [x] `ResourcesDef` model has: `credentials` (list of env var names), `services` (list with health_check URLs), `knowledge` (list of file/directory paths)
 - [x] `McpServerDef` model has: `name` (str, required), `required` (bool, default False)
 - [x] `WorkflowManifest` includes `mcp_servers: list[McpServerDef]` field with default `[]`
+- [x] `EditOperationDef` model has: `name` (str, required), `description` (str, default ""), `entry_stage` (str, default ""), `requires_approval` (bool, default True) -- *added post-completion per PRD v7.3 back-propagation (delta-report.md); implemented 2026-04-12*
+- [x] `WorkflowManifest` includes `edit_operations: list[EditOperationDef]` field with default `[]` -- *added post-completion per PRD v7.3 back-propagation (delta-report.md); implemented 2026-04-12*
 - [x] `WorkflowEntry` is a lightweight index model with: `name`, `description`, `directory: Path`, `pipeline_type`, `triggers`
 - [x] `RunConfig` model has: `workflow_name`, `project_id`, `specification`, `config_overrides`
 - [x] `PipelineFactory` Protocol with `async def __call__(self, ctx: PipelineContext) -> BaseAgent` — the interface contract for all workflow `create_pipeline` functions

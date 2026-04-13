@@ -145,7 +145,7 @@ AutoBuilder's own build process — observable in `.claude/commands/` and `.clau
 
 Phase 8 was split into two phases based on a clean dependency boundary:
 
-**Phase 8a: "Autonomous Execution Loop"** (`L`) — End-to-end autonomous execution with sequential batches. Proves the core thesis: brief in → verified code out → minimal human intervention. Owns: brief submission, management tool DB wiring, Director backlog orchestration, sequential PM batch loop, failure handling, three-layer completion wiring, Director queue routes.
+**Phase 8a: "Autonomous Execution Engine"** (`L`) — End-to-end autonomous execution with sequential batches. Proves the core thesis: brief in → verified code out → minimal human intervention. Owns: brief submission, management tool DB wiring, Director backlog orchestration, sequential PM batch loop, failure handling, three-layer completion wiring, Director queue routes.
 
 **Phase 8b: "Parallel Execution & Isolation"** (`M`) — Upgrades sequential to parallel. Owns: ParallelAgent composition, git worktree lifecycle, merge conflict strategy, state key namespacing, concurrency limits, proactive intervention API.
 
@@ -263,7 +263,7 @@ Phase 8 introduces deliverable DB entities. What's the schema?
 ### T7: Rename Phase 8? — RESOLVED
 
 **Decision**: Split into two phases:
-- **Phase 8a: "Autonomous Execution Loop"** — sequential end-to-end proof
+- **Phase 8a: "Autonomous Execution Engine"** — sequential end-to-end proof
 - **Phase 8b: "Parallel Execution & Isolation"** — parallel upgrade with worktree isolation
 
 See "Phase Split: 8a + 8b" in section 3 for full justification.
@@ -358,3 +358,84 @@ Airflow's dynamic task mapping generates tasks at runtime from previous output. 
 **Biggest risk**: Git worktree merge conflicts during parallel execution. This is the one thing that can't be solved by better prompting — it's a fundamental concurrency problem that needs a deterministic strategy (merge in dependency order, rebase, or escalate).
 
 **Recommended rename**: "Autonomous Execution Engine"
+
+---
+
+## 8. Shaping Decisions (2026-04-12)
+
+Decisions captured during the Phase 8a FRD shaping conversation. These refine and extend the pre-shaping research above.
+
+### D1: Director-Mediated Entry (All Work Through Director)
+
+All work enters through the Director following the supervision hierarchy (CEO → Director → PM → Workers). There is no raw API endpoint that bypasses the Director. The "brief submission endpoint" means the Director has validated a Brief and creates a Project. The Director mediates all entry modes through chat sessions using tools and sub-agents.
+
+### D2: Seven Universal Entry Modes
+
+Entry modes are workflow-agnostic (not specific to auto-code). All workflows support:
+
+1. **New** — no prior work, Director shapes from scratch (PRD: Collaborative shaping)
+2. **New with Materials** — user brings artifacts, Director evaluates and incorporates (PRD: Direct execution)
+3. **Extend** — add new scope to existing project (PRD: Extension)
+4. **Edit** — modify existing deliverables within a project (PRD: Extension subset)
+5. **Re-run** — same process template, new inputs for repeatable workflows (PRD: Process run)
+6. **Direct Execution** — completed Brief submitted directly, skip shaping conversation
+7. **Workstream** — bounded task within a known project, scoped Brief without full project initialization
+
+Entry mode is captured in the Brief; the workflow type (auto-code, auto-research, etc.) is constant regardless of entry mode. Greenfield/brownfield are auto-code-specific framings of New/Extend.
+
+### D3: Projects as First-Order Entities
+
+A new `projects` table is needed as a first-order DB entity. `ProjectConfig` and `Workflow` are related entities, not replacements. A project tracks: workflow type, current stage, active TaskGroup, queued/completed deliverables, pending escalations, accumulated cost, and status.
+
+### D4: TaskGroup as Checkpoint/Resume Boundary
+
+Context recreation and resume happens at TaskGroup boundaries (not stage — too coarse at hours-days; not deliverable — too fine). When context budget is exceeded, the system saves critical state at the current TaskGroup boundary, creates a fresh session, and resumes from the next unfinished TaskGroup. Mid-work batches within a TaskGroup are rediscovered during resume.
+
+### D5: Living Projects with Workflow-Defined Edits
+
+Projects persist after initial completion as living entities. Each workflow defines available edit operations in its manifest (e.g., auto-code: add/remove feature, fix bug, refactor; auto-research: add question, update sources). Edit requests flow through the Director, creating new TaskGroups within the existing project. Project memory and conventions carry forward.
+
+### D6: Phase 8a/8b Split Confirmed
+
+- **Phase 8a**: Sequential execution only. All batches/deliverables execute one at a time. Proves the core thesis.
+- **Phase 8b**: Parallel execution upgrade. `batch_parallel` workflows get actual concurrency + git worktree isolation.
+- Stages always sequential (can't BUILD before PLAN). Within-stage parallelism is Phase 8b.
+
+### D7: Terminology Hierarchy Confirmed
+
+Stage → TaskGroup(s) → Batch(es) → Deliverable(s). TaskGroup ≠ Batch. A TaskGroup is a PM-created runtime planning unit (~1h). A Batch is a group of deliverables dispatched together within a TaskGroup. Director approves at TaskGroup completion.
+
+### D8: 15 Capabilities Defined
+
+- **CAP-1**: Director-Mediated Project Creation & Brief Submission
+- **CAP-2**: Brief Validation & Pre-Execution Resource Checks
+- **CAP-3**: Durable Management Operations (foundation — all roles)
+- **CAP-4**: Director Queue Operations & Observability
+- **CAP-5**: Director Backlog Orchestration
+- **CAP-6**: Autonomous Stage-Driven Execution Loop (Stage→TaskGroup→Batch→Deliverable)
+- **CAP-7**: Failure Handling & Independent Progress
+- **CAP-8**: Batch Failure Threshold & Director Suspension
+- **CAP-9**: Three-Layer Completion Reporting (TaskGroup + Stage level)
+- **CAP-10**: Project Lifecycle Tracking (first-order DB entity)
+- **CAP-11**: Execution & System Observability
+- **CAP-12**: Context Recreation & TaskGroup Resume
+- **CAP-13**: Artifact Storage
+- **CAP-14**: Project Continuity & Workflow-Defined Edit Operations
+- **CAP-15**: Work Layer Pause & Start Lifecycle
+
+### D9: Scope Hierarchy
+
+CEO + Director = full-system scope. PM = project scope. Escalation: Worker → PM → Director → CEO. All queue items flow upward through this hierarchy.
+
+### D10: New Director Tools Identified
+
+Phase 8a introduces new Director tools not yet in the codebase:
+
+- `create_project` — create project entity in DB
+- `validate_brief` — validate brief against workflow's brief_template
+- `check_resources` — verify credentials, services, knowledge availability
+- `delegate_to_pm` — enqueue PM work session for project
+
+### D11: Appetite
+
+L (Large) — ~2-3 weeks focused effort. 15 capabilities, ~30 BOM components. Can split further (8a/8b/8c) if scope exceeds budget.

@@ -248,6 +248,26 @@ director_guidance:
     - If the PM reports 3+ consecutive batch failures, suspend and diagnose
     - If a deliverable is blocked on external resources, surface to CEO queue
 
+# --- Edit Operations ---
+# Permitted edit operations — issued at any time regardless of project state.
+edit_operations:
+  - name: add_feature
+    description: Add a new feature to the project
+    entry_stage: shape
+    requires_approval: true
+  - name: fix_bug
+    description: Fix a bug in existing code
+    entry_stage: plan
+    requires_approval: false
+  - name: refactor
+    description: Refactor existing code for quality improvement
+    entry_stage: plan
+    requires_approval: true
+  - name: remove_feature
+    description: Remove a feature from the project
+    entry_stage: plan
+    requires_approval: true
+
 # --- Config ---
 # Pipeline-specific configuration consumed by pipeline.py.
 config:

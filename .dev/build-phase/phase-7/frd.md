@@ -263,6 +263,8 @@ Five infrastructure skills are operational and teach workflow authoring patterns
 
 ### PRD Coverage
 
+> **Note (PRD v7.3 back-propagation):** PR-4 was expanded to include "available edit operations" in workflow plugin definitions. The `edit_operations` manifest field is a Tier 3 optional field covered by existing FR-7.09b (additional fields validated against type schemas). No new FRD requirement is needed -- the field follows the same progressive disclosure pattern as `mcp_servers`, `brief_template`, and `director_guidance`. The runtime behavior (accepting and routing edit requests) is Phase 8a scope (BOM X27). See `delta-report.md` for full analysis.
+
 | FRD Requirement | PRD Requirement | Domain |
 |-----------------|-----------------|--------|
 | FR-7.01, FR-7.05, FR-7.06, FR-7.07, FR-7.08 | PR-4 (Workflows are plugins with zero core code changes) | Discovery & registry |

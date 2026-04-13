@@ -1,5 +1,5 @@
 # AutoBuilder — Product Requirements Document
-*Version: 7.2 | Date: 2026-03-11 | Maps to: `00-VISION.md` v3.0*
+*Version: 7.3 | Date: 2026-04-12 | Maps to: `00-VISION.md` v3.0*
 
 ---
 
@@ -25,7 +25,8 @@ The system is functionally stateful — projects accumulate memory, decisions pe
 |------|---------------------|
 | **Collaborative shaping** | A raw idea, goal, or problem — the Director interviews, researches, and shapes it into a Brief |
 | **Direct execution** | A completed Brief ready to run |
-| **Extension** | An existing project or codebase — the Director establishes context, then plans incremental changes |
+| **Extension** | An existing project or codebase — the Director establishes context, then plans new scope additions |
+| **Edit** | Modifications to existing deliverables within a completed or active project — the Director scopes changes within accumulated project context |
 | **Workstream** | A bounded task within a known project — routed directly to the right PM |
 | **Process run** | A new instance of a repeatable workflow — different inputs, same encoded process |
 
@@ -59,7 +60,7 @@ What they can't get elsewhere: process fidelity at scale. AI tools automate step
 ## 2. User Journeys
 
 ### J-1: Shape and Build a New Project
-*Personas: P-1, P-2 | Modes: collaborative shaping, direct execution, extension*
+*Personas: P-1, P-2 | Modes: collaborative shaping, direct execution, extension, edit*
 
 The project may begin with a raw idea (Director interviews the user, conducts research, drafts the Brief collaboratively) or a completed Brief (Director validates it and proceeds directly). Either way, once the Brief is documented, the Director delegates to a PM.
 
@@ -100,14 +101,14 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 | ID | Requirement |
 |----|-------------|
 | PR-1 | A **Brief** is the documented project intent — its structure defined by the workflow type. It may be authored collaboratively with the Director (via interviews and research) or submitted directly. At minimum it captures: objective, acceptance criteria, and scope constraints. The Director validates it before delegating to a PM. |
-| PR-2 | Projects track status, active workflow stage, queued and completed deliverables, pending CEO queue items, and cumulative cost at all times. |
-| PR-3 | Projects support pause, resume, and abort at any time. Pause suspends at the next deliverable checkpoint — within a TaskGroup, between deliverables — with full state persisted. Resume restores from that checkpoint; no verified work is re-executed. Abort terminates, preserves all completed work and events, and records the reason. |
+| PR-2 | Projects are persistent first-order entities that track status, active workflow stage, queued and completed deliverables, pending CEO queue items, and cumulative cost at all times. Projects persist after completion and remain queryable and modifiable. Edit operations can be issued at any time regardless of project state — they queue as new work within accumulated project context. |
+| PR-3 | Pause, resume, and abort operate at three layers: **project** (individual project suspends at next checkpoint), **all-projects** (system-wide pause of every active project), and **Director** (stops backlog processing and new project creation; active PMs pause at their next checkpoint). Pause persists full state at the checkpoint boundary. Resume restores from that checkpoint; no verified work is re-executed. Abort terminates, preserves all completed work and events, and records the reason. All lifecycle transitions publish observable events. |
 
 ### 3.2 Workflow Management
 
 | ID | Requirement |
 |----|-------------|
-| PR-4 | Workflows are plugins. A workflow defines its own **stage schema** (e.g., SHAPE → DESIGN → PLAN → BUILD for software), the agents, skills, and tools active at each stage, its mandatory validator pipeline, its deliverable and output format definitions, and its completion report structure. Plugins install via WORKFLOW.yaml with zero core code changes. |
+| PR-4 | Workflows are plugins. A workflow defines its own **stage schema** (e.g., SHAPE → DESIGN → PLAN → BUILD for software), the agents, skills, and tools active at each stage, its mandatory validator pipeline, its deliverable and output format definitions, its completion report structure, and its permitted **edit operations** (domain-specific modifications issued at any time regardless of project state, e.g., add feature, fix bug, refactor for software). Plugins install via WORKFLOW.yaml with zero core code changes. |
 | PR-5 | At each workflow stage, the PM assembles the appropriate agent configuration: research and architecture agents for design stages, coding and verification agents for build stages. Skills and tool authorizations are scoped per stage. |
 | PR-5a | Agent instructions are composed from 6 typed fragments (safety, identity, governance, project context, task context, domain skills) via an InstructionAssembler (see NFR-4a for constitutional SAFETY fragment). The Director controls agent behavior per-project through governance fragments stored in session state — it does not rewrite agent prompts directly. Skills load progressively based on deliverable context. The assembler filters loaded skills per agent using each skill's `applies_to` field — not all agents receive all skills. All fragments are auditable (source-tracked). |
 | PR-5b | Agents are defined as **declarative definition files** (markdown with YAML frontmatter). Frontmatter carries structured metadata (name, type, model routing, tool access, output key). The markdown body provides instruction content. An AgentRegistry scans definition files and builds ADK agents on demand — the filesystem is the registry. No agent identity lives in Python code. |
@@ -211,9 +212,9 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 
 | Entity | What It Is | User Can |
 |--------|-----------|----------|
-| **Project** | Top-level unit: workflow type, conventions, stage and TaskGroup history, accumulated project memory | Create, view, pause, resume, abort |
+| **Project** | Top-level persistent unit: workflow type, conventions, stage and TaskGroup history, accumulated project memory. Persists after completion. Editable at any time regardless of state. | Create, view, pause, resume, abort, edit |
 | **Brief** | Documented project intent — structure defined by workflow type. Produced collaboratively with the Director or submitted directly. Validated before PM delegation. | Submit, view status |
-| **Workflow** | Plugin defining the complete execution process: stage schema, agent/skill/tool configuration per stage, validators, deliverable format, and completion report structure | Select, install third-party, view |
+| **Workflow** | Plugin defining the complete execution process: stage schema, agent/skill/tool configuration per stage, validators, deliverable format, completion report structure, and available edit operations | Select, install third-party, view |
 | **Workflow Stage** | Schema-defined execution stage (e.g., DESIGN, PLAN, BUILD). Contains one or more TaskGroups. Determines active agents, skills, and tools. Visible at portfolio level. CEO approves on completion. | Approve, view, remediate |
 | **TaskGroup** | PM-created runtime planning artifact within a Workflow Stage (~1h work unit). Director approves on completion; produces a completion report scoped to TaskGroup deliverables and a project memory write. Visible at project level. | View |
 | **Batch** | A group of Deliverables within a TaskGroup dispatched together by the PM — parallel or sequential. The PM instructs workers on execution mode based on dependency order. | View |
@@ -286,13 +287,13 @@ Multi-tenant SaaS, workflow marketplace, cross-project dependency orchestration,
 | Vision Goal | Vision Section | Requirements |
 |-------------|---------------|-------------|
 | Autonomous execution | Product Vision | PR-1, 2, 7, 10, 15a, 20, 24, 36, NFR-2, 3 |
-| Hierarchical supervision | Innovations | PR-7, 8, 13, 14, 15, 16, 18, 21, 37 |
+| Hierarchical supervision | Innovations | PR-3, 7, 8, 13, 14, 15, 16, 18, 21, 37 |
 | Guaranteed quality enforcement | Innovations | PR-9, 10, 11, NFR-4 |
 | Agent governance and safety | Innovations | PR-5a, 5b, 5c, NFR-4a, NFR-4b, NFR-4c |
 | Three-layer verification | Innovations | PR-9, 22, 23 |
 | Brief-to-deliverable traceability | Innovations | PR-1, 22, 23, 24, 35 |
 | Workflow composability | Innovations | PR-4, 5, 5b, 5c, 6, 31, 32, 33, 33a, NFR-5 |
 | Cost efficiency | Success Criteria | PR-24, 35, §9 Cost efficiency metric |
-| Transparency and trust | Strategic Advantages | PR-3, 34, 35, 35a, 36, 37 |
+| Transparency and trust | Strategic Advantages | PR-2, 3, 34, 35, 35a, 36, 37 |
 | Structured escalation | Product Vision | PR-10, 15, 16, 17, 18, 19, 20 |
 | Memory accumulation | Strategic Advantages | PR-15b, 26–30 |
