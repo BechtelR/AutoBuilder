@@ -27,9 +27,12 @@
 
 ## Workspace Commands
 ```bash
-# Full stack (Docker — gateway hot-reloads on app/ changes)
-docker compose up -d                  # All services: postgres, redis, gateway, worker
+# Dev (hot-reload — docker-compose.override.yml auto-loaded)
+docker compose up -d                  # All services, gateway reloads on app/ changes
 docker compose run --rm migrate       # Apply migrations (first time / schema changes)
+
+# Prod (-f skips override: no hot-reload, no bind mounts)
+docker compose -f docker-compose.yml up -d --build
 
 # Development (local gateway + worker, Docker infra)
 docker compose up -d postgres redis   # Infrastructure only

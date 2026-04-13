@@ -49,9 +49,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    command: ["uvicorn", "app.gateway.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
     volumes:
-      - ./app:/app/app
+      - ~/.autobuilder:/home/appuser/.autobuilder
     develop:
       watch:
         - action: sync
@@ -62,6 +61,8 @@ services:
     build: .
     container_name: autobuilder-worker
     command: ["arq", "app.workers.settings.WorkerSettings"]
+    volumes:
+      - ~/.autobuilder:/home/appuser/.autobuilder
     env_file: .env
     environment:
       AUTOBUILDER_DB_URL: postgresql+asyncpg://autobuilder:autobuilder@postgres:5432/autobuilder

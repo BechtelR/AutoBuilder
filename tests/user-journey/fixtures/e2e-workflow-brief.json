@@ -1,0 +1,3 @@
+{
+  "content": "Create a Python utility library called mathkit with three functions: fibonacci(n) returning the nth fibonacci number, is_prime(n) returning a boolean, and gcd(a, b) returning the greatest common divisor. Include type hints, docstrings, and unit tests."
+}

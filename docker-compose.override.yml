@@ -1,0 +1,13 @@
+# Dev overrides — auto-loaded by `docker compose up`.
+# Gateway: hot-reload via uvicorn --reload + bind mount.
+# Worker: bind mount so develop.watch sync+restart picks up changes.
+# For production: docker compose -f docker-compose.yml up -d
+services:
+  gateway:
+    command: ["uvicorn", "app.gateway.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
+    volumes:
+      - ./app:/app/app
+
+  worker:
+    volumes:
+      - ./app:/app/app

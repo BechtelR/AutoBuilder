@@ -26,13 +26,21 @@ curl http://localhost:8000/health
 ```
 
 ### Development
+
+Two Docker modes controlled by `docker-compose.override.yml` (auto-loaded when present):
+- **Dev**: `docker compose up -d` — merges the override, adds `--reload` + bind mounts
+- **Prod**: `docker compose -f docker-compose.yml up -d` — `-f` skips the override, runs lean
+
 ```bash
-# Docker (gateway hot-reloads on app/ changes via bind mount)
+# Dev (hot-reload — gateway reloads on app/ changes)
 docker compose up -d
 docker compose run --rm migrate       # First time only
 
-# Or local processes
-docker compose up -d postgres redis   # Infrastructure only
+# Production-like (no hot-reload, no bind mounts)
+docker compose -f docker-compose.yml up -d --build
+
+# Or local processes (Docker infra only)
+docker compose up -d postgres redis
 uv sync && uv run alembic upgrade head
 uv run uvicorn app.gateway.main:app --reload  # Terminal 1
 uv run arq app.workers.settings.WorkerSettings  # Terminal 2

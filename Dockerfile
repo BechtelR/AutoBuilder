@@ -9,10 +9,11 @@ WORKDIR /app
 # Copy dependency files, README, and LICENSE (required by hatchling)
 COPY pyproject.toml uv.lock README.md LICENSE ./
 
-# Copy app directory (required for editable install)
-COPY app/ app/
+# Install production dependencies into .venv (without project itself for layer caching)
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Install production dependencies into .venv
+# Copy app source and install the project (editable link)
+COPY app/ app/
 RUN uv sync --frozen --no-dev
 
 # Stage 2: Runtime

@@ -108,8 +108,24 @@ tests/
     conftest.py        # Tool-specific fixtures
   workers/             # ARQ worker tests
   workflows/           # Workflow composition + validation tests
+  user-journey/        # E2E user journey tests (shell scripts, not pytest)
+    fixtures/          # Test input data (committed)
+    .output/           # Runtime results (gitignored)
   phase1/              # Phase 1 prototype tests (excluded from default run)
 ```
+
+## User Journey Tests
+
+Full E2E tests that drive real workflows through the system (Director → PM → Workers).
+Requires the full Docker stack + LLM API keys.
+
+```bash
+docker compose up -d && docker compose run --rm migrate
+bash tests/user-journey/e2e-workflow-runner.sh   # Run
+bash tests/user-journey/e2e-cleanup.sh           # Cleanup (always run after)
+```
+
+Results are written to `tests/user-journey/.output/e2e-results.json`.
 
 ## Rules
 

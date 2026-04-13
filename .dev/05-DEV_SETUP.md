@@ -138,7 +138,7 @@ ADK provides a built-in development UI for debugging agent interactions:
 
 ```bash
 # Start the ADK web UI (points to the app module)
-adk web app/app.py
+uv run adk web app/app.py
 
 # Opens browser at http://localhost:8000 with:
 # - Agent interaction traces
@@ -338,7 +338,7 @@ git worktree list
 docker compose down -v && docker compose up -d
 
 # View ADK version
-python -c "import google.adk; print(google.adk.__version__)"
+uv run python -c "import google.adk; print(google.adk.__version__)"
 ```
 
 ---
