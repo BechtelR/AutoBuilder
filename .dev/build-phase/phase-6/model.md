@@ -522,9 +522,9 @@ When assembling instructions for agent `X`:
 
 | Extension Point | Future Phase | Preparation |
 |----------------|-------------|-------------|
-| Three-tier merge (workflow-specific skills) | Phase 7 | `SkillLibrary.__init__` accepts `project_dir` — Phase 7 adds `workflow_dir` parameter. `scan()` gains a third scan pass. |
-| Workflow trigger matching | Phase 7 | `SkillLibrary.match()` already returns sorted entries — workflow matching adds to the trigger evaluation, not the interface. |
-| `auto-code/skills/` directory | Phase 7 | Directory structure follows same pattern. `SkillLibrary` scans it as workflow tier between global and project. |
+| Three-tier merge (workflow-specific skills) | Phase 7a | `SkillLibrary.__init__` accepts `project_dir` — Phase 7a adds `workflow_dir` parameter. `scan()` gains a third scan pass. |
+| Workflow trigger matching | Phase 7a | `SkillLibrary.match()` already returns sorted entries — workflow matching adds to the trigger evaluation, not the interface. |
+| `auto-code/skills/` directory | Phase 7a | Directory structure follows same pattern. `SkillLibrary` scans it as workflow tier between global and project. |
 | `MemoryService` integration (real) | Phase 9 | `MemoryLoaderAgent` already in pipeline. Skills and memory are independent subsystems. |
 | Skill effectiveness metrics | Phase 11+ | `loaded_skill_names` in session state and event stream provide the raw data. |
 | Skill marketplace / registry | Phase 13+ | File format is the interop layer. Drop SKILL.md files in project directory. |

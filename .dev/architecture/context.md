@@ -133,7 +133,7 @@ Pipeline start
   └── 7. LLM receives: system instructions + session event history + tools
 ```
 
-**Workflow variance (Phase 7+):** The pipeline steps shown above reflect the auto-code workflow. Pipeline composition varies by workflow -- each workflow defines its own agent topology and stage schema. The context recreation mechanism is shared; the pipeline stages it recreates are workflow-provided.
+**Workflow variance (Phase 7a+):** The pipeline steps shown above reflect the auto-code workflow. Pipeline composition varies by workflow -- each workflow defines its own agent topology and stage schema. The context recreation mechanism is shared; the pipeline stages it recreates are workflow-provided.
 
 State is populated in execution order before LLM agents read it:
 

@@ -478,8 +478,8 @@ Source: `architecture/workflows.md`
 | F53 | Dry run execution (synthetic input, `dry_run: true`) | mechanism | 7b | workflows.md §Director Workflow Authoring | WorkflowRegistry |
 | F54 | Standard validator: `source_verification` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
 | F55 | Standard validator: `citation_check` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
-| F56 | Auto-code validator: `integration_tests` | mechanism | 7b | workflows.md §Validators & Quality Gates | Stub-referenced from Phase 7 auto-code manifest |
-| F57 | Standard validator: `architecture_conformance` | mechanism | 7b | workflows.md §Validators & Quality Gates | Stub-referenced from Phase 7 auto-code manifest |
+| F56 | Auto-code validator: `integration_tests` | mechanism | 7b | workflows.md §Validators & Quality Gates | Stub-referenced from Phase 7a auto-code manifest |
+| F57 | Standard validator: `architecture_conformance` | mechanism | 7b | workflows.md §Validators & Quality Gates | Stub-referenced from Phase 7a auto-code manifest |
 | F60 | Standard validator: `content_review` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
 
 ---
@@ -694,8 +694,8 @@ See component entries above for current counts. Use `grep -c '| [0-9]' 07-COMPON
 |---------|------|---------|
 | 2.4.0 | 2026-04-12 | Phase 8a FRD back-propagation: X01 updated (Director-mediated entry, seven entry modes); X28-X30 added (three-layer pause/resume lifecycle); G30-G33 added (pause/resume routes); X31-X32 added (artifact storage); Sections 14.5 and 14.6 added. 9 new components |
 | 2.3.0 | 2026-04-12 | Phase 8a shaping: X20-X27 and CT04b added (project entity, Director creation tools, context recreation resume, project continuity); Section 14.4 added |
-| 2.1.0 | 2026-04-12 | Phase 8 split into 8a + 8b: Section 14 reorganized into phase-aligned subsections; 9 new components (X12-X16, X18-X19, G28-G29) |
-| 2.0.0 | 2026-03-12 | Phase 7 expansion (Decisions #70-77): 44 new workflow components (F19-F57, S37-S41); Phase 7b added (Director authoring) |
+| 2.1.0 | 2026-04-12 | Phase 8a split into 8a + 8b: Section 14 reorganized into phase-aligned subsections; 9 new components (X12-X16, X18-X19, G28-G29) |
+| 2.0.0 | 2026-03-12 | Phase 7a expansion (Decisions #70-77): 44 new workflow components (F19-F57, S37-S41); Phase 7b added (Director authoring) |
 | 1.9.0 | 2026-03-11 | Phase 6 FRD back-propagation: S16-S17, S33-S36 added; S32 moved to Phase 6; S12 updated |
 | 1.8.0 | 2026-03-10 | Phase 5b FRD decisions: A16 and X11 added; A72 moved to Phase 3 |
 | 1.7.0 | 2026-03-10 | Phase 5 split into 5a and 5b; A78 split into A78a/A78b; M15 moved to 5a; A37 added |

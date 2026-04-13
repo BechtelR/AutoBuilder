@@ -344,7 +344,7 @@ class DiagnosticsAgent(BaseAgent):
 
 ```python
 class RegressionTestAgent(BaseAgent):
-    """Runs cross-deliverable regression tests. Batch-level integration deferred to Phase 8."""
+    """Runs cross-deliverable regression tests. Batch-level integration deferred to Phase 8a."""
 
     async def _run_async_impl(  # type: ignore[override]
         self, ctx: InvocationContext
@@ -767,11 +767,11 @@ flowchart TD
 | BaseMemoryService | Phase 9 (Memory) | InMemoryMemoryService used in Phase 5a. PostgresMemoryService replaces it. |
 | ContextRecreationRequired exception | Phase 5b (Supervision) | Exception raised in 5a. Worker-level catch + 4-step recreation pipeline in 5b. |
 | Director/PM agent definitions | Phase 5b (Supervision) | Definition files created in 5a. Supervision callbacks, delegation, escalation wired in 5b. |
-| AgentRegistry workflow scope | Phase 7 (Workflows) | Scan accepts workflow dir; Phase 5a passes None. Phase 7 passes real workflow agent dirs. |
-| Pipeline factory | Phase 7 (Workflows) | `create_deliverable_pipeline()` called directly. Phase 7's `auto-code/pipeline.py` delegates to it. |
-| DeliverablePipeline in ParallelAgent | Phase 8 (Execution) | Single pipeline in 5a. Phase 8 wraps in ParallelAgent for batch execution. |
-| RegressionTestAgent batch integration | Phase 8 (Execution) | Agent defined + buildable in 5a. Wired into post-batch pipeline position in Phase 8. |
-| tool_role ceiling validation | Phase 7 (Workflows) | A78a (type validation) enforced in 5a. A78b (tool_role ceiling against WORKFLOW.yaml) in Phase 7. |
+| AgentRegistry workflow scope | Phase 7a (Workflows) | Scan accepts workflow dir; Phase 5a passes None. Phase 7a passes real workflow agent dirs. |
+| Pipeline factory | Phase 7a (Workflows) | `create_deliverable_pipeline()` called directly. Phase 7a's `auto-code/pipeline.py` delegates to it. |
+| DeliverablePipeline in ParallelAgent | Phase 8a (Execution) | Single pipeline in 5a. Phase 8a wraps in ParallelAgent for batch execution. |
+| RegressionTestAgent batch integration | Phase 8a (Execution) | Agent defined + buildable in 5a. Wired into post-batch pipeline position in Phase 8a. |
+| tool_role ceiling validation | Phase 7a (Workflows) | A78a (type validation) enforced in 5a. A78b (tool_role ceiling against WORKFLOW.yaml) in Phase 7a. |
 | System reminders (A58) | Phase 5b | before_model_callback infrastructure exists; reminder injection added in 5b. |
 | State key authorization (A79) | Phase 5b | State writes via state_delta in 5a. Tier-prefix validation in EventPublisher ACL in 5b. |
 | ceo_queue / director_queue tables | Phase 5b (Routes + consumption) | Tables created in 5a; CEO queue enums (V13-V15) in 5a, Director queue enums (V20-V22) in Phase 4. Gateway routes and Director consumption logic in 5b. |

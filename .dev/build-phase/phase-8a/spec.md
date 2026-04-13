@@ -3,7 +3,7 @@
 
 ## Overview
 
-Phase 8a connects all prior infrastructure — workflow composition (Phase 7), supervision hierarchy (Phase 5b), toolset (Phase 4), and skills (Phase 6) — into a working autonomous execution loop. A user expresses project intent to the Director via chat, the Director validates the brief, creates a project, and delegates to a PM that drives sequential execution through Stage → TaskGroup → Batch → Deliverable. Management tools write to real database tables. Escalations flow PM → Director → CEO. Context recreation at TaskGroup boundaries enables long-running projects. Edit operations and pause/resume lifecycle make projects living entities.
+Phase 8a connects all prior infrastructure — workflow composition (Phase 7a), supervision hierarchy (Phase 5b), toolset (Phase 4), and skills (Phase 6) — into a working autonomous execution loop. A user expresses project intent to the Director via chat, the Director validates the brief, creates a project, and delegates to a PM that drives sequential execution through Stage → TaskGroup → Batch → Deliverable. Management tools write to real database tables. Escalations flow PM → Director → CEO. Context recreation at TaskGroup boundaries enables long-running projects. Edit operations and pause/resume lifecycle make projects living entities.
 
 This phase proves the core thesis: specification to verified deliverables under hierarchical supervision with minimal human intervention. All execution is sequential (one deliverable at a time) — parallel execution is Phase 8b.
 
@@ -11,7 +11,7 @@ This phase proves the core thesis: specification to verified deliverables under 
 
 | Prerequisite | Status | Evidence |
 |---|---|---|
-| Phase 7: Workflow Composition | MET | WorkflowRegistry, WorkflowManifest, stage schema, validators, PipelineContext all operational. 897 tests pass. |
+| Phase 7a: Workflow Composition | MET | WorkflowRegistry, WorkflowManifest, stage schema, validators, PipelineContext all operational. 897 tests pass. |
 | Phase 5b: Supervision & Integration | MET | Director/PM hierarchy, supervision callbacks, CEO queue, formation, context recreation (degraded mode). |
 | Phase 4: Tool System | MET | GlobalToolset with 42 FunctionTools, role-based vending, management tool stubs in place. |
 | Phase 6: Skill System | MET | SkillLibrary, parser, matchers, SkillLoaderAgent operational. |

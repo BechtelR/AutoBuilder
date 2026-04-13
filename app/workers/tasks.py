@@ -752,7 +752,7 @@ async def run_work_session(
                 recreation_result.new_session_id,
                 len(recreation_result.remaining_stages),
             )
-            # Phase 8: full resume loop — rebuild pipeline with
+            # Phase 8a: full resume loop — rebuild pipeline with
             # stages=recreation_result.remaining_stages and re-run.
             # Phase 5b: log success and let the session complete.
 

@@ -8,7 +8,7 @@ Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0-10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention -- through a production-grade API gateway with async worker execution.
 
-**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: DONE | Phase 6: DONE | Phase 7: DONE | Phase 8a: SHAPING**
+**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: DONE | Phase 6: DONE | Phase 7a: DONE | Phase 8a: BUILDING**
 
 ---
 
@@ -163,7 +163,7 @@ Agent definition infrastructure: AgentRegistry scans declarative markdown files 
 | ✓ | MemoryLoaderAgent executes in pipeline; returns empty context in degraded mode (MemoryService unavailable until Phase 9) | PR-15b |
 | ✓ | SkillLoaderAgent executes in pipeline via SkillLibraryProtocol; returns empty skills with NullSkillLibrary (real SkillLibrary in Phase 6) | PR-5a |
 | ✓ | Hybrid CustomAgents (DependencyResolver, DiagnosticsAgent) use LiteLLM internally with model_role routing | PR-5 |
-| ✓ | Project-scope agent definitions rejected if `type: custom` (`tool_role` ceiling validation deferred to Phase 7) | NFR-4b |
+| ✓ | Project-scope agent definitions rejected if `type: custom` (`tool_role` ceiling validation deferred to Phase 7a) | NFR-4b |
 
 ---
 
@@ -219,7 +219,7 @@ Skill library adopting the Agent Skills open standard file format (`SKILL.md`) w
 
 ---
 
-## Phase 7: Workflow Composition `L`
+## Phase 7a: Workflow Composition `L`
 
 **Goal**: Pluggable workflow architecture with stage schema, validators, and quality framework. auto-code as first workflow.
 **Status**: DONE
@@ -251,11 +251,11 @@ WorkflowRegistry with manifest parsing, validation, and directory-scanned discov
 
 **Goal**: Director can create, validate, and activate new workflows through conversation with the CEO.
 **Status**: DESIGNED
-**Prerequisites**: Phase 7 (workflow composition operational)
+**Prerequisites**: Phase 7a (workflow composition operational)
 
 
 ### Scope Summary
-Director workflow authoring via 6-phase lifecycle (requirements → discovery → draft → validation → review → activation). Five CEO resource discovery tools (list_available_tools, list_mcp_servers, list_configured_credentials, list_workflows, list_available_skills). Director filesystem tool scoping (path-restricted write access). Staging directory convention for draft workflows. Activation gate via CEO queue approval. Dry run capability for pre-activation validation. Workflow improvement loop (4 feedback sources). Four Director authoring skills. Import-level sandboxing for dynamically imported pipeline definitions (deferred from Phase 7). Real implementations of INTEGRATE stage stub validators (integration_tests, architecture_conformance — replacing Phase 7 stubs that return passing).
+Director workflow authoring via 6-phase lifecycle (requirements → discovery → draft → validation → review → activation). Five CEO resource discovery tools (list_available_tools, list_mcp_servers, list_configured_credentials, list_workflows, list_available_skills). Director filesystem tool scoping (path-restricted write access). Staging directory convention for draft workflows. Activation gate via CEO queue approval. Dry run capability for pre-activation validation. Workflow improvement loop (4 feedback sources). Four Director authoring skills. Import-level sandboxing for dynamically imported pipeline definitions (deferred from Phase 7a). Real implementations of INTEGRATE stage stub validators (integration_tests, architecture_conformance — replacing Phase 7a stubs that return passing).
 
 ### Completion Contract
 
@@ -270,15 +270,15 @@ Director workflow authoring via 6-phase lifecycle (requirements → discovery �
 | | Workflow improvement loop triggers on CEO request and post-completion review | PR-6 |
 | | Four Director authoring skills operational (director-workflow-composition, project-conventions, software-development-patterns, research-patterns) | PR-31 |
 | | Import-level sandboxing validates dynamically imported pipeline definitions before execution | NFR-4 |
-| | INTEGRATE stage validators (integration_tests, architecture_conformance) produce real evaluation results, replacing Phase 7 stubs | PR-22 |
+| | INTEGRATE stage validators (integration_tests, architecture_conformance) produce real evaluation results, replacing Phase 7a stubs | PR-22 |
 
 ---
 
 ## Phase 8a: Autonomous Execution Engine `L`
 
-**Goal**: End-to-end autonomous execution — brief in, verified code out, sequential batches. Connects Phase 7's workflow framework, Phase 5b's supervision hierarchy, and Phase 4's toolset into a working autonomous loop. This phase proves the core thesis: specification to verified deliverables with minimal human intervention. PM IS the outer loop.
-**Status**: SHAPING
-**Prerequisites**: Phase 7 (workflow composition operational)
+**Goal**: End-to-end autonomous execution — brief in, verified code out, sequential batches. Connects Phase 7a's workflow framework, Phase 5b's supervision hierarchy, and Phase 4's toolset into a working autonomous loop. This phase proves the core thesis: curated brief to verified deliverables with minimal human intervention. PM IS the outer loop.
+**Status**: BUILDING
+**Prerequisites**: Phase 7a (workflow composition operational)
 
 ### Scope Summary
 Director-mediated project creation through the supervision hierarchy — all work enters via Director chat sessions supporting seven universal entry modes (new, new-with-materials, extend, edit, re-run, direct execution, workstream). Director validates briefs against workflow `brief_template`, checks pre-execution resources (credentials, services, knowledge), creates project entities (new first-order `projects` table), and delegates to PMs by enqueueing work sessions. Management tool DB wiring — the critical infrastructure gap: replace placeholder strings in all PM tools (`select_ready_batch`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `query_dependency_graph`, `escalate_to_director`, `checkpoint_project`) and Director tools (`escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`) plus shared tools (`task_create`, `task_update`, `task_query`) with real DB persistence via ToolContext. New Director tools: `create_project`, `validate_brief`, `check_resources`, `delegate_to_pm`. Deliverable lifecycle expansion: dependency graph resolution, topological sort into sequential batches. Director execution turn with backlog queue orchestration — connecting the Director queue and CEO queue DB infrastructure from Phase 5b: Director triages escalations, resolves within authority, forwards to CEO queue. Director queue gateway routes for observability and processing. PM stage-driven sequential batch loop: Stage → TaskGroup → Batch → Deliverable hierarchy with stage transitions gated by `verify_stage_completion`, TaskGroup completion triggering Director approval and completion reports, and deterministic safety mechanisms (validators, regression tests, checkpoints). Autonomous failure handling with retry/skip/reorder/escalate and batch failure threshold triggering Director suspension. Three-layer completion report wiring at TaskGroup and Stage levels into INTEGRATE stage validators. Context recreation and resume at TaskGroup boundaries — save critical state, fresh session, resume without re-executing verified work. Artifact storage for deliverable outputs and completion reports. Project continuity with workflow-defined edit operations (living entities). Execution and system observability: deliverable status routes, workflow status, queue monitoring.
@@ -358,7 +358,7 @@ PostgresMemoryService backed by PostgreSQL tsvector for full-text keyword search
 
 
 ### Scope Summary
-Event consumer infrastructure on Redis Streams (EventPublisher already operational from Phase 3): SSE endpoint with reconnection/replay, webhook dispatcher, audit logger, event listener CRUD, and consumer group management. Gateway workflow routes (list, select, run workflows — thin wrappers over WorkflowRegistry from Phase 7). CLI via typer as a pure API client (run, status, intervene, list, logs). Observability via OpenTelemetry tracing (ADK-native), structured logging hierarchy, and ADK Dev UI for local development.
+Event consumer infrastructure on Redis Streams (EventPublisher already operational from Phase 3): SSE endpoint with reconnection/replay, webhook dispatcher, audit logger, event listener CRUD, and consumer group management. Gateway workflow routes (list, select, run workflows — thin wrappers over WorkflowRegistry from Phase 7a). CLI via typer as a pure API client (run, status, intervene, list, logs). Observability via OpenTelemetry tracing (ADK-native), structured logging hierarchy, and ADK Dev UI for local development.
 
 ### Completion Contract
 
@@ -367,7 +367,7 @@ Event consumer infrastructure on Redis Streams (EventPublisher already operation
 | | Client receives real-time events via SSE as pipeline executes | PR-34 |
 | | SSE reconnection replays missed events (no data loss) | PR-34 |
 | | Webhook listeners fire on matching events | PR-21 |
-| | Gateway workflow routes operational (list, select, run — wiring WorkflowRegistry from Phase 7) | PR-4 |
+| | Gateway workflow routes operational (list, select, run — wiring WorkflowRegistry from Phase 7a) | PR-4 |
 | | CLI can launch a workflow, stream events, and query status | PR-36 |
 | | OpenTelemetry traces visible for pipeline execution | PR-35 |
 | | **Full MVP validated end-to-end**: brief -> decompose -> execute -> verify -> complete | PR-1, PR-10, PR-22 |
@@ -549,10 +549,9 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 2026-02-18 | Phase 4 DONE |
 | 2026-03-10 | Phase 5 scope finalized (Decisions #50-58); split into 5a + 5b; FRDs written |
 | 2026-03-11 | Phase 6 scope updated from FRD: three-layer loading model, supervision-tier resolution, autonomous creation, `applies_to` filtering, 11 initial skills; completion contract expanded from 5→8 items |
-| 2026-03-11 | All open questions resolved (Decisions #59-67); migrated to `.decision-log.md` |
-| 2026-03-12 | Phase 7 scope expanded (Decisions #70-77): manifest, stage schema, validators, quality framework, directory override model. Phase 7b added (Director workflow authoring). Effort upgraded S→L. |
-| 2026-04-12 | Phase 8 re-scoped and split: renamed "Spec Pipeline & Autonomous Loop" → "Autonomous Execution Engine" (8a) + "Parallel Execution & Isolation" (8b). 8a owns end-to-end sequential autonomous loop (brief submission, management tool DB wiring, Director backlog orchestration, sequential batch execution, failure handling, completion report wiring). 8b owns parallel upgrade (ParallelAgent, git worktrees, merge conflict strategy, concurrency limits, intervention API). Split justified by clean dependency boundary — sequential loop must work before adding filesystem concurrency. Architecture audit added 9 new BOM components (X12-X16, X18-X19, G28-G29). Phases 9/10 prerequisites updated to 8a. |
-| 2026-04-12 | Phases 7b-14 audit against Phase 7 design artifacts and architecture: Phase 7b scope expanded with import-level sandboxing and real INTEGRATE validator implementations (deferred from Phase 7); Phase 8 scope clarified sequential→parallel upgrade and concurrency limits; Phase 9 pgvector removed (deferred to Phase 11 semantic memory upgrade, Phase 9 uses tsvector only); Phase 10 scope corrected (EventPublisher is Phase 3, Phase 10 adds consumer infrastructure) and workflow gateway routes added; Phase 11 removed already-completed "agent role-based tool restrictions" and clarified compound workflow and pgvector scope |
+| 2026-03-12 | Phase 7a scope expanded (Decisions #70-77): manifest, stage schema, validators, quality framework, directory override model. Phase 7b added (Director workflow authoring). Effort upgraded S→L. |
+| 2026-04-12 | Phase 8a split into 8a (Autonomous Execution Engine — sequential end-to-end loop) + 8b (Parallel Execution & Isolation — ParallelAgent, git worktrees, intervention API). 9 new BOM components added. |
+| 2026-04-12 | Phases 7b-14 audit: Phase 7b expanded with sandboxing and real INTEGRATE validators; Phase 9 pgvector deferred to Phase 11; Phase 10 scope corrected (consumer infrastructure, not EventPublisher); Phase 11 clarified compound workflow and pgvector scope |
 
 ---
 

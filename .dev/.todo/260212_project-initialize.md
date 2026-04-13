@@ -43,7 +43,7 @@ This session with AutoBuilder organically followed these phases:
 - Renumber, rename, clean up
 - Output: Complete `.dev/` doc set, AGENTS.md, README.md
 
-### Phase 7: Scaffold & Initialize
+### Phase 7a: Scaffold & Initialize
 - Create `pyproject.toml`, directory structure, config files
 - Initialize git, pre-commit hooks, CI skeleton
 - Output: Working empty project that builds and passes lint/typecheck
@@ -56,7 +56,7 @@ This session with AutoBuilder organically followed these phases:
 4. **Parallel vs sequential** — which phases can overlap, which are blocking
 5. **Agent workflow** — which phases benefit from research subagents, which need direct discussion
 6. **Templates** — the `templates/*.md` files already exist; formalize when each applies
-7. **Initialization script or skill** — automate Phase 7 (scaffold creation) once docs are done
+7. **Initialization script or skill** — automate Phase 7a (scaffold creation) once docs are done
 
 ## Deliverable
 

@@ -122,9 +122,9 @@ uv run pyright                        # Identify type errors
 | `AUTOBUILDER_LOG_LEVEL` | `INFO` | Log verbosity |
 | `AUTOBUILDER_DEFAULT_*_MODEL` | See `.env` | LLM routing: `CODE`, `PLAN`, `REVIEW`, `FAST` |
 | `AUTOBUILDER_SEARCH_PROVIDER` | `tavily` | Web search provider (`tavily` or `brave`) |
-| `AUTOBUILDER_MAX_CONCURRENCY` | `6` | Max parallel deliverable pipelines (Phase 8) |
+| `AUTOBUILDER_MAX_CONCURRENCY` | `6` | Max parallel deliverable pipelines (Phase 8a) |
 | `AUTOBUILDER_SKILLS_DIR` | `./skills` | Project-local skills directory (Phase 6) |
-| `AUTOBUILDER_WORKFLOWS_DIR` | `~/.autobuilder/workflows` | User-level workflows directory (Phase 7) |
+| `AUTOBUILDER_WORKFLOWS_DIR` | `~/.autobuilder/workflows` | User-level workflows directory (Phase 7a) |
 | `ANTHROPIC_API_KEY` | -- | Claude models (primary) |
 | `OPENAI_API_KEY` | -- | OpenAI models (fallback) |
 | `GOOGLE_API_KEY` | -- | Gemini models (fallback) |

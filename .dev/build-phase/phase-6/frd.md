@@ -211,7 +211,7 @@ Agents (Director, PM, or workers guided by the skill-authoring skill) can create
 
 - **`applies_to` filtering in InstructionAssembler**: Both architects found that the current assembler does NOT filter loaded skills by `applies_to` — it dumps all `ctx.loaded_skills` into every agent's SKILL fragment. Phase 6 must add this filtering. The skill content in session state needs to carry `applies_to` metadata alongside the body text so the assembler can filter per-agent at assembly time. This is a type change to `loaded_skills` in session state.
 
-- **Role-name coupling for `applies_to`**: Skills declare `applies_to: [coder, reviewer]` using agent names. If a custom workflow uses different agent names (e.g., `researcher` instead of `coder`), skills won't reach the right agents. Acceptable for Phase 6 (only auto-code workflow with fixed names). Phase 7 should add role aliases in agent definitions to decouple skill routing from agent names.
+- **Role-name coupling for `applies_to`**: Skills declare `applies_to: [coder, reviewer]` using agent names. If a custom workflow uses different agent names (e.g., `researcher` instead of `coder`), skills won't reach the right agents. Acceptable for Phase 6 (only auto-code workflow with fixed names). Phase 7a should add role aliases in agent definitions to decouple skill routing from agent names.
 
 - **Redis cache serialization**: The skill index must serialize to Redis. `SkillEntry` with its trigger specs, lists, and path objects needs a clean serialization format. Use JSON with Path→string conversion. Keep it simple — the index is small (frontmatter only, not bodies).
 
@@ -219,9 +219,9 @@ Agents (Director, PM, or workers guided by the skill-authoring skill) can create
 
 ## No-Gos
 
-- **Workflow-tier skills (three-tier merge)** — Phase 7. Requires WorkflowRegistry to provide the middle scope. Two-tier (global + project-local) is the Phase 6 boundary.
+- **Workflow-tier skills (three-tier merge)** — Phase 7a. Requires WorkflowRegistry to provide the middle scope. Two-tier (global + project-local) is the Phase 6 boundary.
 - **Automatic `scripts/` execution** — Deferred. The Agent Skills standard marks `allowed-tools` as experimental. Skills include `scripts/` directories and the system discovers them (`has_scripts` on SkillEntry), but agents invoke scripts via existing tools (`bash_exec`, `file_read`) — no automatic execution triggered by skill loading.
-- **Self-updating skills** — Phase 7+. The Anthropic skill-creator pattern where skills edit their own SKILL.md based on performance feedback is valuable but out of scope.
+- **Self-updating skills** — Phase 7a+. The Anthropic skill-creator pattern where skills edit their own SKILL.md based on performance feedback is valuable but out of scope.
 - **Skill versioning and deprecation** — Not needed until the skill library is mature. Files on disk are the source of truth; git provides version history.
 - **Marketplace / registry / discovery service** — Phase 13+ at earliest. The file format IS the interop layer. Drop SKILL.md files in the project directory.
 - **User-level skills** (`~/.agents/skills/`) — The standard recommends this scan scope. Defer until there's a demonstrated need for user-wide (not project-specific) skills.

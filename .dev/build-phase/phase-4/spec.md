@@ -29,7 +29,7 @@ Key constraints: All tools execute in ARQ worker processes, never in the gateway
 |---|---|---|
 | Phase 3: ADK Engine Integration | MET | 116 tests pass, 4 skipped (LLM), all quality gates clean. ADK Runner, FunctionTool, and BaseToolset operational in workers. |
 | Open Question #7: Web search provider | RESOLVED | Tavily primary, Brave fallback. Simple `if/elif` dispatch. Env vars: `TAVILY_API_KEY`, `BRAVE_API_KEY`. |
-| Open Question #8: Agent-browser integration | RESOLVED | Vercel `agent-browser` CLI (npm). Invoked via `bash_exec`. Implementation retargeted to Phase 7/13 (workflow-specific). |
+| Open Question #8: Agent-browser integration | RESOLVED | Vercel `agent-browser` CLI (npm). Invoked via `bash_exec`. Implementation retargeted to Phase 7a/13 (workflow-specific). |
 
 **Note:** Phase 4 can be spec'd and partially developed in parallel with Phase 3 since tool functions are pure Python. Full integration testing (tools inside ADK LlmAgent) requires Phase 3 completion.
 
@@ -70,17 +70,17 @@ Q7 resolved: **Tavily primary, Brave fallback**. Simple `if/elif` dispatch — n
 
 Tavily is the default (simple REST API, designed for AI agents, returns clean results). Brave Search API is the fallback provider. If the configured provider's API key is missing, returns a clear error message. Adding a new provider is adding an `elif` branch and a function.
 
-Q8 resolved: Vercel `agent-browser` CLI (npm package). Agents invoke it via `bash_exec("agent-browser <command>")`. Implementation is workflow-specific (Phase 7/13) — no Phase 4 tooling needed beyond `bash_exec`.
+Q8 resolved: Vercel `agent-browser` CLI (npm package). Agents invoke it via `bash_exec("agent-browser <command>")`. Implementation is workflow-specific (Phase 7a/13) — no Phase 4 tooling needed beyond `bash_exec`.
 
 ### DD-4: Management Tools — Placeholder Backends
-PM management tools (6) and Director management tools (6) require DB infrastructure that arrives in Phase 5 (CEO queue table, Director queue table, project configs) and Phase 8 (deliverable dependency resolution). In Phase 4:
+PM management tools (6) and Director management tools (6) require DB infrastructure that arrives in Phase 5 (CEO queue table, Director queue table, project configs) and Phase 8a (deliverable dependency resolution). In Phase 4:
 
 - All 12 management tools have correct signatures, type hints, docstrings, and parameter validation.
 - **PM tools** (6): `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`. PM uses `escalate_to_director` to send issues to the Director queue.
 - **Director tools** (6): `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`. Only the Director can push to the CEO queue.
 - `escalate_to_ceo` validates `item_type` against known values (`NOTIFICATION`, `APPROVAL`, `ESCALATION`, `TASK`) and `priority` against known values (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`). Logs the enqueued item via `get_logger("tools.management")` and returns a confirmation string with a placeholder ID. Phase 5 replaces the log with a DB insert.
 - `escalate_to_director` validates `request_type` against known values (`ESCALATION`, `STATUS_REPORT`, `RESOURCE_REQUEST`, `PATTERN_ALERT`) and `priority` against known values (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`). Returns a confirmation with a placeholder ID. Phase 5 replaces with Director queue DB insert.
-- `select_ready_batch` accepts a `project_id` and returns `"No deliverables configured for project {project_id}"`. Phase 8 replaces this with actual dependency resolution.
+- `select_ready_batch` accepts a `project_id` and returns `"No deliverables configured for project {project_id}"`. Phase 8a replaces this with actual dependency resolution.
 - All other management tools return appropriate placeholder messages indicating which phase provides the real backend.
 
 This ensures the tools are callable from within an ADK LlmAgent (completion contract item 1), schemas are correct (item 2), and the toolset can vend them per role (item 3).
@@ -330,7 +330,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 ### P4.D6: Management Tools
 **Files:** `app/tools/management.py`
 **Depends on:** —
-**Description:** PM-level (6) and Director-level (6) management tools for batch operations, escalation, deliverable lifecycle, project oversight, and CEO communication. Per DD-4, all tools have correct signatures and validation but use placeholder backends. PM escalates via `escalate_to_director`; Director escalates via `escalate_to_ceo`. Real backends arrive in Phase 5 (CEO queue table, Director queue table, project configs) and Phase 8 (deliverable dependency resolution).
+**Description:** PM-level (6) and Director-level (6) management tools for batch operations, escalation, deliverable lifecycle, project oversight, and CEO communication. Per DD-4, all tools have correct signatures and validation but use placeholder backends. PM escalates via `escalate_to_director`; Director escalates via `escalate_to_ceo`. Real backends arrive in Phase 5 (CEO queue table, Director queue table, project configs) and Phase 8a (deliverable dependency resolution).
 **BOM Components:**
 - [x] `T16` — `select_ready_batch` FunctionTool
 - [x] `T17` — `escalate_to_ceo` FunctionTool
@@ -359,7 +359,7 @@ This is used by todo tools (read/write task lists in state) and bash_exec (idemp
 - [x] `query_project_status(project_id: str) -> str` returns placeholder response with project ID
 - [x] `override_pm(project_id: str, action: str, reason: str) -> str` validates `action` is one of `"PAUSE"`, `"RESUME"`, `"REORDER"`, `"CORRECT"`; returns placeholder confirmation
 - [x] `get_project_context(path: str | None = None) -> str` detects project type from filesystem (reads `package.json`, `pyproject.toml`, etc.); functional even in Phase 4
-- [x] `query_dependency_graph(project_id: str, deliverable_id: str | None = None) -> str` returns placeholder "No dependency infrastructure (Phase 8)"
+- [x] `query_dependency_graph(project_id: str, deliverable_id: str | None = None) -> str` returns placeholder "No dependency infrastructure (Phase 8a)"
 - [x] ~~Validation uses string comparison against known values (not enum imports — CEO/Director queue enums arrive in Phase 5)~~ **Outdated** — see delta note below.
 - [x] Module importable as `from app.tools.management import select_ready_batch, escalate_to_director, update_deliverable, query_deliverables, reorder_deliverables, manage_dependencies, escalate_to_ceo, list_projects, query_project_status, override_pm, get_project_context, query_dependency_graph`
 

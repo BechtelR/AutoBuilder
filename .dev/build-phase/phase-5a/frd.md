@@ -88,7 +88,7 @@ Deterministic custom agents execute mandatory pipeline steps with no LLM involve
 - [x] **FR-5a.30**: When the FormatterAgent runs, it executes the project's configured code formatter(s) on the working tree. It writes a summary of changes (files modified, formatting applied) to session state.
 - [x] **FR-5a.31**: When the DependencyResolverAgent runs, it analyzes deliverable dependencies using deterministic graph resolution with internal LiteLLM calls (routed via model_role) for ambiguous relationship classification. It writes a dependency order to session state.
 - [x] **FR-5a.32**: When the DiagnosticsAgent runs, it reads lint results and test results from session state and synthesizes actionable diagnostics using deterministic aggregation with internal LiteLLM calls (routed via model_role) for root-cause analysis. It writes structured diagnostics to session state.
-- [x] **FR-5a.33**: When the RegressionTestAgent is defined, its agent definition file and CustomAgent implementation exist and are buildable by the AgentRegistry. Its integration into batch-level execution is deferred to Phase 8 (it runs after ParallelAgent completes batches, which requires Phase 8's batch execution infrastructure).
+- [x] **FR-5a.33**: When the RegressionTestAgent is defined, its agent definition file and CustomAgent implementation exist and are buildable by the AgentRegistry. Its integration into batch-level execution is deferred to Phase 8a (it runs after ParallelAgent completes batches, which requires Phase 8a's batch execution infrastructure).
 - [x] **FR-5a.34**: When any hybrid custom agent makes an internal LiteLLM call, the call is routed via the agent's `model_role` through the LLM Router, using the same fallback chains as LLM agents.
 
 ---
@@ -151,8 +151,8 @@ The system monitors token usage before each LLM call and signals when context ca
 - **No context recreation pipeline**: Phase 5a raises `ContextRecreationRequired`; Phase 5b catches it and runs the 4-step recreation (persist → seed → fresh → reassemble).
 - **No real SkillLibrary**: Phase 5a uses NullSkillLibrary (returns empty). Real skill matching (trigger matchers, two-tier scan, Redis cache) is Phase 6.
 - **No real MemoryService**: Phase 5a uses InMemoryMemoryService (returns empty in practice). PostgresMemoryService with tsvector/pgvector search is Phase 9.
-- **No tool_role ceiling validation**: Project-scope type:llm restriction is enforced. tool_role ceiling validation (against workflow manifest) requires WORKFLOW.yaml which is Phase 7.
-- **No batch execution**: DeliverablePipeline handles a single deliverable. Parallel batch execution via ParallelAgent and PM-driven batch loop are Phase 8.
+- **No tool_role ceiling validation**: Project-scope type:llm restriction is enforced. tool_role ceiling validation (against workflow manifest) requires WORKFLOW.yaml which is Phase 7a.
+- **No batch execution**: DeliverablePipeline handles a single deliverable. Parallel batch execution via ParallelAgent and PM-driven batch loop are Phase 8a.
 - **No system reminders**: Ephemeral nudges via before_model_callback (A58) are Phase 5b.
 - **No Director formation**: Director formation artifacts in user: scope are Phase 5b.
 
@@ -177,7 +177,7 @@ The system monitors token usage before each LLM call and signals when context ca
 | FR-5a.28, FR-5a.29 | PR-11: Validators as mandatory pipeline steps | Quality |
 | FR-5a.30 | PR-11: Mandatory formatting step | Quality |
 | FR-5a.31, FR-5a.32, FR-5a.34 | PR-5: Hybrid CustomAgent with internal LLM routing | Agent Config |
-| FR-5a.33 | PR-11: RegressionTestAgent defined (batch integration Phase 8) | Quality |
+| FR-5a.33 | PR-11: RegressionTestAgent defined (batch integration Phase 8a) | Quality |
 | FR-5a.35, FR-5a.36, FR-5a.37, FR-5a.38 | PR-10: Deliverable pipeline execution | Pipeline |
 | FR-5a.39, FR-5a.40, FR-5a.41 | PR-5: Inter-agent state communication | Pipeline |
 | FR-5a.42, FR-5a.43, FR-5a.44, FR-5a.45, FR-5a.46 | PR-15: Bounded authority — context budget; PR-15a: Context recreation trigger | Context |

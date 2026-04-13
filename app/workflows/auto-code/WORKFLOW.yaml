@@ -274,4 +274,4 @@ config:
   max_review_cycles: 3
   enable_linting: true
   enable_testing: true
-  git_worktree_per_deliverable: true   # Forward reference: requires git_worktree tool (Phase 8). Ignored until then.
+  git_worktree_per_deliverable: true   # Forward reference: requires git_worktree tool (Phase 8a). Ignored until then.

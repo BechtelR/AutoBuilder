@@ -119,7 +119,7 @@ Follows the original 6-level memory architecture (260211_plan-shaping.md §11), 
 - Agent communication now hierarchical: Director → PM → Workers, not flat pipeline
 - `sub_agents` tree construction replaces flat `SequentialAgent` at the top level
 
-### Phase 8 (Spec Pipeline & Autonomous Loop) — Restructured
+### Phase 8a (Spec Pipeline & Autonomous Loop) — Restructured
 - The PM IS the outer loop — no separate orchestrator agent
 - The "outer loop" is now at Director level (cross-project) and PM level (per-project)
 - Director manages multiple concurrent projects
@@ -144,7 +144,7 @@ Follows the original 6-level memory architecture (260211_plan-shaping.md §11), 
 | 32 | Director has full project observability | Can intervene when patterns go wrong; not blind delegation |
 | 33 | Hard limits cascade CEO → Director → PM | Resource governance follows the hierarchy |
 | 34 | 6-level memory applied per tier scope | Original memory architecture maps naturally to hierarchical supervision |
-| 35 | All hierarchy is MVP scope | Not deferred; Director + PMs built in Phase 5, not Phase 8+ |
+| 35 | All hierarchy is MVP scope | Not deferred; Director + PMs built in Phase 5, not Phase 8a+ |
 
 ---
 

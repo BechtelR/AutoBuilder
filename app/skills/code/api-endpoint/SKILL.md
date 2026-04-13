@@ -78,7 +78,7 @@ async def get_project(
 Standard dependencies in `app/gateway/deps.py`:
 - `get_db_session` — yields `AsyncSession`, commits on success, rolls back on exception
 - `get_redis` — returns shared `ArqRedis` client (superset of Redis, single client for jobs + cache)
-- `get_current_user` — auth header extraction (Phase 7+)
+- `get_current_user` — auth header extraction (Phase 7a+)
 
 Prefer thin route handlers — move business logic into service functions or ARQ tasks. A route should read request, call service, return response.
 

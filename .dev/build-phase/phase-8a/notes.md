@@ -1,15 +1,15 @@
-# Phase 8 Pre-Shaping Research Notes
+# Phase 8a Pre-Shaping Research Notes
 
 Research date: 2026-04-12
-Focus: What Phase 8 should become now that Phase 7 (Workflow Composition) has absorbed capabilities Phase 8 originally claimed. Brain-dump for `/shape-phase 8`.
+Focus: What Phase 8a should become now that Phase 7a (Workflow Composition) has absorbed capabilities Phase 8a originally claimed. Brain-dump for `/shape-phase 8`.
 
 ---
 
-## 1. What Phase 7 Owns (vs. What Phase 8 Claimed)
+## 1. What Phase 7a Owns (vs. What Phase 8a Claimed)
 
-Phase 8 was written as "Spec Pipeline & Autonomous Loop" before Phase 7's full design. Phase 7 ended up absorbing significant chunks of what Phase 8 claimed to own. Here's the gap analysis.
+Phase 8a was written as "Spec Pipeline & Autonomous Loop" before Phase 7a's full design. Phase 7a ended up absorbing significant chunks of what Phase 8a claimed to own. Here's the gap analysis.
 
-### Phase 8's Original Claims (from `08-ROADMAP.md`)
+### Phase 8a's Original Claims (from `08-ROADMAP.md`)
 
 Goal: "The core thesis — specification to parallel deliverable execution with autonomous continuation under hierarchical supervision. PM IS the outer loop."
 
@@ -26,27 +26,27 @@ Claimed scope:
 
 9 acceptance criteria, 20 BOM components (G02-G08, V19, A62-A63, X01-X11).
 
-### What Phase 7 Now Owns
+### What Phase 7a Now Owns
 
-| Phase 8 Claim | Phase 7 Reality | Who Owns It Now |
+| Phase 8a Claim | Phase 7a Reality | Who Owns It Now |
 |---|---|---|
-| Stage schema with per-stage scoping | `WORKFLOW.yaml` stages field with agents/tools/skills/validators/completion_criteria/approval | **Phase 7** |
-| PM-driven stage transitions | PM reconciliation loop with `pm:current_stage`, `pm:stage_index`, state-driven reconfiguration | **Phase 7** |
-| Spec-to-deliverable decomposition *pattern* | PLAN stage in auto-code defines this; DeliverableDef in manifest guides it | **Phase 7** (pattern); Phase 8 (runtime) |
-| Deliverable status tracking *model* | Validators + completion criteria + `deliverable_status_check` standard validator | **Phase 7** (framework); Phase 8 (DB entities) |
-| Batch execution *architecture* | `batch_parallel` pipeline type defined; `select_ready_batch` pattern in stage schema notes | **Phase 7** (architecture); Phase 8 (implementation) |
-| Inter-batch PM reasoning | PM reconciliation already enables observe → reason → act per batch | **Phase 7** (reasoning pattern); Phase 8 (retry/skip/reorder) |
-| Completion criteria composition | Three-type AND: deliverable + validator + approval. Three-layer reports (functional/architectural/contract) | **Phase 7** |
-| TaskGroup/stage close conditions | `verify_taskgroup_completion()`, `verify_stage_completion()` — hard gates PM can't override | **Phase 7** |
-| Validator framework (6 standard) | lint_check, test_suite, regression_tests, dependency_validation, deliverable_status_check, code_review | **Phase 7** |
+| Stage schema with per-stage scoping | `WORKFLOW.yaml` stages field with agents/tools/skills/validators/completion_criteria/approval | **Phase 7a** |
+| PM-driven stage transitions | PM reconciliation loop with `pm:current_stage`, `pm:stage_index`, state-driven reconfiguration | **Phase 7a** |
+| Spec-to-deliverable decomposition *pattern* | PLAN stage in auto-code defines this; DeliverableDef in manifest guides it | **Phase 7a** (pattern); Phase 8a (runtime) |
+| Deliverable status tracking *model* | Validators + completion criteria + `deliverable_status_check` standard validator | **Phase 7a** (framework); Phase 8a (DB entities) |
+| Batch execution *architecture* | `batch_parallel` pipeline type defined; `select_ready_batch` pattern in stage schema notes | **Phase 7a** (architecture); Phase 8a (implementation) |
+| Inter-batch PM reasoning | PM reconciliation already enables observe → reason → act per batch | **Phase 7a** (reasoning pattern); Phase 8a (retry/skip/reorder) |
+| Completion criteria composition | Three-type AND: deliverable + validator + approval. Three-layer reports (functional/architectural/contract) | **Phase 7a** |
+| TaskGroup/stage close conditions | `verify_taskgroup_completion()`, `verify_stage_completion()` — hard gates PM can't override | **Phase 7a** |
+| Validator framework (6 standard) | lint_check, test_suite, regression_tests, dependency_validation, deliverable_status_check, code_review | **Phase 7a** |
 | Director workflow authoring | 6-phase lifecycle, staging directory, CEO approval, L1-L5 validation, filesystem tools | **Phase 7b** |
 | CEO resource discovery tools | list_available_tools, list_mcp_servers, list_configured_credentials, list_workflows, list_available_skills | **Phase 7b** |
 
-### What Phase 8 Still Exclusively Owns
+### What Phase 8a Still Exclusively Owns
 
 | Capability | Why It's New |
 |---|---|
-| **Parallel batch execution runtime** (ParallelAgent instantiation) | Phase 7 designed it; Phase 8 wires the ADK agents |
+| **Parallel batch execution runtime** (ParallelAgent instantiation) | Phase 7a designed it; Phase 8a wires the ADK agents |
 | **Git worktree isolation** (create/merge/cleanup per deliverable) | No prior phase touches worktrees |
 | **Brief/spec submission gateway endpoint** (`POST /specs`) | Gateway route + project creation + work session enqueueing |
 | **Concurrency limits** (max parallel pipelines, cascaded) | Deferred from Phase 5b; no phase owns it yet |
@@ -54,20 +54,20 @@ Claimed scope:
 | **Human-in-the-loop intervention API** (`POST /workflows/{id}/intervene`) | New gateway route + batch-boundary pause |
 | **Director execution turn** (cross-project orchestration) | Director's batch-of-PMs management |
 | **Batch failure threshold** (consecutive failures → Director suspension) | Safety mechanism, no prior implementation |
-| **Deliverable DB entities expansion** (status lifecycle, dependency graph) | Phase 7 added StageExecution/TaskGroupExecution/ValidatorResult tables; deliverables table exists but management tools are all placeholders |
+| **Deliverable DB entities expansion** (status lifecycle, dependency graph) | Phase 7a added StageExecution/TaskGroupExecution/ValidatorResult tables; deliverables table exists but management tools are all placeholders |
 | **Backlog queue orchestration** | CEO submits brief → Director triages → PM executes. DB tables exist (Phase 5b) but the entire orchestration layer is unbuilt |
 | **`escalate_to_director` real implementation** | Tool exists as Phase 4 FunctionTool but returns a placeholder string — does NOT write to director_queue DB table |
 | **Director queue gateway routes** | No CRUD routes for director_queue exposed via API |
 | **Management tool DB wiring** | 10+ management tools (select_ready_batch, update_deliverable, query_deliverables, etc.) are all placeholder strings with no DB access |
-| **Three-layer completion report wiring** | Phase 7 built CompletionReport model + verify_stage_completion; Phase 8 wires into INTEGRATE stage |
-| **Brief validation against `brief_template`** | WorkflowManifest BriefTemplateDef exists (Phase 7); runtime validation of incoming briefs is Phase 8 |
-| **Pre-execution resource validation** | ResourcesDef parsed at manifest level (Phase 7); runtime credential/service/knowledge checks are Phase 8 |
+| **Three-layer completion report wiring** | Phase 7a built CompletionReport model + verify_stage_completion; Phase 8a wires into INTEGRATE stage |
+| **Brief validation against `brief_template`** | WorkflowManifest BriefTemplateDef exists (Phase 7a); runtime validation of incoming briefs is Phase 8a |
+| **Pre-execution resource validation** | ResourcesDef parsed at manifest level (Phase 7a); runtime credential/service/knowledge checks are Phase 8a |
 
 ### Critical Finding: Backlog Queue Gap
 
 Phase 5b built the **communication channels** (CEO queue gateway routes, Director queue DB table + cron scanner). But the **backlog flow** is entirely unbuilt:
 
-| What Exists (Phase 5b) | What's Missing (Phase 8) |
+| What Exists (Phase 5b) | What's Missing (Phase 8a) |
 |---|---|
 | `ceo_queue` table + CRUD routes | `POST /specs` — no way to submit work |
 | `director_queue` table + `DirectorQueueItem` model | No Director queue gateway routes (no CRUD) |
@@ -75,7 +75,7 @@ Phase 5b built the **communication channels** (CEO queue gateway routes, Directo
 | CEO queue approval → session state writeback | No Director execution turn (X03) to process escalations |
 | `run_work_session` ARQ job | No project backlog model (brief → triage → delegation) |
 
-The Director execution turn described in `architecture/execution.md` §Director Execution Turn — CEO submits spec → Gateway enqueues decomposition → Director assigns PM → PM drives batch loop — requires Phase 8 to actually connect these pieces.
+The Director execution turn described in `architecture/execution.md` §Director Execution Turn — CEO submits spec → Gateway enqueues decomposition → Director assigns PM → PM drives batch loop — requires Phase 8a to actually connect these pieces.
 
 Additionally, the codebase audit reveals **10+ management tools in `app/tools/management.py` are placeholder strings** returning hardcoded text with no DB access:
 - `select_ready_batch`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `query_dependency_graph` (PM tools)
@@ -84,13 +84,13 @@ Additionally, the codebase audit reveals **10+ management tools in `app/tools/ma
 
 Only `reconfigure_stage` has a real implementation (writes state deltas via ToolContext).
 
-**Summary**: Phase 7 owns the *framework* (stage schema, validators, completion criteria, PM reasoning pattern). Phase 8 owns the *runtime* (parallel execution, worktree isolation, failure handling, gateway endpoints, DB entities).
+**Summary**: Phase 7a owns the *framework* (stage schema, validators, completion criteria, PM reasoning pattern). Phase 8a owns the *runtime* (parallel execution, worktree isolation, failure handling, gateway endpoints, DB entities).
 
 ---
 
 ## 2. The Manual Build Process
 
-AutoBuilder's own build process — observable in `.claude/commands/` and `.claude/agents/` — is the reference implementation of the "auto-code" thesis. This IS what Phase 8 automates.
+AutoBuilder's own build process — observable in `.claude/commands/` and `.claude/agents/` — is the reference implementation of the "auto-code" thesis. This IS what Phase 8a automates.
 
 ### The 5-Phase Manual Loop
 
@@ -121,13 +121,13 @@ AutoBuilder's own build process — observable in `.claude/commands/` and `.clau
 
 **2. Spec and model collapse into DESIGN.** Manual produces three separate artifacts (frd.md, spec.md, model.md). Auto-code collapses these into one DESIGN stage producing design artifacts. This is simpler — but the traceability rigor (every FR → deliverable → contract item) must survive the collapse.
 
-**3. Completion protocol is not just integration testing.** Manual Step 5 runs three independent verification layers (FRs, Deliverables, Contract items) with evidence tables. INTEGRATE stage is described as "integration testing and final verification" but doesn't detail the three-layer structure. Phase 8 must wire the three-layer completion report (already designed in Phase 7's architecture) into the INTEGRATE stage.
+**3. Completion protocol is not just integration testing.** Manual Step 5 runs three independent verification layers (FRs, Deliverables, Contract items) with evidence tables. INTEGRATE stage is described as "integration testing and final verification" but doesn't detail the three-layer structure. Phase 8a must wire the three-layer completion report (already designed in Phase 7a's architecture) into the INTEGRATE stage.
 
 **4. Build order is an explicit planning artifact.** The manual `/spec-phase` produces a topological build order (parallel batches). In auto-code, this is the PLAN stage's job. PLAN must be deterministic — dependency graph resolution, not LLM reasoning.
 
 ### Quality Gates in the Manual Process
 
-| Gate | Phase | Enforcer | Phase 8 Equivalent |
+| Gate | Phase | Enforcer | Phase 8a Equivalent |
 |---|---|---|---|
 | Capability review | SHAPE | User | Reflector agent (auto) or CEO queue (escalation) |
 | Reviewer verification | SPEC | reviewer agent | DESIGN stage validators |
@@ -135,15 +135,15 @@ AutoBuilder's own build process — observable in `.claude/commands/` and `.clau
 | User plan approval | BUILD Step 1 | User | Auto (or CEO queue if ambiguous) |
 | ruff + pyright + pytest | BUILD Step 3 | test-gates agent | lint_check + test_suite validators |
 | Dual independent review | BUILD Step 4 | 2-6 reviewer agents | code_review validator (per_batch schedule) |
-| 3-layer verification | BUILD Step 5 | test-gates agent | Three-layer completion report (Phase 7 design) |
+| 3-layer verification | BUILD Step 5 | test-gates agent | Three-layer completion report (Phase 7a design) |
 
 ---
 
-## 3. Phase 8 Vision
+## 3. Phase 8a Vision
 
 ### Phase Split: 8a + 8b
 
-Phase 8 was split into two phases based on a clean dependency boundary:
+Phase 8a was split into two phases based on a clean dependency boundary:
 
 **Phase 8a: "Autonomous Execution Engine"** (`L`) — End-to-end autonomous execution with sequential batches. Proves the core thesis: brief in → verified code out → minimal human intervention. Owns: brief submission, management tool DB wiring, Director backlog orchestration, sequential PM batch loop, failure handling, three-layer completion wiring, Director queue routes.
 
@@ -157,11 +157,11 @@ Phase 9 and 10 depend on 8a (not 8b) — memory ingestion and event streaming ne
 
 **Spec in → verified working code out → minimal human intervention.**
 
-Phase 8 is where this stops being architecture and starts being real. Everything before Phase 8 is infrastructure. Phase 8 is the proof.
+Phase 8a is where this stops being architecture and starts being real. Everything before Phase 8a is infrastructure. Phase 8a is the proof.
 
 ### Minimum Thesis Proof
 
-What is the minimum Phase 8 must deliver to prove the core thesis works?
+What is the minimum Phase 8a must deliver to prove the core thesis works?
 
 **The demo**: Submit a brief to the auto-code workflow. Watch it SHAPE → DESIGN → PLAN → BUILD → INTEGRATE autonomously. Get back verified, tested, reviewed code with a three-layer completion report. Human touches nothing after submission (unless escalated).
 
@@ -173,7 +173,7 @@ What is the minimum Phase 8 must deliver to prove the core thesis works?
 4. **Parallel batch executor** — ParallelAgent composition for concurrent deliverable pipelines
 5. **Git worktree isolation** — create worktree per deliverable, merge on completion, cleanup on failure
 6. **Autonomous PM loop** — retry/skip/reorder/escalate heuristics within BUILD stage
-7. **Three-layer completion** — wire Phase 7's completion report framework into INTEGRATE validators
+7. **Three-layer completion** — wire Phase 7a's completion report framework into INTEGRATE validators
 8. **Batch intervention API** — pause/resume at batch boundaries for CEO override
 
 What can be deferred:
@@ -181,15 +181,15 @@ What can be deferred:
 - Concurrency limits (hardcode a reasonable default; configurability later)
 - Batch failure threshold Director suspension (PM escalation is sufficient initially)
 
-### What Phase 8 is NOT
+### What Phase 8a is NOT
 
-- **Not a new pipeline framework** — Phase 7 built that
-- **Not new validators** — Phase 7 built those (Phase 8 wires them)
-- **Not stage schema** — Phase 7 built that
+- **Not a new pipeline framework** — Phase 7a built that
+- **Not new validators** — Phase 7a built those (Phase 8a wires them)
+- **Not stage schema** — Phase 7a built that
 - **Not workflow authoring** — Phase 7b built that
-- **Not the PM reasoning loop** — Phase 5b built that; Phase 8 extends it
+- **Not the PM reasoning loop** — Phase 5b built that; Phase 8a extends it
 
-Phase 8 is the **runtime engine** that connects all prior infrastructure into the autonomous loop.
+Phase 8a is the **runtime engine** that connects all prior infrastructure into the autonomous loop.
 
 ---
 
@@ -197,7 +197,7 @@ Phase 8 is the **runtime engine** that connects all prior infrastructure into th
 
 ### T1: Parallel Execution + Stage Reconfiguration
 
-**Tension**: Phase 7's stage reconfiguration is state-driven — PM writes `pm:stage_agents`, `pm:stage_tools`, `pm:stage_skills` to session state, and the pipeline reads these at deliverable dispatch. But parallel batch execution means multiple deliverables dispatching simultaneously. Do they all read the same state? Is there a race condition?
+**Tension**: Phase 7a's stage reconfiguration is state-driven — PM writes `pm:stage_agents`, `pm:stage_tools`, `pm:stage_skills` to session state, and the pipeline reads these at deliverable dispatch. But parallel batch execution means multiple deliverables dispatching simultaneously. Do they all read the same state? Is there a race condition?
 
 **Probable resolution**: State reconfiguration happens at stage boundaries, not during execution. Within a stage, all deliverables share the same agent/tool/skill configuration. ParallelAgent workers read stage config once at batch start. No race condition because reconfiguration is between stages, not between deliverables.
 
@@ -254,13 +254,13 @@ This is a **tool** (FunctionTool) the PM calls, not a separate agent. It reads f
 
 ### T6: What is a "Deliverable" in the DB?
 
-Phase 8 introduces deliverable DB entities. What's the schema?
+Phase 8a introduces deliverable DB entities. What's the schema?
 
 **Minimum fields**: id, project_id, name, description, status (PLANNED/IN_PROGRESS/COMPLETE/FAILED/SKIPPED), dependencies (list of deliverable IDs), worktree_branch, validation_results, created_at, updated_at.
 
 **Open question**: Is a deliverable the same granularity as a PR? The manual process maps 1 deliverable = 1 unit of reviewable work. Git worktree isolation suggests 1 deliverable = 1 branch = 1 merge. This feels right.
 
-### T7: Rename Phase 8? — RESOLVED
+### T7: Rename Phase 8a? — RESOLVED
 
 **Decision**: Split into two phases:
 - **Phase 8a: "Autonomous Execution Engine"** — sequential end-to-end proof
@@ -274,7 +274,7 @@ See "Phase Split: 8a + 8b" in section 3 for full justification.
 
 ### Spec Steering (from `.claude/specflow/`)
 
-The manual process has a "spec steering" concept — an iterative loop where specs are refined through feedback. Phase 8's SHAPE stage should incorporate this: brief → draft spec → reflector critique → revised spec → approval (or escalation). Not just one-shot generation.
+The manual process has a "spec steering" concept — an iterative loop where specs are refined through feedback. Phase 8a's SHAPE stage should incorporate this: brief → draft spec → reflector critique → revised spec → approval (or escalation). Not just one-shot generation.
 
 ### Hard Iteration Limits (from external systems research)
 
@@ -288,14 +288,14 @@ These prevent unbounded LLM loops that burn tokens without progress.
 
 ### Deterministic-First Quality Gates (from Shopify Roast)
 
-Roast's cog pipeline: `sed → autocorrect → LLM`. The cheapest check runs first. Phase 8 should enforce:
+Roast's cog pipeline: `sed → autocorrect → LLM`. The cheapest check runs first. Phase 8a should enforce:
 1. Lint (instant, free) → 2. Type check (fast, free) → 3. Unit tests (medium, free) → 4. LLM review (slow, expensive)
 
 This is already the test-gates pipeline. Just ensure validators schedule in this order.
 
 ### Trace Recording (from OpenAI Codex)
 
-Every prompt, tool call, agent transition must be inspectable. Phase 7's Redis Streams event bus already publishes events. Phase 8 should ensure batch execution produces a complete, replayable trace.
+Every prompt, tool call, agent transition must be inspectable. Phase 7a's Redis Streams event bus already publishes events. Phase 8a should ensure batch execution produces a complete, replayable trace.
 
 ### Dynamic Batch Composition (from Airflow `expand()`)
 
@@ -306,11 +306,11 @@ Airflow's dynamic task mapping generates tasks at runtime from previous output. 
 ## 6. References
 
 ### Architecture & Design
-- `.dev/08-ROADMAP.md` — Phase 8 scope, acceptance criteria, BOM assignments
+- `.dev/08-ROADMAP.md` — Phase 8a scope, acceptance criteria, BOM assignments
 - `.dev/07-COMPONENTS.md` — Phase 8a + 8b BOM components (filter by phase)
-- `.dev/architecture/workflows.md` — Phase 7 workflow composition system (the framework Phase 8 runs on)
+- `.dev/architecture/workflows.md` — Phase 7a workflow composition system (the framework Phase 8a runs on)
 
-### Design Notes (Phase 7 foundation)
+### Design Notes (Phase 7a foundation)
 - `.dev/.notes/260312_stage-schema-design.md` — Stage schema system, PM-driven transitions, state-driven reconfiguration, completion criteria
 - `.dev/.notes/260312_manifest-design.md` — WORKFLOW.yaml format, progressive disclosure, three manifest tiers
 - `.dev/.notes/260312_director-authoring-design.md` — Director authoring lifecycle, staging/activation, L1-L5 validation
@@ -347,13 +347,13 @@ Airflow's dynamic task mapping generates tasks at runtime from previous output. 
 
 ---
 
-## 7. Summary: The Phase 8 Picture
+## 7. Summary: The Phase 8a Picture
 
-**Phase 7 built the orchestra pit.** Stage schema, validators, completion criteria, PM reasoning pattern, WorkflowRegistry, WORKFLOW.yaml — all infrastructure.
+**Phase 7a built the orchestra pit.** Stage schema, validators, completion criteria, PM reasoning pattern, WorkflowRegistry, WORKFLOW.yaml — all infrastructure.
 
-**Phase 8 conducts the orchestra.** It takes a brief, creates a project, runs it through auto-code's 5 stages autonomously with parallel batch execution, git worktree isolation, failure recovery, and three-layer verification. The human submits intent. The system delivers verified code.
+**Phase 8a conducts the orchestra.** It takes a brief, creates a project, runs it through auto-code's 5 stages autonomously with parallel batch execution, git worktree isolation, failure recovery, and three-layer verification. The human submits intent. The system delivers verified code.
 
-**The minimum proof**: Submit a brief → auto-code SHAPE/DESIGN/PLAN/BUILD/INTEGRATE → verified deliverables with completion report. No human touch after submission (unless escalated). One project, one workflow, sequential batches first (parallel as the upgrade within Phase 8).
+**The minimum proof**: Submit a brief → auto-code SHAPE/DESIGN/PLAN/BUILD/INTEGRATE → verified deliverables with completion report. No human touch after submission (unless escalated). One project, one workflow, sequential batches first (parallel as the upgrade within Phase 8a).
 
 **Biggest risk**: Git worktree merge conflicts during parallel execution. This is the one thing that can't be solved by better prompting — it's a fundamental concurrency problem that needs a deterministic strategy (merge in dependency order, rebase, or escalate).
 

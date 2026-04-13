@@ -113,7 +113,7 @@
 
 **Relevance to AutoBuilder**: Dagster's asset-centric model is a paradigm shift from task-centric orchestration. While AutoBuilder is fundamentally task-centric (plan -> code -> lint -> test -> review), Dagster's insight is valuable: **define what you produce, not just what you do**. This maps to AutoBuilder's artifact system (Decision #59) — deliverables produce artifacts (source files, tests, reports), and the artifact graph could be the workflow dependency graph.
 
-However, adopting asset-centric design would be a fundamental architecture change inappropriate for Phase 7. The observation is noted for future consideration.
+However, adopting asset-centric design would be a fundamental architecture change inappropriate for Phase 7a. The observation is noted for future consideration.
 
 **Applicable patterns**:
 - Declarative dependency inference (assets declare what they need, graph is computed)
@@ -478,7 +478,7 @@ Compound workflows (Decision #3, architecture doc section 6) are Phase 11+ scope
 - Gateway can orchestrate sequential ARQ jobs
 - No workflow assumes it is the only one in a session
 
-No additional design work is needed for compound workflows in Phase 7.
+No additional design work is needed for compound workflows in Phase 7a.
 
 ---
 

@@ -53,12 +53,12 @@ The Director operates as the root agent -- stateless configuration, recreated fr
 
 ### CAP-2: PM Autonomous Loop (Sequential Mode)
 
-The PM manages a project autonomously with reliable inter-batch reasoning, tools, and deterministic safety callbacks. The loop executes a multi-deliverable sequence with tool-driven batch selection, callback-driven checkpointing after each deliverable, and batch verification after completion. The PM reasons between batches -- assessing results, deciding composition for the next batch -- without losing context. Phase 5b runs batches sequentially; Phase 8 extends the same loop with parallel execution and git worktrees.
+The PM manages a project autonomously with reliable inter-batch reasoning, tools, and deterministic safety callbacks. The loop executes a multi-deliverable sequence with tool-driven batch selection, callback-driven checkpointing after each deliverable, and batch verification after completion. The PM reasons between batches -- assessing results, deciding composition for the next batch -- without losing context. Phase 5b runs batches sequentially; Phase 8a extends the same loop with parallel execution and git worktrees.
 
 **Requirements:**
 
 - [x]**FR-5b.12**: When the PM receives a project with pre-seeded deliverables in session state, it uses the batch selection tool to identify dependency-ready deliverables and composes a batch for execution.
-- [x]**FR-5b.13**: When the PM dispatches a batch, each deliverable in the batch executes through the DeliverablePipeline sequentially. Parallel intra-batch execution is not in scope (Phase 8).
+- [x]**FR-5b.13**: When the PM dispatches a batch, each deliverable in the batch executes through the DeliverablePipeline sequentially. Parallel intra-batch execution is not in scope (Phase 8a).
 - [x]**FR-5b.14**: After each deliverable completes in the pipeline, the checkpoint callback fires automatically. The callback persists the deliverable's completion status and pipeline output to durable state. This is not discretionary -- the callback fires regardless of success or failure.
 - [x]**FR-5b.15**: After all deliverables in a batch complete, the batch verification callback fires. It validates that all deliverables reached a terminal state (completed or failed) and logs the batch result.
 - [x]**FR-5b.16**: After a batch completes, the PM reasons about the results using its tools -- querying deliverable statuses, assessing failures, and deciding the composition of the next batch or whether to escalate. This inter-batch reasoning maintains coherence across batch boundaries.
@@ -173,18 +173,18 @@ The Director observes PM execution through supervision callbacks attached to PM 
 
 ## No-Gos
 
-- **No parallel batch execution**: Phase 5b runs deliverables sequentially within batches. ParallelAgent for intra-batch parallelism is Phase 8.
-- **No spec decomposition**: Phase 5b uses pre-seeded deliverables. Spec parsing and deliverable decomposition is Phase 8.
-- **No git worktree isolation**: Filesystem isolation for parallel execution is Phase 8.
+- **No parallel batch execution**: Phase 5b runs deliverables sequentially within batches. ParallelAgent for intra-batch parallelism is Phase 8a.
+- **No spec decomposition**: Phase 5b uses pre-seeded deliverables. Spec parsing and deliverable decomposition is Phase 8a.
+- **No git worktree isolation**: Filesystem isolation for parallel execution is Phase 8a.
 - **No real MemoryService**: Context recreation runs in degraded mode. PostgresMemoryService with tsvector/pgvector is Phase 9. Full equivalence verification is a Phase 9 contract item.
 - **No real SkillLibrary**: Skills load via NullSkillLibrary (empty results). Trigger matching, two-tier scan, and Redis cache are Phase 6.
 - **No SSE streaming for CEO queue**: The SSE endpoint for real-time CEO queue push notifications (G14) is Phase 10. Phase 5b provides polling via the query route.
 - **No webhook notifications**: Notification delivery for unresolved CEO queue items via webhooks/email/Slack is Phase 10.
-- **No tool_role ceiling validation**: Requires WORKFLOW.yaml which is Phase 7.
-- **No RegressionTestAgent integration**: Agent definition exists from 5a, but batch-level regression testing is Phase 8.
+- **No tool_role ceiling validation**: Requires WORKFLOW.yaml which is Phase 7a.
+- **No RegressionTestAgent integration**: Agent definition exists from 5a, but batch-level regression testing is Phase 8a.
 - **No Director governance tools**: Advanced governance tooling (tool authoring, CEO approval gates) is Phase 13+.
 - **No adaptive LLM routing**: Cost/latency-aware model selection is Phase 11.
-- **No batch failure threshold (PR-16)**: Requires real batch execution to trigger consecutive failure counting. The supervision callback infrastructure is wired (FR-5b.47–50); the batch failure counter and threshold logic are entirely Phase 8.
+- **No batch failure threshold (PR-16)**: Requires real batch execution to trigger consecutive failure counting. The supervision callback infrastructure is wired (FR-5b.47–50); the batch failure counter and threshold logic are entirely Phase 8a.
 
 ## Traceability
 
@@ -220,7 +220,7 @@ The Director observes PM execution through supervision callbacks attached to PM 
 |---|---------------|------------|
 | 1 | Director agent operates as root_agent (stateless config, recreated per invocation) | CAP-1: FR-5b.01 |
 | 2 | PM agent manages a project autonomously via tools + deterministic safety mechanisms (`checkpoint_project`, `verify_batch_completion`), escalating only when necessary | CAP-2: FR-5b.12, FR-5b.14, FR-5b.15, FR-5b.17, FR-5b.19 |
-| 3 | PM loop (sequential mode): PM reasons correctly between batches — queries results, decides next batch composition, maintains coherent state across batch boundaries (2+ deliverables); Phase 8 adds parallel execution | CAP-2: FR-5b.12, FR-5b.13, FR-5b.14, FR-5b.15, FR-5b.16, FR-5b.18 |
+| 3 | PM loop (sequential mode): PM reasons correctly between batches — queries results, decides next batch composition, maintains coherent state across batch boundaries (2+ deliverables); Phase 8a adds parallel execution | CAP-2: FR-5b.12, FR-5b.13, FR-5b.14, FR-5b.15, FR-5b.16, FR-5b.18 |
 | 4 | Director -> PM delegation and PM -> Director escalation via transfer_to_agent | CAP-1: FR-5b.02, FR-5b.03 |
 | 5 | Context recreation produces a functional session with equivalent agent context (persist -> fresh session -> reassemble end-to-end) in degraded mode | CAP-5: FR-5b.34, FR-5b.35, FR-5b.36, FR-5b.37, FR-5b.38, FR-5b.39, FR-5b.40 |
 | 6 | State key writes with tier prefix rejected when author tier does not match prefix | CAP-6: FR-5b.42, FR-5b.43, FR-5b.44 |

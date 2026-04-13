@@ -1,9 +1,9 @@
-# Phase 7 Spec: Workflow Composition
+# Phase 7a Spec: Workflow Composition
 *Generated: 2026-04-11*
 
 ## Overview
 
-Phase 7 delivers the pluggable workflow architecture that makes AutoBuilder a multi-workflow platform rather than a hardcoded code generation system. Before this phase, there is exactly one implicit pipeline (the DeliverablePipeline from Phase 5a) with no formal workflow abstraction, no stage schema, no declarative quality gates, and no mechanism for adding new workflow types. After this phase, workflows are self-contained discoverable units with manifests, stage schemas, validators, and completion reports.
+Phase 7a delivers the pluggable workflow architecture that makes AutoBuilder a multi-workflow platform rather than a hardcoded code generation system. Before this phase, there is exactly one implicit pipeline (the DeliverablePipeline from Phase 5a) with no formal workflow abstraction, no stage schema, no declarative quality gates, and no mechanism for adding new workflow types. After this phase, workflows are self-contained discoverable units with manifests, stage schemas, validators, and completion reports.
 
 The system introduces WORKFLOW.yaml manifests with progressive disclosure (a valid manifest requires only `name` and `description`; everything else has sensible defaults). The WorkflowRegistry discovers workflows from two tiers: built-in (`app/workflows/`) and user-level (`~/.autobuilder/workflows/`, configurable via `AUTOBUILDER_WORKFLOWS_DIR`). User-level workflows override built-in by name. Stage schemas provide organizational structure within PM sessions — stages are PM-driven transitions following a K8s reconciliation pattern, not separate execution contexts.
 
@@ -14,7 +14,7 @@ Standard validators form an evidence collection framework that evaluates existin
 Run before starting implementation. All 53 tests must pass:
 
 ```bash
-uv run pytest tests/workflows/test_phase7_readiness.py -v
+uv run pytest tests/workflows/test_phase7a_readiness.py -v
 ```
 
 Validates: manifest example well-formed, workflow directories ready, prerequisite infrastructure intact (AgentRegistry, SkillLibrary, pipeline.py, agent definitions, enums, skills).
@@ -331,7 +331,7 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 - [x] `design` stage: agents `[planner, reviewer]`, validator `design_consistency` (llm, per_stage), approval `director`
 - [x] `plan` stage: agents `[planner]`, validator `dependency_validation` (deterministic, per_stage), completion_criteria `all_deliverables_planned`, approval `auto`
 - [x] `build` stage: agents `[coder, reviewer, fixer, formatter, linter, tester, diagnostics]`, validators: `lint_check` (per_deliverable), `test_suite` (per_deliverable), `code_review` (per_deliverable), `regression_tests` (per_batch), approval `auto`
-  > **Note (Phase 7):** `pipeline.py` composes all agents including `planner` (line 323) regardless of which stage is active. Runtime stage-agent filtering — where the pipeline reads the stage's `agents` list and excludes agents not listed — is wired in Phase 8. For Phase 7 the full agent tree is always composed; the manifest's per-stage `agents` field is authoritative metadata that Phase 8 will enforce at runtime.
+  > **Note (Phase 7a):** `pipeline.py` composes all agents including `planner` (line 323) regardless of which stage is active. Runtime stage-agent filtering — where the pipeline reads the stage's `agents` list and excludes agents not listed — is wired in Phase 8a. For Phase 7a the full agent tree is always composed; the manifest's per-stage `agents` field is authoritative metadata that Phase 8a will enforce at runtime.
 - [x] `integrate` stage: agents `[tester, reviewer, diagnostics]`, validators: `integration_tests` (deterministic, per_stage, Phase 7b stub returning passed=True), `architecture_conformance` (llm, per_stage, required: false, Phase 7b stub returning passed=True), `final_approval` (approval, per_stage), approval `ceo`
 - [x] Manifest declares `required_tools`: `file_read`, `file_write`, `file_edit`, `bash_exec`, `git_status`, `git_commit`, `git_diff`
 - [x] Manifest declares `default_models` with `PLAN: anthropic/claude-opus-4-6` and `CODE: anthropic/claude-sonnet-4-6`
@@ -384,7 +384,7 @@ The user-level workflows directory defaults to `~/.autobuilder/workflows/`. This
 - [x] `STAGE_COMPLETION_KEYS` dict moved out of `context_recreation.py` — becomes workflow-provided configuration
 - [x] `app/workers/adk.py`: `build_work_session_agents()` uses `WorkflowRegistry.create_pipeline(workflow_name, pipeline_ctx)` instead of importing pipeline directly
 - [x] `app/workers/tasks.py`: `run_workflow` uses WorkflowRegistry path instead of `create_deliverable_pipeline_from_context`
-  > **Note:** `validate_project_scope()` is defined in `app/agents/_registry.py` as infrastructure-ready code. Its call site is deferred to Phase 8, when project-scope agent scanning is implemented and the workflow manifest's `required_tools` ceiling can be enforced end-to-end.
+  > **Note:** `validate_project_scope()` is defined in `app/agents/_registry.py` as infrastructure-ready code. Its call site is deferred to Phase 8a, when project-scope agent scanning is implemented and the workflow manifest's `required_tools` ceiling can be enforced end-to-end.
 **Validation:**
 - `uv run pyright app/agents/_registry.py app/skills/library.py app/agents/context_recreation.py app/workers/adk.py`
 - `uv run pytest tests/agents/test_registry.py tests/skills/test_library.py tests/agents/test_context_recreation.py -v`
@@ -563,7 +563,7 @@ Existing migrations use sequential `NNN` format. Check `app/db/migrations/versio
 
 ### CustomAgent Pattern
 
-All CustomAgents inherit from `BaseAgent`, override `_run_async_impl()` (async generator yielding Events), and register in `CLASS_REGISTRY` via `app/agents/custom/__init__.py`. Phase 7 validators do NOT use this pattern — they're framework functions, not CustomAgents (DD-2).
+All CustomAgents inherit from `BaseAgent`, override `_run_async_impl()` (async generator yielding Events), and register in `CLASS_REGISTRY` via `app/agents/custom/__init__.py`. Phase 7a validators do NOT use this pattern — they're framework functions, not CustomAgents (DD-2).
 
 ### Redis Cache Pattern
 
@@ -588,7 +588,7 @@ app.state.skill_library = skill_library
 
 Stage state keys use `pm:` prefix per Decision #58. The EventPublisher's `validate_state_delta()` already enforces tier-based ACL — PM-tier agents can write `pm:` prefixed keys. No additional authorization logic needed.
 
-### Test Patterns for Phase 7
+### Test Patterns for Phase 7a
 
 - `tests/workflows/` new directory with `conftest.py`
 - Helper: `_write_workflow(base_dir, name, manifest_yaml)` writes WORKFLOW.yaml

@@ -696,15 +696,15 @@ This is a synchronous check (~1ms), not a database lookup. The prefix→tier map
 
 | Extension Point | Future Phase | Preparation |
 |----------------|-------------|-------------|
-| `verify_batch_completion` callback | Phase 8 | Batch failure threshold counter (X11) plugs into this callback |
-| `checkpoint_project` callback | Phase 8 | Parallel execution adds per-worktree checkpoint via same callback shape |
+| `verify_batch_completion` callback | Phase 8a | Batch failure threshold counter (X11) plugs into this callback |
+| `checkpoint_project` callback | Phase 8a | Parallel execution adds per-worktree checkpoint via same callback shape |
 | Context recreation `memory_available` flag | Phase 9 | PostgresMemoryService replaces InMemoryMemoryService; recreation uses real memory |
 | State key authorization ACL | Phase 11 | Adaptive router and token tracking write `app:` scoped keys; ACL already supports this |
-| Director Queue cron interval | Phase 8+ | Configurable via `AUTOBUILDER_DIRECTOR_QUEUE_INTERVAL` setting |
+| Director Queue cron interval | Phase 8a+ | Configurable via `AUTOBUILDER_DIRECTOR_QUEUE_INTERVAL` setting |
 | System reminders | Phase 11 | Token tracking plugin provides actual cost data for budget reminders |
 | CEO queue SSE stream | Phase 10 | `GET /ceo/queue/stream` (G14) adds real-time push; polling infrastructure from 5b remains |
-| Supervision callbacks | Phase 8 | Parallel batch execution uses same before/after callback shape |
-| `build_agent_tree()` | Phase 8 | Multi-project concurrent PM agents; same tree construction pattern |
+| Supervision callbacks | Phase 8a | Parallel batch execution uses same before/after callback shape |
+| `build_agent_tree()` | Phase 8a | Multi-project concurrent PM agents; same tree construction pattern |
 
 ## Notes
 

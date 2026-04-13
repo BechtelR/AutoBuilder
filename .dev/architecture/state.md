@@ -41,7 +41,7 @@ Key characteristics:
 
 > **Workflow stage state keys:** PM-tier stage state keys (`pm:current_stage`, `pm:stage_index`, `pm:stage_status`, `pm:stages_completed`, `pm:workflow_stages`) are defined in [workflows.md §Stage State Keys](./workflows.md#stage-state-keys). All use the `pm:` tier prefix per Decision #58.
 >
-> **Note:** TaskGroup lifecycle is tracked via the `TaskGroupExecution` database table (Phase 7), not session state. The `pm:` state keys above are stage-level execution state only.
+> **Note:** TaskGroup lifecycle is tracked via the `TaskGroupExecution` database table (Phase 7a), not session state. The `pm:` state keys above are stage-level execution state only.
 
 ### 1.3 State Scope per Tier
 

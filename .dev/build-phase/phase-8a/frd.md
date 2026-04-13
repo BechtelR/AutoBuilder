@@ -3,7 +3,7 @@
 
 ## Objective
 
-Phase 8a connects all prior infrastructure — workflow composition (Phase 7), supervision hierarchy (Phase 5b), toolset (Phase 4), and skills (Phase 6) — into a working autonomous execution loop. For the first time, a user can express project intent to the Director and receive verified deliverables without manual intervention during execution. This phase proves the core thesis: specification to verified output under hierarchical supervision. Derives from PR-1, PR-2, PR-3, PR-8, PR-10, PR-13, PR-14, PR-22.
+Phase 8a connects all prior infrastructure — workflow composition (Phase 7a), supervision hierarchy (Phase 5b), toolset (Phase 4), and skills (Phase 6) — into a working autonomous execution loop. For the first time, a user can express project intent to the Director and receive verified deliverables without manual intervention during execution. This phase proves the core thesis: specification to verified output under hierarchical supervision. Derives from PR-1, PR-2, PR-3, PR-8, PR-10, PR-13, PR-14, PR-22.
 
 ## Consumer Roles
 

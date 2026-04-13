@@ -265,7 +265,7 @@ def task_query(
 ```python
 # PM tools (6)
 def select_ready_batch(project_id: str) -> str:
-    """Placeholder — returns 'no deliverables' until Phase 8.""" ...
+    """Placeholder — returns 'no deliverables' until Phase 8a.""" ...
 
 def escalate_to_director(priority: EscalationPriority, context: str, request_type: EscalationRequestType) -> str:
     """Escalate an issue from PM to the Director queue for resolution.""" ...  # str -> typed enums (review delta)
@@ -280,7 +280,7 @@ def reorder_deliverables(project_id: str, order: list[str]) -> str:
     """Change execution priority by reordering deliverables. Placeholder until Phase 5.""" ...
 
 def manage_dependencies(action: DependencyAction, source_id: str, target_id: str | None = None) -> str:
-    """Add, remove, or query deliverable dependency relationships. Placeholder until Phase 8.""" ...  # str -> DependencyAction (review delta)
+    """Add, remove, or query deliverable dependency relationships. Placeholder until Phase 8a.""" ...  # str -> DependencyAction (review delta)
 
 # Director tools (6)
 def escalate_to_ceo(
@@ -303,7 +303,7 @@ def get_project_context(path: str | None = None) -> str:
     Functional in Phase 4 (reads filesystem).""" ...
 
 def query_dependency_graph(project_id: str, deliverable_id: str | None = None) -> str:
-    """Query the deliverable dependency graph. Placeholder until Phase 8.""" ...
+    """Query the deliverable dependency graph. Placeholder until Phase 8a.""" ...
 ```
 
 ## Key Type Definitions
@@ -594,15 +594,15 @@ flowchart TD
 |----------------|-------------|-------------|
 | `escalate_to_ceo` backend | Phase 5 | Correct signature + validation in place; replace log with `INSERT INTO ceo_queue` |
 | `escalate_to_director` backend | Phase 5 | Correct signature + validation in place; replace log with `INSERT INTO director_queue` |
-| `select_ready_batch` backend | Phase 8 | Correct signature in place; replace placeholder with topological sort over deliverables |
+| `select_ready_batch` backend | Phase 8a | Correct signature in place; replace placeholder with topological sort over deliverables |
 | `update_deliverable` backend | Phase 5 | Correct signature in place; replace placeholder with DB update |
 | `query_deliverables` backend | Phase 5 | Correct signature in place; replace placeholder with DB query |
 | `reorder_deliverables` backend | Phase 5 | Correct signature in place; replace placeholder with DB reorder |
-| `manage_dependencies` backend | Phase 8 | Correct signature in place; replace placeholder with dependency graph ops |
+| `manage_dependencies` backend | Phase 8a | Correct signature in place; replace placeholder with dependency graph ops |
 | `list_projects` backend | Phase 5 | Correct signature in place; replace placeholder with DB query |
 | `query_project_status` backend | Phase 5 | Correct signature in place; replace placeholder with DB + event query |
 | `override_pm` backend | Phase 5 | Correct signature in place; replace placeholder with PM agent control |
-| `query_dependency_graph` backend | Phase 8 | Correct signature in place; replace placeholder with graph query |
+| `query_dependency_graph` backend | Phase 8a | Correct signature in place; replace placeholder with graph query |
 | `task_create/update/query` backend | Phase 5 | Correct signatures in place; replace placeholder with shared task DB |
 | `AGENT_ROLE_MAP` | Phase 5+ | New agent names added to map as agents are defined beyond Phase 4 defaults |
 | `ROLE_PERMISSIONS` | Phase 5+ | New tool names added to role sets as new tools are created |
@@ -610,7 +610,7 @@ flowchart TD
 | `require_confirmation` | Phase 11 | `FunctionTool(bash_exec, require_confirmation=True)` for human-in-the-loop |
 | Tool authoring by Director | Phase 13+ | Director writes new tool functions; CEO approval gate before activation |
 | `web_search` providers | Phase 4+ | Add `elif provider == "new_provider":` branch for new search providers |
-| `agent-browser` integration | Phase 7/13 | Vercel `agent-browser` CLI invoked via `bash_exec`. Workflow-specific. |
+| `agent-browser` integration | Phase 7a/13 | Vercel `agent-browser` CLI invoked via `bash_exec`. Workflow-specific. |
 
 ## Notes
 
@@ -621,6 +621,6 @@ flowchart TD
 - **No abstract class hierarchy for search providers** — a simple `if/elif` dispatch suffices. Tavily primary, Brave fallback. Adding a provider is adding a function + branch.
 - **Escalation path**: PM -> Director Queue -> Director -> resolves OR -> CEO Queue -> CEO. PM never directly accesses the CEO queue.
 - **Three-tier task system**: Session todos (ToolContext state, dies with session), shared tasks (cross-session, placeholder until Phase 5), deliverables (DB-backed, managed by PM management tools, placeholder until Phase 5/8).
-- **`agent-browser` resolved**: Vercel `agent-browser` CLI (Q8). Invoked via `bash_exec`. Workflow-specific, implemented in Phase 7/13.
+- **`agent-browser` resolved**: Vercel `agent-browser` CLI (Q8). Invoked via `bash_exec`. Workflow-specific, implemented in Phase 7a/13.
 - **`beautifulsoup4` dependency**: Required for `web_fetch` HTML-to-text extraction. Verify it's in `pyproject.toml` before building.
 - **`tree-sitter` dependency**: Required for `code_symbols` symbol extraction. Verify it's in `pyproject.toml` before building.

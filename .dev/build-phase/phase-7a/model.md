@@ -1,4 +1,4 @@
-# Phase 7 Architecture Model
+# Phase 7a Architecture Model
 *Generated: 2026-04-11*
 
 > L1/L2 architecture docs remain the source of truth. References point to
@@ -7,7 +7,7 @@
 
 ## Overview
 
-Phase 7 transforms AutoBuilder from a single-pipeline system into a multi-workflow platform. It builds the WorkflowRegistry (discovery, caching, trigger matching, pipeline instantiation), the manifest schema with progressive disclosure, stage schema with PM-driven transitions, a validator framework producing machine-generated evidence, deterministic completion gates, three-layer verification reports, the auto-code workflow as reference implementation, and three-tier skill/agent merge. 50 BOM components across engine and infrastructure layers.
+Phase 7a transforms AutoBuilder from a single-pipeline system into a multi-workflow platform. It builds the WorkflowRegistry (discovery, caching, trigger matching, pipeline instantiation), the manifest schema with progressive disclosure, stage schema with PM-driven transitions, a validator framework producing machine-generated evidence, deterministic completion gates, three-layer verification reports, the auto-code workflow as reference implementation, and three-tier skill/agent merge. 50 BOM components across engine and infrastructure layers.
 
 ## Components
 
@@ -275,7 +275,7 @@ types:
     kind: model
     fields: [name, description, entry_stage, requires_approval]
     used_by: [WorkflowManifest]
-    note: "Added per PRD v7.3 back-propagation. Schema-only in Phase 7; runtime consumer is Phase 8a (X27)."
+    note: "Added per PRD v7.3 back-propagation. Schema-only in Phase 7a; runtime consumer is Phase 8a (X27)."
 
   - name: PipelineType
     kind: enum
@@ -344,9 +344,9 @@ integrations:
   future:
     - { extension_point: "Registry directory scan", target_phase: "Phase 7b", preparation: ".staging/ excluded from scan. Director authoring writes there." }
     - { extension_point: "Compound workflow composition", target_phase: "Phase 11", preparation: "Registry can instantiate multiple workflows. Independent units sharing state." }
-    - { extension_point: "Parallel batch execution", target_phase: "Phase 8", preparation: "batch_parallel pattern and PipelineContext established. Phase 8 adds ParallelAgent + git worktrees." }
+    - { extension_point: "Parallel batch execution", target_phase: "Phase 8a", preparation: "batch_parallel pattern and PipelineContext established. Phase 8a adds ParallelAgent + git worktrees." }
     - { extension_point: "Gateway workflow routes", target_phase: "Phase 10", preparation: "Registry provides get/match/list_available/create_pipeline. Gateway routes = thin wrappers." }
-    - { extension_point: "Stub validators (integration_tests, architecture_conformance)", target_phase: "Phase 7b", preparation: "Phase 7 stubs return passing with explicit stub evidence markers." }
+    - { extension_point: "Stub validators (integration_tests, architecture_conformance)", target_phase: "Phase 7b", preparation: "Phase 7a stubs return passing with explicit stub evidence markers." }
 ```
 
 ## Notes
@@ -356,6 +356,6 @@ integrations:
 - **code_review validator is deterministic**: Reads a boolean state key. The review itself is LLM (ReviewCycleAgent); the validator checks the result.
 - **Stage transitions are state-only**: No agent tree rebuilds, no new sessions. `reconfigure_stage` updates `pm:*` state keys.
 - **Stub validators in INTEGRATE**: `integration_tests` and `architecture_conformance` return passing with explicit stub evidence markers (Phase 7b implements real evaluation).
-- **Dynamic import security**: Phase 7 trusts user-placed pipeline.py files. Import sandboxing is Phase 7b.
+- **Dynamic import security**: Phase 7a trusts user-placed pipeline.py files. Import sandboxing is Phase 7b.
 - **YAML edge cases**: Parser must handle anchors/aliases and boolean coercion. Use `yaml.safe_load`.
 - **All stage state keys use `pm:` prefix**: Per Decision #58 tier-based authorization.

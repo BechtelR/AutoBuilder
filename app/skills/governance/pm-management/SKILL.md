@@ -91,7 +91,7 @@ Before starting each batch, record why this batch comes next. This reasoning:
 
 Example reasoning:
 - "Batch 3 starts after Batch 2 because all model deliverables are complete; the API deliverables can now reference the finalized schema."
-- "Batch 4 deferred `test_api_auth` from Batch 3 because authentication is not yet implemented; tests will be added in Phase 7."
+- "Batch 4 deferred `test_api_auth` from Batch 3 because authentication is not yet implemented; tests will be added in Phase 7a."
 
 ## Progress Reporting
 

@@ -34,7 +34,7 @@ All findings are documentation-only. No code changes are required.
 | PR-N | What Changed | FR Affected | Action |
 |------|-------------|-------------|--------|
 | NFR-3 | PRD v6.0 added: "LLM reliability is AutoBuilder's responsibility — handled through heartbeats, retry hooks, and provider fallback." | None | No action — Phase 2 already implements the heartbeat cron (W09). Retry hooks and provider fallback are Phase 11 scope. |
-| NFR-5 | PRD v6.0 added: "Third-party workflow plugins and Agent Skills standard skills install without code changes." | None | No action — Agent Skills is Phase 6 scope; workflow plugins are Phase 7+. Phase 2's API-first gateway is the correct foundation. |
+| NFR-5 | PRD v6.0 added: "Third-party workflow plugins and Agent Skills standard skills install without code changes." | None | No action — Agent Skills is Phase 6 scope; workflow plugins are Phase 7a+. Phase 2's API-first gateway is the correct foundation. |
 
 ### Structural PRD Changes (No Phase 2 Impact)
 

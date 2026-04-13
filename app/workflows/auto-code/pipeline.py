@@ -129,7 +129,7 @@ async def create_pipeline(ctx: PipelineContext) -> BaseAgent:
     memory_loader: BaseAgent = _build_agent(
         ctx,
         "memory_loader",
-        memory_service=None,  # Phase 7 degraded mode
+        memory_service=None,  # Phase 7a degraded mode
     )
 
     # -- LLM agents --

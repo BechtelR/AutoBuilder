@@ -100,7 +100,7 @@ await redis.set(cache_key, project.model_dump_json(), ex=300)
 ARQ tasks that process agent pipelines should be bounded:
 
 - One deliverable pipeline per task — never batch multiple deliverables in one ARQ job
-- Tasks that fan out (Phase 8 concurrency) respect `AUTOBUILDER_MAX_CONCURRENCY`
+- Tasks that fan out (Phase 8a concurrency) respect `AUTOBUILDER_MAX_CONCURRENCY`
 - Long-running tasks should checkpoint state to Redis/DB so they can be resumed on worker restart
 
 ## Checklist

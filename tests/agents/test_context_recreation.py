@@ -379,7 +379,7 @@ class TestRecreateContext:
         assert "project_config" in result.seeded_keys
         # code_output matches _output suffix -> seeded
         assert "code_output" in result.seeded_keys
-        # implementation_plan does not match _output suffix -> NOT seeded (Phase 8 gap)
+        # implementation_plan does not match _output suffix -> NOT seeded (Phase 8a gap)
         assert "implementation_plan" not in result.seeded_keys
 
         # State-based detection: skill_loader, memory_loader, planner, coder done

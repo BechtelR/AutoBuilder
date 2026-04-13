@@ -507,7 +507,7 @@ The `skill-authoring` global skill teaches agents how to produce valid SKILL.md 
 
 ### Constraints
 
-- **No self-updating skills.** Skills cannot edit their own SKILL.md based on performance feedback (deferred to Phase 7+).
+- **No self-updating skills.** Skills cannot edit their own SKILL.md based on performance feedback (deferred to Phase 7a+).
 - **No `scripts/` execution.** Skills can include scripts in their directory for reference, but automatic execution is deferred.
 - **No marketplace.** The file format is the interop layer. Drop SKILL.md files in the project directory.
 

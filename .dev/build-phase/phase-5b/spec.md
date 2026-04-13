@@ -15,7 +15,7 @@ Phase 5b wires the supervision hierarchy and makes AutoBuilder an interactive, s
 8. **Chat integration** — Wire real Director into existing chat routes. Per-message invocation. Auto-create "Main" project session.
 9. **Context recreation** — 4-step pipeline (persist → seed → fresh session → reassemble) triggered by ContextRecreationRequired. Degraded mode (no real MemoryService). Pipeline resumes from correct stage.
 
-Aligns with FRD capabilities CAP-1 through CAP-7. No parallel execution (Phase 8), no real SkillLibrary (Phase 6), no real MemoryService (Phase 9).
+Aligns with FRD capabilities CAP-1 through CAP-7. No parallel execution (Phase 8a), no real SkillLibrary (Phase 6), no real MemoryService (Phase 9).
 
 ## Prerequisites
 
@@ -321,11 +321,11 @@ Both use `AgentRegistry.build("director", ctx)` but with different sub_agent con
 ### P5b.D6: PM Autonomous Loop (Sequential)
 **Files:** `app/workers/tasks.py`
 **Depends on:** P5b.D4, P5b.D5
-**Description:** Wire the PM's autonomous batch loop within the work session. The PM reasons across multiple turns: selects batch via tool, dispatches each deliverable through DeliverablePipeline sequentially, receives checkpoint/verification callbacks, reasons about results, and decides the next batch or escalation. No parallel execution (Phase 8). The PM discovers approval resolutions from session state during batch selection.
+**Description:** Wire the PM's autonomous batch loop within the work session. The PM reasons across multiple turns: selects batch via tool, dispatches each deliverable through DeliverablePipeline sequentially, receives checkpoint/verification callbacks, reasons about results, and decides the next batch or escalation. No parallel execution (Phase 8a). The PM discovers approval resolutions from session state during batch selection.
 **BOM Components:** *(None unique — emergent behavior from PM agent (5a) + callbacks (D4) + delegation (D5))*
 **Requirements:**
 - [x]PM receives project with pre-seeded deliverables in session state and uses `select_ready_batch` tool to compose batches
-- [x]Each deliverable dispatches through DeliverablePipeline sequentially (no ParallelAgent — Phase 8)
+- [x]Each deliverable dispatches through DeliverablePipeline sequentially (no ParallelAgent — Phase 8a)
 - [x]`checkpoint_project` callback fires automatically after each deliverable completes — persists status and output
 - [x]`verify_batch_completion` callback fires after all batch deliverables complete — validates terminal states
 - [x]PM reasons between batches: queries results via `query_deliverables`, assesses failures, decides next batch composition
@@ -546,7 +546,7 @@ Batch 4 (sequential): P5b.D9
 |---|---|---|---|
 | 1 | Director agent operates as root_agent (stateless config, recreated per invocation) | P5b.D5 | `pytest tests/workers/ -k director_stateless` |
 | 2 | PM agent manages a project autonomously via tools + deterministic callbacks (`checkpoint_project`, `verify_batch_completion`), escalating only when necessary | P5b.D4, P5b.D6 | `pytest tests/workers/test_pm_loop.py` |
-| 3 | PM loop (sequential mode): PM reasons correctly between batches — queries results, decides next batch composition, maintains coherent state across batch boundaries (2+ deliverables); Phase 8 adds parallel execution | P5b.D6 | `pytest tests/workers/test_pm_loop.py -k multi_batch` |
+| 3 | PM loop (sequential mode): PM reasons correctly between batches — queries results, decides next batch composition, maintains coherent state across batch boundaries (2+ deliverables); Phase 8a adds parallel execution | P5b.D6 | `pytest tests/workers/test_pm_loop.py -k multi_batch` |
 | 4 | Director → PM delegation and PM → Director escalation via transfer_to_agent | P5b.D5 | `pytest tests/workers/ -k delegation` |
 | 5 | Context recreation produces a functional session with equivalent agent context (persist → fresh session → reassemble end-to-end) in degraded mode | P5b.D9 | `pytest tests/agents/test_context_recreation.py -k end_to_end` |
 | 6 | State key writes with tier prefix rejected when author tier does not match prefix | P5b.D1 | `pytest tests/events/test_publisher.py -k tier_auth` |

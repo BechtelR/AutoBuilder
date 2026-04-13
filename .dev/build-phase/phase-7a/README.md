@@ -1,4 +1,4 @@
-# Phase 7: Workflow Composition System — Build Notes
+# Phase 7a: Workflow Composition System — Build Notes
 
 **Status**: Architecture Validated — Build Ready
 **Date**: 2026-04-12 (validation), 2026-04-11 (design)
@@ -28,14 +28,14 @@ Primary: `.dev/architecture/workflows.md` (v5.0)
 | 71 | Stage schema | Organizational groupings, PM-driven transitions, AND-composed criteria |
 | 72 | Directory override | User-level overrides built-in by name |
 | 73 | Pipeline.py | Generated from scratch by Director, not templated |
-| 74 | Validator framework | 6 standard validators (Phase 7); evidence collection via ValidatorRunner |
+| 74 | Validator framework | 6 standard validators (Phase 7a); evidence collection via ValidatorRunner |
 | 75 | Quality framework | Three-layer verification, deterministic close conditions |
 | 76 | Director authoring | 6-phase lifecycle with staging gate (Phase 7b) |
 | 77 | Authoring skills | 9 skills across 4 categories |
 
 ## Phase Split
 
-### Phase 7 (Infrastructure)
+### Phase 7a (Infrastructure)
 - WorkflowRegistry with manifest parsing and validation
 - Stage schema Pydantic models and state keys
 - Standard validator implementations (6 code-focused + universal)
@@ -89,7 +89,7 @@ uv run pytest tests/workflows/ -v --tb=short
 ### Readiness Tests (2026-04-11)
 
 ```bash
-uv run pytest tests/workflows/test_phase7_readiness.py -v
+uv run pytest tests/workflows/test_phase7a_readiness.py -v
 ```
 
 53 tests verify: manifest example well-formed, workflow directories ready, prerequisite infrastructure intact.
@@ -100,7 +100,7 @@ uv run pytest tests/workflows/test_phase7_readiness.py -v
 |----------|----------|---------|
 | Workflow manifest example | `reference/workflow-manifest-example.yaml` | Production-ready Tier 3 manifest (auto-code) |
 | Validation report | `validation-report.md` | Architecture validation results and findings |
-| Pre-build validation tests | `tests/workflows/test_phase7_readiness.py` | 53 readiness tests |
+| Pre-build validation tests | `tests/workflows/test_phase7a_readiness.py` | 53 readiness tests |
 | Architecture validation tests | `tests/workflows/test_manifest.py` + 6 more | 208 architecture validation tests |
 
 ## Open Questions for Build Phase
@@ -109,7 +109,7 @@ uv run pytest tests/workflows/test_phase7_readiness.py -v
 2. ~~Case-insensitive YAML enums~~ — **Resolved**: `BeforeValidator(_upper)` on manifest-facing enum fields.
 3. ~~Stage status on advance~~ — **Resolved**: ACTIVE (not PENDING) when PM explicitly advances.
 4. Stage-scoped skills — additive only (no remove mechanism). If needed, use `applies_to` instead.
-5. `allow_stage_overlap` — deferred to Phase 8+ (concurrency optimization).
+5. `allow_stage_overlap` — deferred to Phase 8a+ (concurrency optimization).
 
 ## Build Order (Updated Post-Validation)
 

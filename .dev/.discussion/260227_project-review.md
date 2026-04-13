@@ -58,7 +58,7 @@ End-to-end review of the AutoBuilder architecture and implementation state follo
 
 ### Point 4: Long runway to first useful output
 
-**Raised**: First user-facing workflow (auto-code) is Phase 7 — significant investment before proving the value proposition.
+**Raised**: First user-facing workflow (auto-code) is Phase 7a — significant investment before proving the value proposition.
 
 **Response**: Delayed gratification is how robust systems are built. E2E workflow tests can validate the vertical path earlier.
 

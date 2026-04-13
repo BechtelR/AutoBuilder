@@ -1,9 +1,9 @@
-# Phase 7 FRD: Workflow Composition
+# Phase 7a FRD: Workflow Composition
 *Generated: 2026-04-11*
 
 ## Objective
 
-Transform AutoBuilder from a single-pipeline system into a multi-workflow platform where each workflow is a self-contained, discoverable unit with its own stage schema, agent configuration, quality gates, and completion reports. After Phase 7, adding a new workflow means adding a directory with a manifest file -- zero registration code, zero core changes. Traces to PR-4 (workflows as plugins), PR-5 (per-stage agent configuration), PR-7 (user-level overrides), PR-8 (resource validation), PR-11 (mandatory validators), PR-22 (three-layer verification), PR-23 (deterministic close conditions), PR-31 (infrastructure skills), NFR-5 (plugin install without code changes).
+Transform AutoBuilder from a single-pipeline system into a multi-workflow platform where each workflow is a self-contained, discoverable unit with its own stage schema, agent configuration, quality gates, and completion reports. After Phase 7a, adding a new workflow means adding a directory with a manifest file -- zero registration code, zero core changes. Traces to PR-4 (workflows as plugins), PR-5 (per-stage agent configuration), PR-7 (user-level overrides), PR-8 (resource validation), PR-11 (mandatory validators), PR-22 (three-layer verification), PR-23 (deterministic close conditions), PR-31 (infrastructure skills), NFR-5 (plugin install without code changes).
 
 ## Consumer Roles
 
@@ -234,13 +234,13 @@ Five infrastructure skills are operational and teach workflow authoring patterns
 
 - **Validator type confusion**: The code review validator is deterministic (reads a boolean from state), not an LLM call. The distinction matters because deterministic validators are fully reproducible and fast, while LLM validators introduce non-determinism and latency. Misclassifying a validator type in the manifest changes its execution model.
 
-- **Pipeline definition dynamic import**: Instantiating a pipeline requires dynamically loading and executing a module from a user-level directory. Phase 7 trusts user-placed files; import-level sandboxing is deferred to Phase 7b. The security boundary is the file system -- only files the user placed in the workflows directory are loaded.
+- **Pipeline definition dynamic import**: Instantiating a pipeline requires dynamically loading and executing a module from a user-level directory. Phase 7a trusts user-placed files; import-level sandboxing is deferred to Phase 7b. The security boundary is the file system -- only files the user placed in the workflows directory are loaded.
 
 - **Manifest field collision with YAML reserved constructs**: Fields like `version` and `name` are common YAML keys. Manifest parsing must handle YAML anchors, aliases, and edge cases (e.g., `true`/`false` string values) gracefully without misinterpreting manifest intent.
 
 - **Stage reconfiguration is state-only**: Stage transitions update session state keys -- they do not rebuild agent trees or create new sessions. If implementation accidentally introduces agent tree rebuilds on stage transitions, it couples stages to execution contexts, violating the organizational-not-executional design principle.
 
-- **Three-tier skill merge ordering**: The middle tier (workflow skills) is new in Phase 7. If the scan order is wrong (e.g., project before workflow), override semantics break. The correct order is global -> workflow -> project, where each later tier overwrites earlier entries by name.
+- **Three-tier skill merge ordering**: The middle tier (workflow skills) is new in Phase 7a. If the scan order is wrong (e.g., project before workflow), override semantics break. The correct order is global -> workflow -> project, where each later tier overwrites earlier entries by name.
 
 - **Stub validators returning true**: The INTEGRATE stage's integration tests and architecture conformance validators are Phase 7b stubs. They must be explicitly documented as stubs in their evidence output so that completion reports do not misrepresent the verification depth. A passing stub is not the same as a passing real validator.
 
@@ -254,7 +254,7 @@ Five infrastructure skills are operational and teach workflow authoring patterns
 - **Dashboard and CLI workflow routes** -- Phase 10/12. User-facing workflow selection, listing, and status display are client concerns, not workflow engine concerns.
 - **Custom validators** -- Custom validators require deploying new evaluation logic. The Director composes existing standard validators in novel combinations via the manifest; it cannot create new validator types.
 - **Real MemoryService integration** -- Phase 9. Context recreation uses degraded-mode stubs; real memory persistence is a future capability.
-- **Stage overlap and concurrency** -- Phase 8+. The `allow_stage_overlap` concurrency model (multiple stages active simultaneously) is not part of Phase 7.
+- **Stage overlap and concurrency** -- Phase 8a+. The `allow_stage_overlap` concurrency model (multiple stages active simultaneously) is not part of Phase 7a.
 - **Import-level sandboxing for pipeline definitions** -- Phase 7b. Dynamic import of user-level pipeline definitions executes arbitrary code; L4 import validation is deferred.
 
 ---
@@ -294,7 +294,7 @@ Five infrastructure skills are operational and teach workflow authoring patterns
 | # | Contract Item | Covered By |
 |---|---------------|------------|
 | 1 | WorkflowRegistry discovers auto-code on startup via directory scan | CAP-1: FR-7.01, FR-7.08; CAP-9: FR-7.71 |
-| 2 | `POST /workflows/run {"workflow": "auto-code"}` resolves and instantiates pipeline. Gateway route wiring deferred to Phase 10; Phase 7 delivers the underlying resolution and instantiation capability. | CAP-1: FR-7.05; CAP-8: FR-7.56; CAP-9: FR-7.62, FR-7.70 |
+| 2 | `POST /workflows/run {"workflow": "auto-code"}` resolves and instantiates pipeline. Gateway route wiring deferred to Phase 10; Phase 7a delivers the underlying resolution and instantiation capability. | CAP-1: FR-7.05; CAP-8: FR-7.56; CAP-9: FR-7.62, FR-7.70 |
 | 3 | Adding a new workflow = adding a directory + manifest (zero registration code) | CAP-1: FR-7.08; CAP-2: FR-7.09 |
 | 4 | User-level workflows at `~/.autobuilder/workflows/` override built-in by name | CAP-1: FR-7.02, FR-7.03, FR-7.04 |
 | 5 | WORKFLOW.yaml validates with progressive disclosure (2-field minimum is valid) | CAP-2: FR-7.09, FR-7.15, FR-7.16 |

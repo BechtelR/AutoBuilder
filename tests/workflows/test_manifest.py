@@ -404,7 +404,7 @@ class TestReferenceManifest:
             Path(__file__).resolve().parent.parent.parent
             / ".dev"
             / "build-phase"
-            / "phase-7"
+            / "phase-7a"
             / "reference"
             / "workflow-manifest-example.yaml"
         )

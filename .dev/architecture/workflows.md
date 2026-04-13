@@ -425,7 +425,7 @@ validators:
 
 ### Standard Validators (Decision #74)
 
-Ten standard validators ship with the platform (six in Phase 7; four additional research/integration validators in Phase 7b):
+Ten standard validators ship with the platform (six in Phase 7a; four additional research/integration validators in Phase 7b):
 
 | Name | Type | Domain | What It Checks |
 |------|------|--------|---------------|
@@ -722,7 +722,7 @@ stages:
     approval: ceo
 ```
 
-> **Simplified for architectural overview.** The [Tier 3 reference manifest](../build-phase/phase-7/reference/workflow-manifest-example.yaml) is the authoritative, buildable source for auto-code's `WORKFLOW.yaml` — including per-stage `tools`, `skills`, `models`, validator `config`, and all optional fields.
+> **Simplified for architectural overview.** The [Tier 3 reference manifest](../build-phase/phase-7a/reference/workflow-manifest-example.yaml) is the authoritative, buildable source for auto-code's `WORKFLOW.yaml` — including per-stage `tools`, `skills`, `models`, validator `config`, and all optional fields.
 
 ### PM Execution Flow
 
@@ -775,4 +775,4 @@ It does not define how tools work, how skills load, how models are selected, how
 
 **Document Version:** 5.2
 **Last Updated:** 2026-04-12
-**Status:** Phase 7 Design Complete -- Phase 8a Shaping
+**Status:** Phase 7a Design Complete -- Phase 8a Shaping

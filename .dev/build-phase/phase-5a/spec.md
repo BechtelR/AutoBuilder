@@ -42,7 +42,7 @@ Phase 5a uses ADK's `InMemoryMemoryService` for the MemoryLoaderAgent. The agent
 
 ### DD-5: Pipeline Composition Location
 
-The `DeliverablePipeline` lives in `app/agents/pipeline.py` as a factory function that constructs the full SequentialAgent tree. In Phase 5a, workers call this factory directly. In Phase 7, the auto-code workflow's `pipeline.py` delegates to it. This avoids premature coupling to the workflow registry.
+The `DeliverablePipeline` lives in `app/agents/pipeline.py` as a factory function that constructs the full SequentialAgent tree. In Phase 5a, workers call this factory directly. In Phase 7a, the auto-code workflow's `pipeline.py` delegates to it. This avoids premature coupling to the workflow registry.
 
 ### DD-6: ReviewCycle Termination Signal
 
@@ -254,7 +254,7 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 ### P5a.D5: Deterministic Custom Agents
 **Files:** `app/agents/custom/skill_loader.py`, `app/agents/custom/memory_loader.py`, `app/agents/custom/linter.py`, `app/agents/custom/test_runner.py`, `app/agents/custom/formatter.py`, `app/agents/custom/regression_tester.py`, `app/agents/custom/__init__.py`, `app/agents/skill_loader.md`, `app/agents/memory_loader.md`, `app/agents/linter.md`, `app/agents/tester.md`, `app/agents/formatter.md`, `app/agents/regression_tester.md`
 **Depends on:** P5a.D2, P5a.D3
-**Description:** Implement 6 deterministic CustomAgent subclasses and their definition files. Each agent overrides `_run_async_impl`, reads upstream state, performs its operation, and writes results to session state via `Event(actions=EventActions(state_delta={...}))`. SkillLoaderAgent uses NullSkillLibrary (empty results). MemoryLoaderAgent uses InMemoryMemoryService (empty results, graceful degradation). Linter/TestRunner/Formatter execute configurable commands. RegressionTestAgent is defined and buildable but not integrated into batch execution (Phase 8).
+**Description:** Implement 6 deterministic CustomAgent subclasses and their definition files. Each agent overrides `_run_async_impl`, reads upstream state, performs its operation, and writes results to session state via `Event(actions=EventActions(state_delta={...}))`. SkillLoaderAgent uses NullSkillLibrary (empty results). MemoryLoaderAgent uses InMemoryMemoryService (empty results, graceful degradation). Linter/TestRunner/Formatter execute configurable commands. RegressionTestAgent is defined and buildable but not integrated into batch execution (Phase 8a).
 **BOM Components:**
 - [x] `A30` — SkillLoaderAgent (CustomAgent)
 - [x] `A31` — LinterAgent (CustomAgent)
@@ -272,7 +272,7 @@ Migrations follow sequential `NNN_description.py` naming per engineering standar
 - [x] LinterAgent: reads project config for linter command (default: `ruff check .`), runs via subprocess, writes structured `lint_results` (pass/fail, file locations, messages) and `lint_passed` (bool) to state
 - [x] TestRunnerAgent: reads project config for test command (default: `pytest`), runs via subprocess, writes structured `test_results` (pass/fail, test names, output) and `tests_passed` (bool) to state
 - [x] FormatterAgent: reads project config for formatter command (default: `ruff format .`), runs via subprocess, writes summary of changes to state
-- [x] RegressionTestAgent: defined with valid definition file and CustomAgent implementation; buildable by AgentRegistry; no pipeline integration (Phase 8)
+- [x] RegressionTestAgent: defined with valid definition file and CustomAgent implementation; buildable by AgentRegistry; no pipeline integration (Phase 8a)
 - [x] Each agent implementation ≤ 150 lines (NFR-5a.05)
 - [x] Each definition file has valid frontmatter with `type: custom` and `class` field matching the class registry key
 - [x] All agents registered in class registry in `_registry.py`

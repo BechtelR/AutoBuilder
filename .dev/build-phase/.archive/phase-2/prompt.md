@@ -62,7 +62,7 @@ Build the production-grade FastAPI gateway, Redis infrastructure, database layer
 - Event system / Redis Streams (Phase 10)
 - SSE endpoint (Phase 10)
 - CLI (Phase 10)
-- Workflow CRUD routes (Phase 7+)
+- Workflow CRUD routes (Phase 7a+)
 - Auth middleware (Phase 11)
 - OpenTelemetry / Langfuse (Phase 11)
 

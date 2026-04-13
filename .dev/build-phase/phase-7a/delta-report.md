@@ -1,9 +1,9 @@
-# Phase 7 Delta Report: PRD v7.3 Back-Propagation
+# Phase 7a Delta Report: PRD v7.3 Back-Propagation
 *Generated: 2026-04-12*
 
 ## Trigger
 
-PRD updated to v7.3. Architecture doc `workflows.md` updated to v5.2. BOM updated to v2.3.0/v2.4.0. Phase 7 is DONE -- this report identifies what changed upstream and what, if anything, Phase 7 artifacts need.
+PRD updated to v7.3. Architecture doc `workflows.md` updated to v5.2. BOM updated to v2.3.0/v2.4.0. Phase 7a is DONE -- this report identifies what changed upstream and what, if anything, Phase 7a artifacts need.
 
 ---
 
@@ -15,7 +15,7 @@ PRD updated to v7.3. Architecture doc `workflows.md` updated to v5.2. BOM update
 
 **After:** PR-4 now includes "permitted **edit operations** (domain-specific modifications issued at any time regardless of project state, e.g., add feature, fix bug, refactor for software)."
 
-**Impact on Phase 7:** LOW. PR-4 is Phase 7's primary traceability target. The new `edit_operations` clause is an additive manifest field. Phase 7 already satisfies all other PR-4 clauses. The edit operations runtime (accepting edits, creating TaskGroups, routing to stages) is Phase 8a scope.
+**Impact on Phase 7a:** LOW. PR-4 is Phase 7a's primary traceability target. The new `edit_operations` clause is an additive manifest field. Phase 7a already satisfies all other PR-4 clauses. The edit operations runtime (accepting edits, creating TaskGroups, routing to stages) is Phase 8a scope.
 
 ### PR-2 Expansion (v7.3)
 
@@ -23,13 +23,13 @@ PRD updated to v7.3. Architecture doc `workflows.md` updated to v5.2. BOM update
 
 **After:** Projects persist after completion and remain "queryable and modifiable. Edit operations can be issued at any time regardless of project state — they queue as new work within accumulated project context."
 
-**Impact on Phase 7:** NONE. Phase 7 does not implement project lifecycle. PR-2 traceability is Phase 8a (X20/X21 project entity, X27 edit request flow).
+**Impact on Phase 7a:** NONE. Phase 7a does not implement project lifecycle. PR-2 traceability is Phase 8a (X20/X21 project entity, X27 edit request flow).
 
 ### Information Architecture Update
 
 The **Workflow** entity description now includes "and its available edit operations." The **Project** entity now includes "edit" in the "User Can" column.
 
-**Impact on Phase 7:** NONE. These are informational; no Phase 7 artifact references the IA table.
+**Impact on Phase 7a:** NONE. These are informational; no Phase 7a artifact references the IA table.
 
 ---
 
@@ -57,15 +57,15 @@ EditOperationDef:
 
 Documents how projects persist post-completion, how `edit_operations` defines valid modifications, and how edits create new TaskGroups in existing projects. References `execution.md` for entry modes.
 
-### Impact on Phase 7
+### Impact on Phase 7a
 
-The `edit_operations` field is a Tier 3 (comprehensive) manifest field -- optional, no impact on existing workflows if absent. This is exactly the progressive disclosure pattern Phase 7 designed for.
+The `edit_operations` field is a Tier 3 (comprehensive) manifest field -- optional, no impact on existing workflows if absent. This is exactly the progressive disclosure pattern Phase 7a designed for.
 
-**Key question:** Should Phase 7's `WorkflowManifest` Pydantic model include the `edit_operations` field?
+**Key question:** Should Phase 7a's `WorkflowManifest` Pydantic model include the `edit_operations` field?
 
 **Analysis:**
-- Phase 7's manifest model uses `extra="ignore"` (line 128 of `manifest.py`). YAML files containing `edit_operations` parse without error -- the field is silently dropped.
-- However, Phase 7's design principle is that the manifest model IS the schema. Fields that exist in the architecture doc should be parseable by the model, even if the runtime ignores them.
+- Phase 7a's manifest model uses `extra="ignore"` (line 128 of `manifest.py`). YAML files containing `edit_operations` parse without error -- the field is silently dropped.
+- However, Phase 7a's design principle is that the manifest model IS the schema. Fields that exist in the architecture doc should be parseable by the model, even if the runtime ignores them.
 - The field is purely declarative (a list of operation definitions). No runtime behavior is needed -- the model just needs to store the parsed data.
 - Adding an optional `edit_operations: list[EditOperationDef]` field with `default_factory=lambda: list[EditOperationDef]()` is consistent with how `mcp_servers`, `resources`, and other Tier 3 fields were handled.
 
@@ -81,9 +81,9 @@ The `edit_operations` field is a Tier 3 (comprehensive) manifest field -- option
 |----|-----------|------|-------|--------|
 | X26 | Workflow-defined edit operations manifest field (`edit_operations` in WORKFLOW.yaml) | config | 8a | workflows.md Workflow Manifest |
 
-**Analysis:** X26 is typed as `config` (not `mechanism` or `workflow`). It is a manifest schema field. Phase 7 owns the manifest schema. The BOM assigns it to 8a because its consumer (the Director's edit routing logic) is Phase 8a. But the schema definition is Phase 7 territory.
+**Analysis:** X26 is typed as `config` (not `mechanism` or `workflow`). It is a manifest schema field. Phase 7a owns the manifest schema. The BOM assigns it to 8a because its consumer (the Director's edit routing logic) is Phase 8a. But the schema definition is Phase 7a territory.
 
-**Recommendation:** X26's phase assignment is reasonable -- the component encompasses both schema AND consumption. Phase 7 should add the schema field to the model (progressive disclosure), and X26 remains 8a for the runtime wiring. No BOM change needed; the delta report documents the split responsibility.
+**Recommendation:** X26's phase assignment is reasonable -- the component encompasses both schema AND consumption. Phase 7a should add the schema field to the model (progressive disclosure), and X26 remains 8a for the runtime wiring. No BOM change needed; the delta report documents the split responsibility.
 
 ### X27 — Project edit request flow (Phase 8a)
 
@@ -91,7 +91,7 @@ The `edit_operations` field is a Tier 3 (comprehensive) manifest field -- option
 |----|-----------|------|-------|--------|
 | X27 | Project edit request flow (Director receives edit -> creates new TaskGroup in existing project) | workflow | 8a | execution.md §Director Execution Turn |
 
-**Impact on Phase 7:** NONE. X27 is pure runtime behavior. No Phase 7 artifact references it.
+**Impact on Phase 7a:** NONE. X27 is pure runtime behavior. No Phase 7a artifact references it.
 
 ---
 
@@ -99,7 +99,7 @@ The `edit_operations` field is a Tier 3 (comprehensive) manifest field -- option
 
 ### frd.md -- NO CHANGE
 
-All 85 FRD requirements (FR-7.01 through FR-7.85) remain valid. The `edit_operations` field does not introduce new functional requirements for Phase 7 -- it is a schema addition covered by existing FR-7.09 (progressive disclosure: "When a manifest contains only a name and description, the system accepts it as valid") and FR-7.09b (additional fields validated against type schemas). No new FR is needed because the field follows the same pattern as `mcp_servers`, `brief_template`, `conventions`, and `director_guidance`.
+All 85 FRD requirements (FR-7.01 through FR-7.85) remain valid. The `edit_operations` field does not introduce new functional requirements for Phase 7a -- it is a schema addition covered by existing FR-7.09 (progressive disclosure: "When a manifest contains only a name and description, the system accepts it as valid") and FR-7.09b (additional fields validated against type schemas). No new FR is needed because the field follows the same pattern as `mcp_servers`, `brief_template`, `conventions`, and `director_guidance`.
 
 ### spec.md -- ADDENDUM
 
@@ -166,4 +166,4 @@ Add `EditOperationDef` to `__all__` and imports.
 | Model changes | Add EditOperationDef type, add edit_operations to WorkflowManifest fields | LOW |
 | Code remediation | 4 changes, 2-3 files, trivial effort | ✓ ALL APPLIED (2026-04-12) |
 
-**Conclusion:** Phase 7 is architecturally sound. The only gap is a missing optional schema field (`edit_operations`) in the `WorkflowManifest` Pydantic model. This is consistent with Phase 7's progressive disclosure principle -- the field should be parseable even though its runtime consumer is Phase 8a. All other Phase 7 deliverables, completion contract items, and FRD requirements remain satisfied.
+**Conclusion:** Phase 7a is architecturally sound. The only gap is a missing optional schema field (`edit_operations`) in the `WorkflowManifest` Pydantic model. This is consistent with Phase 7a's progressive disclosure principle -- the field should be parseable even though its runtime consumer is Phase 8a. All other Phase 7a deliverables, completion contract items, and FRD requirements remain satisfied.

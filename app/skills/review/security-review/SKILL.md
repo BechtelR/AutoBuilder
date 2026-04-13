@@ -56,7 +56,7 @@ AutoBuilder generates code and instructions for agents. Review content that coul
 
 ## Secure Defaults
 
-- New API endpoints default to requiring authentication when auth is implemented (Phase 7+) — no `public=True` shortcuts
+- New API endpoints default to requiring authentication when auth is implemented (Phase 7a+) — no `public=True` shortcuts
 - New database columns with security implications (e.g., `is_admin`, `role`) default to least-privilege values
 - Skill loading respects trust model: project-scope skills gated on trust check, never auto-trusted
 - Error responses include structured `{"code": "...", "message": "..."}` — never expose stack traces, internal paths, or database errors to clients

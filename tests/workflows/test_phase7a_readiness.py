@@ -1,11 +1,11 @@
-"""Phase 7 pre-build validation tests.
+"""Phase 7a pre-build validation tests.
 
 Verify that design artifacts are well-formed and existing infrastructure
 is ready for the workflow composition build. Run these BEFORE starting
-Phase 7 implementation to catch issues early.
+Phase 7a implementation to catch issues early.
 
 Usage:
-    uv run pytest tests/workflows/test_phase7_readiness.py -v
+    uv run pytest tests/workflows/test_phase7a_readiness.py -v
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 MANIFEST_EXAMPLE = (
-    ROOT / ".dev" / "build-phase" / "phase-7" / "reference" / "workflow-manifest-example.yaml"
+    ROOT / ".dev" / "build-phase" / "phase-7a" / "reference" / "workflow-manifest-example.yaml"
 )
 WORKFLOWS_DIR = ROOT / "app" / "workflows"
 AGENTS_DIR = ROOT / "app" / "agents"
@@ -168,7 +168,7 @@ class TestManifestExample:
 
 
 class TestWorkflowDirectoryStructure:
-    """Verify the workflow directories are ready for Phase 7."""
+    """Verify the workflow directories are ready for Phase 7a."""
 
     def test_workflows_dir_exists(self) -> None:
         assert WORKFLOWS_DIR.exists(), f"Missing: {WORKFLOWS_DIR}"
@@ -188,7 +188,7 @@ class TestWorkflowDirectoryStructure:
 
 
 class TestInfrastructureReadiness:
-    """Verify Phase 5/6 infrastructure that Phase 7 builds on is intact."""
+    """Verify Phase 5/6 infrastructure that Phase 7a builds on is intact."""
 
     def test_agent_registry_importable(self) -> None:
         from app.agents._registry import AgentRegistry
@@ -223,9 +223,9 @@ class TestInfrastructureReadiness:
         assert InstructionContext is not None
 
     def test_old_pipeline_deleted(self) -> None:
-        """The old pipeline.py has been migrated and deleted (Phase 7)."""
+        """The old pipeline.py has been migrated and deleted (Phase 7a)."""
         pipeline = AGENTS_DIR / "pipeline.py"
-        assert not pipeline.exists(), "app/agents/pipeline.py should have been deleted in Phase 7"
+        assert not pipeline.exists(), "app/agents/pipeline.py should have been deleted in Phase 7a"
 
     def test_auto_code_pipeline_exists(self) -> None:
         """The new auto-code pipeline exists."""
@@ -276,12 +276,12 @@ class TestInfrastructureReadiness:
 
 
 # ===========================================================================
-# 4. Enum Readiness (Phase 7 will add new enums)
+# 4. Enum Readiness (Phase 7a will add new enums)
 # ===========================================================================
 
 
 class TestEnumReadiness:
-    """Verify existing enums are compatible with Phase 7 additions."""
+    """Verify existing enums are compatible with Phase 7a additions."""
 
     def test_enums_follow_value_equals_name(self) -> None:
         """All existing enums follow VALUE = 'VALUE' convention."""
@@ -301,19 +301,19 @@ class TestEnumReadiness:
                     )
 
     def test_pipeline_type_enum_exists(self) -> None:
-        """PipelineType enum created by Phase 7."""
+        """PipelineType enum created by Phase 7a."""
         from app.models import enums
 
         assert hasattr(enums, "PipelineType")
 
     def test_stage_status_enum_exists(self) -> None:
-        """StageStatus enum created by Phase 7."""
+        """StageStatus enum created by Phase 7a."""
         from app.models import enums
 
         assert hasattr(enums, "StageStatus")
 
     def test_validator_type_enum_exists(self) -> None:
-        """ValidatorType enum created by Phase 7."""
+        """ValidatorType enum created by Phase 7a."""
         from app.models import enums
 
         assert hasattr(enums, "ValidatorType")

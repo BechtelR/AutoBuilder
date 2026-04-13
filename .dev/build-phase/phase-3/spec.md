@@ -117,7 +117,7 @@ The existing `app.state.redis` client is **replaced** by `app.state.arq_pool` si
 ### DD-9: Redis Cache + Stream Helpers
 Two small utility modules (~100 LOC each) provide the foundation for Redis-based infrastructure:
 
-- **Cache helpers** (`app/lib/cache.py`): `cache_get`, `cache_set`, `cache_delete` with TTL support. Used by LLM Router (routing config cache), Skill Library (Phase 6), and Workflow Registry (Phase 7).
+- **Cache helpers** (`app/lib/cache.py`): `cache_get`, `cache_set`, `cache_delete` with TTL support. Used by LLM Router (routing config cache), Skill Library (Phase 6), and Workflow Registry (Phase 7a).
 - **Stream helpers** (`app/events/streams.py`): `stream_publish`, `stream_read_range` wrapping `XADD`/`XRANGE` with the naming convention `workflow:{id}:events`. Used by EventPublisher and future SSE consumers.
 
 These are thin wrappers — no abstraction beyond type safety and naming convention enforcement.

@@ -1,4 +1,4 @@
-"""Shared fixtures for Phase 7 workflow composition tests."""
+"""Shared fixtures for Phase 7a workflow composition tests."""
 
 from __future__ import annotations
 

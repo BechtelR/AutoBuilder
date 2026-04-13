@@ -12,7 +12,7 @@
 - [x] Remove `app/orchestrator/` directory (orphaned placeholder, no BOM component, removed from `03-STRUCTURE.md` v1.5)
 - [x] `.env.example` line 26: fix reference `.dev/11-PROVIDERS.md` → `.dev/06-PROVIDERS.md`
 - [x] `.env.example` lines 16–19: update search provider comment — remove "Phase 1 TBD" and `SEARXNG_URL`, reflect Tavily+Brave decision (Roadmap Q7)
-- [x] `.env.example` lines 23–24: remove `AUTOBUILDER_MAX_CONCURRENCY` and `AUTOBUILDER_SKILLS_DIR` (not loaded by Settings; Phase 8 and Phase 6 scope)
+- [x] `.env.example` lines 23–24: remove `AUTOBUILDER_MAX_CONCURRENCY` and `AUTOBUILDER_SKILLS_DIR` (not loaded by Settings; Phase 8a and Phase 6 scope)
 
 ## Phase 4 Remediation
 

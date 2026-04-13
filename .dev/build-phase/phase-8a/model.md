@@ -293,11 +293,11 @@ types:
   - name: ResolvedWorkflow
     kind: typed_dict
     fields:
-      - manifest: WorkflowManifest  # existing type from Phase 7
+      - manifest: WorkflowManifest  # existing type from Phase 7a
       - pipeline_factory: Callable  # builds pipeline agents for a stage
       - validators: dict  # schedule → list[ValidatorDef]
     used_by: [X22, X23, X01]
-    notes: "Returned by WorkflowRegistry.resolve(); existing WorkflowManifest type from Phase 7"
+    notes: "Returned by WorkflowRegistry.resolve(); existing WorkflowManifest type from Phase 7a"
 ```
 
 ## Data Flows
@@ -355,11 +355,11 @@ integrations:
     - { component: ManagementTools (X12), connects_to: "DB models (Phase 3/5b)", interface: "SQLAlchemy async queries against existing Deliverable, CeoQueueItem, DirectorQueueItem, ProjectConfig models" }
     - { component: DirectorTurn (X03), connects_to: "process_director_queue cron (Phase 5b)", interface: "Cron enqueues run_director_turn; Director processes queue items during turn" }
     - { component: PMBatchLoop (X04), connects_to: "DeliverablePipeline (Phase 5a)", interface: "Pipeline factory from WorkflowRegistry builds SequentialAgent + ReviewCycle" }
-    - { component: PMBatchLoop (X04), connects_to: "Validator pipeline (Phase 7)", interface: "WorkflowRegistry.get_validators(schedule) returns configured validators per schedule" }
+    - { component: PMBatchLoop (X04), connects_to: "Validator pipeline (Phase 7a)", interface: "WorkflowRegistry.get_validators(schedule) returns configured validators per schedule" }
     - { component: ContextRecreationResume (CT04b), connects_to: "Context recreation pipeline (Phase 5b)", interface: "Extends 4-step pipeline with TaskGroup-aware resume logic" }
     - { component: BatchCompletionEvents (V19), connects_to: "EventPublisher (Phase 3)", interface: "publish_event() to Redis Streams with batch completion payload" }
-    - { component: BriefValidation (X18/X22), connects_to: "WorkflowRegistry (Phase 7)", interface: "registry.resolve(name) → WorkflowManifest with brief_template" }
-    - { component: CompletionReports (X14/X32), connects_to: "StageExecution + TaskGroupExecution tables (Phase 7)", interface: "Reports stored as artifacts associated with F29/F30 execution records" }
+    - { component: BriefValidation (X18/X22), connects_to: "WorkflowRegistry (Phase 7a)", interface: "registry.resolve(name) → WorkflowManifest with brief_template" }
+    - { component: CompletionReports (X14/X32), connects_to: "StageExecution + TaskGroupExecution tables (Phase 7a)", interface: "Reports stored as artifacts associated with F29/F30 execution records" }
     - { component: GatewayRoutes, connects_to: "Existing CEO queue routes (Phase 5b)", interface: "Director queue follows same pattern: list + resolve/forward" }
 
   future:
@@ -371,7 +371,7 @@ integrations:
 
 ## Notes
 
-- **Existing placeholder tools**: `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `query_dependency_graph` all exist as stubs. X12 replaces them with real DB-backed implementations. `reconfigure_stage` and `get_project_context` are already real (Phase 7).
+- **Existing placeholder tools**: `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `query_dependency_graph` all exist as stubs. X12 replaces them with real DB-backed implementations. `reconfigure_stage` and `get_project_context` are already real (Phase 7a).
 - **Rabbit hole: over-engineering pause/resume** — Pause is "finish current deliverable, checkpoint, stop." Resume is "load state, rebuild context, continue." Don't build a state machine framework for three states.
 - **Rabbit hole: edit operation validation** — Edit operations are workflow-defined strings. Don't build a plugin system for edit types. The Director interprets the operation and creates TaskGroups — the PM executes them like any other work.
 - **ADK state persistence**: Direct `session.state["key"] = val` does NOT persist with DatabaseSessionService. All state writes must go through `Event(actions=EventActions(state_delta={...}))` from agents, or delete-then-recreate session for out-of-band writes. Management tools write to DB directly, not through session state.
