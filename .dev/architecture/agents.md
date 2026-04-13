@@ -754,7 +754,7 @@ The fix agent receives structured review feedback and applies targeted correctio
 
 Worker-tier Custom Agents inherit from ADK's `BaseAgent` and implement `_run_async_impl`. They execute guaranteed workflow steps that must not be skippable by LLM judgment. Each emits events into the unified event stream and writes results to session state. Custom Agents are either **purely deterministic** (no LLM calls) or **hybrid** (deterministic process flow with internal LLM calls via LiteLLM).
 
-The `SkillLoaderAgent` is shared across all workflows at worker level. Other Custom Agents are workflow-specific -- auto-code uses LinterAgent and TestRunnerAgent; other workflows define their own validators appropriate to their output type.
+The `SkillLoaderAgent` is shared across all workflows at worker level. Other Custom Agents are workflow-specific -- auto-code uses LinterAgent and TestRunnerAgent; other workflows define their own gates appropriate to their output type.
 
 Like all agents, Custom Agents execute inside worker processes. Their subprocess calls (linter, test runner, formatter) and any internal LiteLLM calls have access to the worker's filesystem and environment.
 

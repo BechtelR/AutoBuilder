@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from google.adk.models.llm_request import LlmRequest
     from google.adk.models.llm_response import LlmResponse
     from google.adk.sessions.base_session_service import BaseSessionService
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.agents._registry import AgentRegistry
     from app.agents.assembler import InstructionContext
@@ -273,6 +274,7 @@ async def build_work_session_agents(
     ) = None,
     workflow_registry: WorkflowRegistry | None = None,
     workflow_name: str = "auto-code",
+    db_session_factory: async_sessionmaker[AsyncSession] | None = None,
 ) -> BaseAgent:
     """Build Director with PM sub_agent for a work session.
 
@@ -287,6 +289,7 @@ async def build_work_session_agents(
         create_after_pm_callback,
         create_before_pm_callback,
         create_checkpoint_callback,
+        create_deliverable_checkpoint_callback,
     )
     from app.tools._toolset import GlobalToolset
     from app.workflows.context import PipelineContext
@@ -325,8 +328,13 @@ async def build_work_session_agents(
     )
     pipeline = await wf_registry.create_pipeline(workflow_name, pipeline_ctx)
 
-    # Wire pipeline checkpoint callback
-    pipeline.after_agent_callback = create_checkpoint_callback(publisher)  # type: ignore[reportAttributeAccessIssue]
+    # Wire pipeline checkpoint callback — Tier 1 DB checkpoint when db_session_factory
+    # is available (work sessions), state-only checkpoint otherwise (tests, echo pipelines)
+    if db_session_factory is not None:
+        tier1_cb = create_deliverable_checkpoint_callback(db_session_factory, publisher)
+        pipeline.after_agent_callback = tier1_cb  # type: ignore[reportAttributeAccessIssue]
+    else:
+        pipeline.after_agent_callback = create_checkpoint_callback(publisher)  # type: ignore[reportAttributeAccessIssue]
 
     # Wire PM supervision callbacks
     pm.before_agent_callback = create_before_pm_callback(publisher)  # type: ignore[reportAttributeAccessIssue]

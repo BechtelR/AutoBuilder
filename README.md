@@ -13,28 +13,29 @@ AutoBuilder takes a specification and runs it through pluggable workflows (auto-
 - [uv](https://docs.astral.sh/uv/) package manager
 - [Docker](https://docs.docker.com/get-docker/) (PostgreSQL + Redis)
 
-### Installation
+### Full Stack (Docker)
 ```bash
-# Start infrastructure (PostgreSQL + Redis)
+# Start everything: PostgreSQL, Redis, gateway, worker
 docker compose up -d
 
-# Install dependencies
-uv sync
+# Apply migrations (first time or after schema changes)
+docker compose run --rm migrate
 
-# Apply database migrations
-uv run alembic upgrade head
+# Verify
+curl http://localhost:8000/health
 ```
 
 ### Development
 ```bash
-# Start the gateway server
-uv run uvicorn app.gateway.main:app --reload
+# Docker (gateway hot-reloads on app/ changes via bind mount)
+docker compose up -d
+docker compose run --rm migrate       # First time only
 
-# Start an ARQ worker (separate terminal)
-uv run arq app.workers.settings.WorkerSettings
-
-# Use the CLI
-uv run python -m app --help
+# Or local processes
+docker compose up -d postgres redis   # Infrastructure only
+uv sync && uv run alembic upgrade head
+uv run uvicorn app.gateway.main:app --reload  # Terminal 1
+uv run arq app.workers.settings.WorkerSettings  # Terminal 2
 ```
 
 ## Features
@@ -119,11 +120,8 @@ uv run pyright
 
 ### Common Issues
 
-**Redis not running**: Gateway and workers require Redis to be running.
-- **Solution**: `redis-server` or check your system service: `redis-cli ping`
-
-**PostgreSQL not running**: Database requires Docker.
-- **Solution**: `docker compose up -d`
+**Services not running**: Gateway and workers require PostgreSQL and Redis.
+- **Solution**: `docker compose up -d` (starts all services including gateway and worker)
 
 **Migration errors**: Database schema out of sync.
 - **Solution**: `uv run alembic upgrade head`

@@ -106,17 +106,20 @@ AutoBuilder/
 │   │       └── project-conventions/ # How to configure project-level overrides (SKILL.md)
 │   │
 │   ├── workflows/                  # Pluggable workflow definitions
-│   │   ├── auto-code/              # First workflow
-│   │   │   ├── WORKFLOW.yaml       # Manifest: triggers, tools, models, pipeline type
-│   │   │   ├── pipeline.py         # ADK agent composition
+│   │   ├── auto-code/              # Reference workflow (built-in)
+│   │   │   ├── WORKFLOW.yaml       # Manifest: identity, stages, nodes, gates, config
+│   │   │   ├── pipeline.py         # Escape hatch (node schema is primary)
 │   │   │   ├── agents/             # Workflow-specific agent definitions
 │   │   │   │   ├── planner.md      # Planning agent overrides for auto-code
 │   │   │   │   ├── coder.md        # Coding agent overrides for auto-code
 │   │   │   │   └── reviewer.md     # Review agent overrides for auto-code
+│   │   │   ├── prompts/            # Node prompt files (TASK fragments per node)
+│   │   │   │   ├── implement.md
+│   │   │   │   ├── review.md
+│   │   │   │   └── ...
 │   │   │   └── skills/             # Workflow-specific skills (extend global)
 │   │   │       └── code/           # auto-code specific skills (test-generation, etc.)
-│   │   ├── auto-design/            # Future
-│   │   └── auto-market/            # Future
+│   │   └── auto-campaign/          # Future (minimal manifest example)
 │   │
 │   ├── router/                     # LLM Router (model_role to model mapping)
 │   ├── memory/                     # Memory service (PostgreSQL tsvector + pgvector)

@@ -33,6 +33,20 @@ The gateway owns the external API contract. ADK is an internal implementation de
 | `GET` | `/ceo/queue` | List CEO queue items (filter by type, priority, status) |
 | `PATCH` | `/ceo/queue/{id}` | Resolve/dismiss a queue item |
 | `GET` | `/ceo/queue/stream` | SSE push for new queue items |
+| `POST` | `/projects` | Enqueue project creation from brief | 202 |
+| `GET` | `/projects` | List projects (filter by status) | 200 |
+| `GET` | `/projects/{id}` | Get project detail with deliverable counts | 200 |
+| `POST` | `/projects/{id}/abort` | Abort a project | 202 |
+| `POST` | `/projects/{id}/pause` | Pause a project | 202 |
+| `POST` | `/projects/{id}/resume` | Resume a paused project | 202 |
+| `POST` | `/projects/pause` | System-wide pause all projects | 202 |
+| `POST` | `/projects/resume` | System-wide resume all projects | 202 |
+| `GET` | `/deliverables` | List deliverables (filter by project, status, stage) | 200 |
+| `GET` | `/deliverables/{id}` | Get deliverable detail with artifacts | 200 |
+| `GET` | `/director/queue` | List Director queue items (filter by type, priority, status) | 200 |
+| `PATCH` | `/director/queue/{id}` | Resolve or forward Director queue item to CEO | 200 |
+| `POST` | `/director/pause` | Pause Director backlog processing | 202 |
+| `POST` | `/director/resume` | Resume Director backlog processing | 202 |
 
 ### Transport
 
@@ -73,6 +87,6 @@ Build-time type safety from Python models to TypeScript UI without maintaining a
 
 ---
 
-*Document Version: 1.1*
-*Last Updated: 2026-02-28*
+*Document Version: 1.2*
+*Last Updated: 2026-04-13*
 *Extracted from [02-ARCHITECTURE.md](../02-ARCHITECTURE.md) v2.9*

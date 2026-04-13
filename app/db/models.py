@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, func, text
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -18,8 +19,10 @@ from app.models.enums import (
     DirectorQueueStatus,
     EscalationPriority,
     EscalationRequestType,
+    ProjectStatus,
     SpecificationStatus,
     StageStatus,
+    TaskStatus,
     WorkflowStatus,
 )
 
@@ -89,6 +92,9 @@ class Deliverable(TimestampMixin, Base):
     __tablename__ = "deliverables"
 
     workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflows.id"), index=True)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True, default=None, index=True
+    )
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     status: Mapped[DeliverableStatus] = mapped_column(
@@ -97,8 +103,43 @@ class Deliverable(TimestampMixin, Base):
     )
     depends_on: Mapped[list[str]] = mapped_column(JSONB, default=list)
     result: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True, default=None)
+    retry_count: Mapped[int] = mapped_column(default=0)
+    execution_order: Mapped[int | None] = mapped_column(nullable=True, default=None)
 
     workflow: Mapped[Workflow] = relationship(back_populates="deliverables", lazy="raise")
+
+
+class Project(TimestampMixin, Base):
+    """A first-order project entity tracking autonomous execution lifecycle."""
+
+    __tablename__ = "projects"
+
+    name: Mapped[str] = mapped_column(String(255))
+    workflow_type: Mapped[str] = mapped_column(String(100))
+    brief: Mapped[str] = mapped_column(Text)
+    status: Mapped[ProjectStatus] = mapped_column(
+        SqlEnum(ProjectStatus, native_enum=False),
+        default=ProjectStatus.SHAPING,
+    )
+    current_stage: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    current_taskgroup_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "taskgroup_executions.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_projects_current_taskgroup",
+        ),
+        nullable=True,
+        default=None,
+    )
+    accumulated_cost: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal("0"))
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
 
 class Chat(TimestampMixin, Base):
@@ -155,7 +196,7 @@ class CeoQueueItem(TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(255))
     source_project_id: Mapped[uuid.UUID | None] = mapped_column(
-        nullable=True, default=None, index=True
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, default=None, index=True
     )
     source_agent: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
     metadata_: Mapped[dict[str, object]] = mapped_column(
@@ -187,7 +228,7 @@ class DirectorQueueItem(TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(255))
     source_project_id: Mapped[uuid.UUID | None] = mapped_column(
-        nullable=True, default=None, index=True
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, default=None, index=True
     )
     source_agent: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
     context: Mapped[str] = mapped_column(Text)
@@ -198,6 +239,7 @@ class DirectorQueueItem(TimestampMixin, Base):
         DateTime(timezone=True), nullable=True, default=None
     )
     resolved_by: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    resolution: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
 
 class ProjectConfig(TimestampMixin, Base):
@@ -205,6 +247,9 @@ class ProjectConfig(TimestampMixin, Base):
 
     __tablename__ = "project_configs"
 
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True, default=None, index=True
+    )
     project_name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     config: Mapped[dict[str, object]] = mapped_column(JSONB, server_default="{}", default=dict)
     active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"), default=True)
@@ -216,6 +261,9 @@ class StageExecution(TimestampMixin, Base):
     __tablename__ = "stage_executions"
 
     workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflows.id"), index=True)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True, default=None, index=True
+    )
     stage_name: Mapped[str] = mapped_column(String(255), index=True)
     stage_index: Mapped[int]
     status: Mapped[StageStatus] = mapped_column(
@@ -249,6 +297,9 @@ class TaskGroupExecution(TimestampMixin, Base):
     stage_execution_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("stage_executions.id"), index=True
     )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True, default=None, index=True
+    )
     taskgroup_number: Mapped[int]
     status: Mapped[StageStatus] = mapped_column(
         SqlEnum(StageStatus, native_enum=False),
@@ -260,6 +311,12 @@ class TaskGroupExecution(TimestampMixin, Base):
     deliverable_count: Mapped[int] = mapped_column(default=0)
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
+    )
+    checkpoint_data: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB, nullable=True, default=None
+    )
+    completion_report: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB, nullable=True, default=None
     )
 
     stage_execution: Mapped[StageExecution] = relationship(
@@ -288,3 +345,34 @@ class ValidatorResult(TimestampMixin, Base):
     stage_execution: Mapped[StageExecution | None] = relationship(
         back_populates="validator_results", lazy="raise"
     )
+
+
+class ProjectTask(TimestampMixin, Base):
+    """Cross-session task visible to all agents in a project."""
+
+    __tablename__ = "project_tasks"
+
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, default=None, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text)
+    status: Mapped[TaskStatus] = mapped_column(
+        SqlEnum(TaskStatus, native_enum=False),
+        default=TaskStatus.OPEN,
+    )
+    assignee: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+
+
+class Artifact(TimestampMixin, Base):
+    """Persistent artifact storage — polymorphic entity association."""
+
+    __tablename__ = "artifacts"
+
+    entity_type: Mapped[str] = mapped_column(String(50))
+    entity_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    path: Mapped[str] = mapped_column(String(1024))
+    content_type: Mapped[str] = mapped_column(String(255))
+    size_bytes: Mapped[int]

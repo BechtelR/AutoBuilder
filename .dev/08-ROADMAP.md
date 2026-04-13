@@ -8,7 +8,7 @@ Component inventories and detailed checklists live in [`07-COMPONENTS.md`](./07-
 
 AutoBuilder is delivered in phased increments. Each phase produces testable, independently validatable output. No phase begins until its prerequisites are validated. The MVP (Phases 0-10) proves the core thesis: an autonomous agentic system can take a specification, decompose it into deliverables, execute them in parallel, and produce verified output with minimal human intervention -- through a production-grade API gateway with async worker execution.
 
-**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: DONE | Phase 6: DONE | Phase 7a: DONE | Phase 8a: BUILDING**
+**Status -- Phase 0: COMPLETE | Phase 1: DONE | Phase 2: DONE | Phase 3: DONE | Phase 4: DONE | Phase 5a: DONE | Phase 5b: DONE | Phase 6: DONE | Phase 7a: DONE | Phase 7b: DESIGNED | Phase 8a: DONE**
 
 ---
 
@@ -221,13 +221,13 @@ Skill library adopting the Agent Skills open standard file format (`SKILL.md`) w
 
 ## Phase 7a: Workflow Composition `L`
 
-**Goal**: Pluggable workflow architecture with stage schema, validators, and quality framework. auto-code as first workflow.
+**Goal**: Pluggable workflow architecture with stage schema, gates, and quality framework. auto-code as first workflow.
 **Status**: DONE
 **Prerequisites**: Phase 6 (skills system operational), Phase 5b (supervision operational)
 
 
 ### Scope Summary
-WorkflowRegistry with manifest parsing, validation, and directory-scanned discovery (built-in + user-level override by name). WORKFLOW.yaml manifest with progressive disclosure (2 fields minimum → full operating manual). Stage schema system: optional `stages` field with per-stage agent/tool/skill scoping, PM-driven transitions via reconciliation pattern, completion criteria composition (deliverables + validators + approval gates). Six standard validator implementations (lint, test, regression, review, dependency validation, deliverable status). Three-layer completion reports (PR-22). Deterministic TaskGroup/stage close conditions (PR-23). auto-code workflow with 5-stage schema (SHAPE→DESIGN→PLAN→BUILD→INTEGRATE). Five infrastructure authoring skills.
+WorkflowRegistry with manifest parsing, validation, and directory-scanned discovery (built-in + user-level override by name). WORKFLOW.yaml manifest with progressive disclosure (2 fields minimum → full operating manual). Stage schema system: optional `stages` field with per-stage agent/tool/skill scoping, PM-driven transitions via reconciliation pattern, completion criteria composition (deliverables + gates + approval gates). Six standard gate implementations (lint, test, regression, review, dependency validation, deliverable status). Three-layer completion reports (PR-22). Deterministic TaskGroup/stage close conditions (PR-23). auto-code workflow with 5-stage schema (SHAPE→DESIGN→PLAN→BUILD→INTEGRATE). Five infrastructure authoring skills.
 
 ### Completion Contract
 
@@ -239,23 +239,23 @@ WorkflowRegistry with manifest parsing, validation, and directory-scanned discov
 | ✓ | User-level workflows at `~/.autobuilder/workflows/` override built-in by name | PR-4, NFR-5 |
 | ✓ | WORKFLOW.yaml validates with progressive disclosure (2-field minimum is valid) | PR-4 |
 | ✓ | auto-code manifest includes 5-stage schema with per-stage agent/tool/skill config | PR-4, PR-5 |
-| ✓ | Stage completion criteria compose as AND (deliverables + validators + approval) | PR-11 |
-| ✓ | Standard validators (lint, test, regression, review) produce machine evidence | PR-22 |
+| ✓ | Stage completion criteria compose as AND (deliverables + gates + approval) | PR-11 |
+| ✓ | Standard gates (lint, test, regression, review) produce machine evidence | PR-22 |
 | ✓ | Three-layer completion reports generated (functional, architectural, contract) | PR-22 |
 | ✓ | TaskGroup/stage close conditions enforced deterministically (hard gates) | PR-23 |
 | ✓ | Five infrastructure skills operational (workflow-authoring, agent-definition, skill-authoring, workflow-quality, workflow-testing) | PR-31 |
 
 ---
 
-## Phase 7b: Director Workflow Authoring `M`
+## Phase 7b: Director Workflow Authoring `L`
 
-**Goal**: Director can create, validate, and activate new workflows through conversation with the CEO.
+**Goal**: Director can create, validate, and activate new workflows through conversation with the CEO. Introduces the node-based pipeline schema as the primary composition model, two Director-authored proof workflows (auto-research, auto-writer), and the gate rename (validator to gate) across the codebase.
 **Status**: DESIGNED
 **Prerequisites**: Phase 7a (workflow composition operational)
 
 
 ### Scope Summary
-Director workflow authoring via 6-phase lifecycle (requirements → discovery → draft → validation → review → activation). Five CEO resource discovery tools (list_available_tools, list_mcp_servers, list_configured_credentials, list_workflows, list_available_skills). Director filesystem tool scoping (path-restricted write access). Staging directory convention for draft workflows. Activation gate via CEO queue approval. Dry run capability for pre-activation validation. Workflow improvement loop (4 feedback sources). Four Director authoring skills. Import-level sandboxing for dynamically imported pipeline definitions (deferred from Phase 7a). Real implementations of INTEGRATE stage stub validators (integration_tests, architecture_conformance — replacing Phase 7a stubs that return passing).
+Director workflow authoring via 6-phase lifecycle (requirements → discovery → draft → validation → review → activation). Node-based pipeline schema replacing pipeline.py as primary composition model (NodeDef, StepDef, CompositeNodeDef, schema execution engine, auto-code migration). Five CEO resource discovery tools (list_available_tools, list_mcp_servers, list_configured_credentials, list_workflows, list_available_skills). Director filesystem tool scoping (path-restricted write access). Staging directory convention for draft workflows. Activation gate via CEO queue approval. Pre-activation dry run with full E2E simulation using lightweight LLM. auto-research and auto-writer workflows authored through the Director pipeline. Gate rename (validator to gate) across codebase, manifests, database schema, tests, and documentation. Workflow deactivation/deletion with CEO authority. Workflow improvement loop (4 feedback sources). Three Director authoring skills (existing project-conventions skill from Phase 6 is a dependency, not a deliverable). Import-level sandboxing for dynamically imported pipeline definitions (deferred from Phase 7a). Real implementations of INTEGRATE stage stub gates (integration_tests, architecture_conformance — replacing Phase 7a stubs that return passing). Standard research gates (source_verification, citation_check, content_review).
 
 ### Completion Contract
 
@@ -264,45 +264,53 @@ Director workflow authoring via 6-phase lifecycle (requirements → discovery �
 | | Director can compose a new workflow through conversation with CEO | PR-6 |
 | | Five resource discovery tools operational (never expose credential values) | PR-8 |
 | | Director writes to staging directory, not active registry | NFR-4 |
-| | CEO approval required to activate a workflow (activation gate) | NFR-4 |
+| | CEO approval required to activate a workflow (activation gate) | PR-6 |
 | | Validation runs L1-L4 before activation (schema, references, parse, structural) | PR-8 |
 | | Director-authored agents restricted to `type: llm` only | NFR-4b |
 | | Workflow improvement loop triggers on CEO request and post-completion review | PR-6 |
-| | Four Director authoring skills operational (director-workflow-composition, project-conventions, software-development-patterns, research-patterns) | PR-31 |
+| | Three Director authoring skills operational (director-workflow-composition, software-development-patterns, research-patterns) | PR-31 |
 | | Import-level sandboxing validates dynamically imported pipeline definitions before execution | NFR-4 |
-| | INTEGRATE stage validators (integration_tests, architecture_conformance) produce real evaluation results, replacing Phase 7a stubs | PR-22 |
+| | INTEGRATE stage gates (integration_tests, architecture_conformance) produce real evaluation results, replacing Phase 7a stubs | PR-22 |
+| | Node-based pipeline schema replaces pipeline.py as primary composition model | PR-4 |
+| | auto-research workflow authored through Director pipeline | PR-6 |
+| | auto-writer workflow authored through Director pipeline | PR-6 |
+| | Pre-activation dry run with full E2E simulation | PR-8 |
+| | Gate rename (validator to gate) across codebase | — |
+| | Workflow deactivation and deletion with CEO authority | PR-6 |
+| | Standard research gates (source_verification, citation_check, content_review) | PR-22 |
+| | Research worker skills (source-evaluation, citation-standards) operational for auto-research and auto-writer workflows | PR-31 |
 
 ---
 
 ## Phase 8a: Autonomous Execution Engine `L`
 
 **Goal**: End-to-end autonomous execution — brief in, verified code out, sequential batches. Connects Phase 7a's workflow framework, Phase 5b's supervision hierarchy, and Phase 4's toolset into a working autonomous loop. This phase proves the core thesis: curated brief to verified deliverables with minimal human intervention. PM IS the outer loop.
-**Status**: BUILDING
+**Status**: DONE
 **Prerequisites**: Phase 7a (workflow composition operational)
 
 ### Scope Summary
-Director-mediated project creation through the supervision hierarchy — all work enters via Director chat sessions supporting seven universal entry modes (new, new-with-materials, extend, edit, re-run, direct execution, workstream). Director validates briefs against workflow `brief_template`, checks pre-execution resources (credentials, services, knowledge), creates project entities (new first-order `projects` table), and delegates to PMs by enqueueing work sessions. Management tool DB wiring — the critical infrastructure gap: replace placeholder strings in all PM tools (`select_ready_batch`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `query_dependency_graph`, `escalate_to_director`, `checkpoint_project`) and Director tools (`escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`) plus shared tools (`task_create`, `task_update`, `task_query`) with real DB persistence via ToolContext. New Director tools: `create_project`, `validate_brief`, `check_resources`, `delegate_to_pm`. Deliverable lifecycle expansion: dependency graph resolution, topological sort into sequential batches. Director execution turn with backlog queue orchestration — connecting the Director queue and CEO queue DB infrastructure from Phase 5b: Director triages escalations, resolves within authority, forwards to CEO queue. Director queue gateway routes for observability and processing. PM stage-driven sequential batch loop: Stage → TaskGroup → Batch → Deliverable hierarchy with stage transitions gated by `verify_stage_completion`, TaskGroup completion triggering Director approval and completion reports, and deterministic safety mechanisms (validators, regression tests, checkpoints). Autonomous failure handling with retry/skip/reorder/escalate and batch failure threshold triggering Director suspension. Three-layer completion report wiring at TaskGroup and Stage levels into INTEGRATE stage validators. Context recreation and resume at TaskGroup boundaries — save critical state, fresh session, resume without re-executing verified work. Artifact storage for deliverable outputs and completion reports. Project continuity with workflow-defined edit operations (living entities). Execution and system observability: deliverable status routes, workflow status, queue monitoring.
+Director-mediated project creation through the supervision hierarchy — all work enters via Director chat sessions supporting seven universal entry modes (new, new-with-materials, extend, edit, re-run, direct execution, workstream). Director validates briefs against workflow `brief_template`, checks pre-execution resources (credentials, services, knowledge), creates project entities (new first-order `projects` table), and delegates to PMs by enqueueing work sessions. Management tool DB wiring — the critical infrastructure gap: replace placeholder strings in all PM tools (`select_ready_batch`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `query_dependency_graph`, `escalate_to_director`, `checkpoint_project`) and Director tools (`escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`) plus shared tools (`task_create`, `task_update`, `task_query`) with real DB persistence via ToolContext. New Director tools: `create_project`, `validate_brief`, `check_resources`, `delegate_to_pm`. Deliverable lifecycle expansion: dependency graph resolution, topological sort into sequential batches. Director execution turn with backlog queue orchestration — connecting the Director queue and CEO queue DB infrastructure from Phase 5b: Director triages escalations, resolves within authority, forwards to CEO queue. Director queue gateway routes for observability and processing. PM stage-driven sequential batch loop: Stage → TaskGroup → Batch → Deliverable hierarchy with stage transitions gated by `verify_stage_completion`, TaskGroup completion triggering Director approval and completion reports, and deterministic safety mechanisms (gates, regression tests, checkpoints). Autonomous failure handling with retry/skip/reorder/escalate and batch failure threshold triggering Director suspension. Three-layer completion report wiring at TaskGroup and Stage levels into INTEGRATE stage gates. Context recreation and resume at TaskGroup boundaries — save critical state, fresh session, resume without re-executing verified work. Artifact storage for deliverable outputs and completion reports. Project continuity with workflow-defined edit operations (living entities). Execution and system observability: deliverable status routes, workflow status, queue monitoring.
 
 ### Completion Contract
 
 | Status | Contract Item | PRD |
 |--------|--------------|-----|
-| | Director creates projects through conversation supporting seven entry modes (new, new-with-materials, extend, edit, re-run, direct execution, workstream) — validates brief, checks resources, creates project entity, delegates to PM via work session | PR-1, PR-8, PR-13 |
-| | Brief validated against workflow's `brief_template` before acceptance; pre-execution resource validation checks credentials, services, and knowledge availability | PR-8 |
-| | Projects are first-order DB entities tracking workflow type, status, stage, deliverables, escalations, and cost | PR-2 |
-| | Management tools (all PM, Director, and shared tools) write to and read from the database — no placeholder strings remain | PR-10 |
-| | `escalate_to_director` writes real `DirectorQueueItem` rows; `escalate_to_ceo` writes real `CeoQueueItem` rows; Director queue gateway routes (`GET /director/queue`, `PATCH /director/queue/{id}`) operational | PR-14 |
-| | Director execution turn processes backlog: reads Director queue, triages items within authority, forwards unresolvable items to CEO queue | PR-14 |
-| | PM drives sequential execution through Stage → TaskGroup → Batch → Deliverable hierarchy: creates TaskGroups, selects dependency-ordered batches, executes one batch at a time, stage transitions gated by `verify_stage_completion` | PR-10, PR-14 |
-| | Loop continues autonomously until all stages complete or work escalated | PR-10 |
-| | Failed deliverables don't block independent work — PM skips/reorders around failures | PR-12, PR-25 |
-| | Consecutive batch failures trigger Director suspension of project (batch failure threshold) | PR-16 |
-| | Three-layer completion report (functional/architectural/contract) generated at TaskGroup and Stage completion with machine evidence from validators | PR-22 |
-| | Context recreation at TaskGroup boundaries — save critical state, create fresh session, resume without re-executing verified work | PR-15a |
-| | Deliverable outputs and completion reports stored as persistent, retrievable artifacts | PR-24 |
-| | Projects support workflow-defined edit operations at any time regardless of project state — single and batch edits queue as new TaskGroups | PR-3, PR-4 |
-| | Deliverable and workflow status query routes operational; Director queue, PM queue, and system observability accessible via API | PR-34 |
-| | Every work layer (project, all-projects, Director) supports explicit Pause (save state, log, stop) and Resume (load resources, rebuild context, continue) lifecycle operations | PR-3 |
+| ✓ | Director creates projects through conversation supporting seven entry modes (new, new-with-materials, extend, edit, re-run, direct execution, workstream) — validates brief, checks resources, creates project entity, delegates to PM via work session | PR-1, PR-8, PR-13 |
+| ✓ | Brief validated against workflow's `brief_template` before acceptance; pre-execution resource validation checks credentials, services, and knowledge availability | PR-8 |
+| ✓ | Projects are first-order DB entities tracking workflow type, status, stage, deliverables, escalations, and cost | PR-2 |
+| ✓ | Management tools (all PM, Director, and shared tools) write to and read from the database — no placeholder strings remain | PR-10 |
+| ✓ | `escalate_to_director` writes real `DirectorQueueItem` rows; `escalate_to_ceo` writes real `CeoQueueItem` rows; Director queue gateway routes (`GET /director/queue`, `PATCH /director/queue/{id}`) operational | PR-14 |
+| ✓ | Director execution turn processes backlog: reads Director queue, triages items within authority, forwards unresolvable items to CEO queue | PR-14 |
+| ✓ | PM drives sequential execution through Stage → TaskGroup → Batch → Deliverable hierarchy: creates TaskGroups, selects dependency-ordered batches, executes one batch at a time, stage transitions gated by `verify_stage_completion` | PR-10, PR-14 |
+| ✓ | Loop continues autonomously until all stages complete or work escalated | PR-10 |
+| ✓ | Failed deliverables don't block independent work — PM skips/reorders around failures | PR-12, PR-25 |
+| ✓ | Consecutive batch failures trigger Director suspension of project (batch failure threshold) | PR-16 |
+| ✓ | Three-layer completion report (functional/architectural/contract) generated at TaskGroup and Stage completion with machine evidence from gates | PR-22 |
+| ✓ | Context recreation at TaskGroup boundaries — save critical state, create fresh session, resume without re-executing verified work | PR-15a |
+| ✓ | Deliverable outputs and completion reports stored as persistent, retrievable artifacts | PR-24 |
+| ✓ | Projects support workflow-defined edit operations at any time regardless of project state — single and batch edits queue as new TaskGroups | PR-3, PR-4 |
+| ✓ | Deliverable and workflow status query routes operational; Director queue, PM queue, and system observability accessible via API | PR-34 |
+| ✓ | Every work layer (project, all-projects, Director) supports explicit Pause (save state, log, stop) and Resume (load resources, rebuild context, continue) lifecycle operations | PR-3 |
 
 ---
 
@@ -336,7 +344,7 @@ PM batch execution upgraded from sequential (Phase 8a) to parallel via `select_r
 
 
 ### Scope Summary
-PostgresMemoryService backed by PostgreSQL tsvector for full-text keyword search. Memory loading: MemoryLoaderAgent (CustomAgent, deterministic -- loads relevant memories into session state at pipeline start) and LoadMemory tool (agent-decided on-demand retrieval). Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end). Context recreation full equivalence verification: validates that recreation with real MemoryService produces fully equivalent agent context (state + skills + instructions + cross-session memory), completing the degraded-mode contract from Phase 5b. Semantic search via pgvector embeddings deferred to Phase 11.
+PostgresMemoryService backed by PostgreSQL tsvector (full-text keyword search) and pgvector (semantic embedding search) in a single table. Memory loading: MemoryLoaderAgent (CustomAgent, deterministic -- loads relevant memories into session state at pipeline start) and LoadMemory tool (agent-decided on-demand retrieval). Embedding generation via LiteLLM (`litellm.embedding()`) — same provider-agnostic routing as LLM calls, model configurable per project. Configurable ingestion strategy at session completion (per-deliverable, per-batch, or session end). Search blends keyword and semantic results. Context recreation full equivalence verification: validates that recreation with real MemoryService produces fully equivalent agent context (state + skills + instructions + cross-session memory), completing the degraded-mode contract from Phase 5b.
 
 ### Completion Contract
 
@@ -345,7 +353,8 @@ PostgresMemoryService backed by PostgreSQL tsvector for full-text keyword search
 | | Completed sessions are ingested into searchable memory | PR-26, PR-29 |
 | | Agents can search for patterns from prior runs | PR-28, PR-29 |
 | | Memory persists across sessions in PostgreSQL | PR-26 |
-| | Uses existing PostgreSQL database -- tsvector for keyword search (pgvector semantic search deferred to Phase 11) | PR-26 |
+| | Uses existing PostgreSQL database -- tsvector for keyword search + pgvector for semantic search in single table | PR-26 |
+| | Embedding generation via LiteLLM; model configurable, no hardcoded provider dependency | PR-26 |
 | | Context recreation with real MemoryService produces fully equivalent agent context (state + skills + instructions + cross-session memory) — validates full equivalence deferred from Phase 5b degraded mode | PR-15a |
 
 ---
@@ -382,7 +391,7 @@ Event consumer infrastructure on Redis Streams (EventPublisher already operation
 
 
 ### Scope Summary
-LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with prompt tracking, latency analysis, and quality scoring. Token/cost tracking per-deliverable and per-agent with context budget awareness. Crash recovery via PM checkpoint resume, ADK session resume with ResumabilityConfig, and tool idempotency validation. Adaptive LLM Router (cost/latency-aware model selection based on collected metrics). Advanced capabilities: compound workflow composition (workflows spanning multiple types, e.g. auto-design + auto-code) and semantic memory upgrade (pgvector embeddings extending Phase 9's tsvector keyword search).
+LLM observability via Langfuse (self-hosted, OpenTelemetry ingestion) with prompt tracking, latency analysis, and quality scoring. Token/cost tracking per-deliverable and per-agent with context budget awareness. Crash recovery via PM checkpoint resume, ADK session resume with ResumabilityConfig, and tool idempotency validation. Adaptive LLM Router (cost/latency-aware model selection based on collected metrics). Advanced capabilities: compound workflow composition (workflows spanning multiple types, e.g. auto-design + auto-code).
 
 ### Completion Contract
 
@@ -422,7 +431,7 @@ React 19 + Vite SPA with hey-api codegen (OpenAPI to typed TypeScript client + T
 
 ### Phase 13: Additional Workflow Types `L`
 
-Auto-design, auto-research, auto-market -- new workflow directories with their own pipelines, agents, skills, and quality gates. Validates that the workflow composition system is truly pluggable.
+Auto-design, auto-market, and additional workflow types -- new workflow directories with their own pipelines, agents, skills, and quality gates. Validates that the workflow composition system is truly pluggable. (auto-research and auto-writer moved to Phase 7b as Director-authored proof workflows. Research worker skills source-evaluation and citation-standards also moved to Phase 7b as runtime dependencies for those workflows.)
 
 ### Phase 14: Self-Learning Patterns `M`
 
@@ -522,8 +531,8 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 5a: Agent Definitions & Pipeline | `L-` | Agent definition files, InstructionAssembler, AgentRegistry, DeliverablePipeline, forward-dependency contracts |
 | 5b: Supervision & Integration | `M` | Director + PM hierarchy, PM loop (sequential), CEO queue, state key auth |
 | 6: Skills System | `M` | SkillLibrary, three-layer loading, supervision-tier resolution, 11 initial skills |
-| 7: Workflow Composition | `L` | WorkflowRegistry, manifest, stage schema, validators, auto-code 5-stage |
-| 7b: Director Authoring | `M` | Director workflow creation, resource discovery, staging gate |
+| 7a: Workflow Composition | `L` | WorkflowRegistry, manifest, stage schema, gates, auto-code 5-stage |
+| 7b: Director Authoring | `L` | Node-based pipeline schema, Director workflow authoring, auto-research/auto-writer workflows, gate rename, E2E dry run |
 | 8a: Autonomous Execution Engine | `L` | Brief submission, management tool DB wiring, Director backlog turn, sequential batch execution, failure handling, completion wiring |
 | 8b: Parallel Execution & Isolation | `M` | ParallelAgent, git worktree lifecycle, merge conflict strategy, concurrency limits, intervention API |
 | 9: Memory Service | `M` | PostgresMemoryService, cross-session search |
@@ -549,10 +558,14 @@ Resolved questions are recorded in [`.decision-log.md`](./.decision-log.md).
 | 2026-02-18 | Phase 4 DONE |
 | 2026-03-10 | Phase 5 scope finalized (Decisions #50-58); split into 5a + 5b; FRDs written |
 | 2026-03-11 | Phase 6 scope updated from FRD: three-layer loading model, supervision-tier resolution, autonomous creation, `applies_to` filtering, 11 initial skills; completion contract expanded from 5→8 items |
-| 2026-03-12 | Phase 7a scope expanded (Decisions #70-77): manifest, stage schema, validators, quality framework, directory override model. Phase 7b added (Director workflow authoring). Effort upgraded S→L. |
+| 2026-03-12 | Phase 7a scope expanded (Decisions #70-77): manifest, stage schema, gates, quality framework, directory override model. Phase 7b added (Director workflow authoring). Effort upgraded S→L. |
 | 2026-04-12 | Phase 8a split into 8a (Autonomous Execution Engine — sequential end-to-end loop) + 8b (Parallel Execution & Isolation — ParallelAgent, git worktrees, intervention API). 9 new BOM components added. |
-| 2026-04-12 | Phases 7b-14 audit: Phase 7b expanded with sandboxing and real INTEGRATE validators; Phase 9 pgvector deferred to Phase 11; Phase 10 scope corrected (consumer infrastructure, not EventPublisher); Phase 11 clarified compound workflow and pgvector scope |
+| 2026-04-12 | Phases 7b-14 audit: Phase 7b expanded with sandboxing and real INTEGRATE gates; Phase 9 pgvector deferred to Phase 11; Phase 10 scope corrected (consumer infrastructure, not EventPublisher); Phase 11 clarified compound workflow and pgvector scope |
+| 2026-04-12 | Phase 7b FRD: upsized M→L, node-based pipeline schema, auto-research/auto-writer workflows, gate rename, deactivation/deletion, E2E dry run |
+| 2026-04-12 | S29 (research/source-evaluation) and S30 (research/citation-standards) moved from Phase 13 to Phase 7b; Phase 7b completion contract updated; FR-7b.39a added to FRD |
+| 2026-04-13 | Phase 8a DONE (1217 tests, double review, all 16 contract items verified) |
+| 2026-04-13 | pgvector merged back into Phase 9 (was deferred to Phase 11). Single-pass implementation avoids duplicate migration + re-test. Phase 11 scope reduced to remove semantic memory upgrade. |
 
 ---
 
-*Last Updated: 2026-04-12 (Phase 8a shaping)*
+*Last Updated: 2026-04-13 (Phase 8a completion, pgvector consolidated into Phase 9)*

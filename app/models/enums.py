@@ -21,6 +21,19 @@ class DeliverableStatus(enum.StrEnum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     BLOCKED = "BLOCKED"
+    PLANNED = "PLANNED"
+    SKIPPED = "SKIPPED"
+
+
+class ProjectStatus(enum.StrEnum):
+    """Status of a project entity."""
+
+    SHAPING = "SHAPING"
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    SUSPENDED = "SUSPENDED"
+    COMPLETED = "COMPLETED"
+    ABORTED = "ABORTED"
 
 
 class AgentRole(enum.StrEnum):
@@ -66,6 +79,9 @@ class PipelineEventType(enum.StrEnum):
     STAGE_COMPLETED = "STAGE_COMPLETED"
     STAGE_FAILED = "STAGE_FAILED"
     VALIDATOR_COMPLETED = "VALIDATOR_COMPLETED"
+    BATCH_COMPLETED = "BATCH_COMPLETED"
+    PROJECT_STATUS_CHANGED = "PROJECT_STATUS_CHANGED"
+    CONTEXT_RECREATED = "CONTEXT_RECREATED"
 
 
 class GitBranchAction(enum.StrEnum):
@@ -246,6 +262,9 @@ class SupervisionEventType(enum.StrEnum):
     ESCALATION_DETECTED = "ESCALATION_DETECTED"
     LIMIT_EXCEEDED = "LIMIT_EXCEEDED"
     STATE_AUTH_VIOLATION = "STATE_AUTH_VIOLATION"
+    TOOL_ACCESS_VIOLATION = "TOOL_ACCESS_VIOLATION"
+    DIRECTOR_QUEUE_PENDING = "DIRECTOR_QUEUE_PENDING"
+    PROJECT_SUSPENDED = "PROJECT_SUSPENDED"
 
 
 class CeoQueueAction(enum.StrEnum):
@@ -253,6 +272,13 @@ class CeoQueueAction(enum.StrEnum):
 
     RESOLVE = "RESOLVE"
     DISMISS = "DISMISS"
+
+
+class DirectorQueueAction(enum.StrEnum):
+    """Action the Director can take on a queue item."""
+
+    RESOLVE = "RESOLVE"
+    FORWARD_TO_CEO = "FORWARD_TO_CEO"
 
 
 class TriggerType(enum.StrEnum):

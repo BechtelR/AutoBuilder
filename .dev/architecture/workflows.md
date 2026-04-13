@@ -13,14 +13,16 @@
 2. [Architecture: Workflows as Discoverable, Composable Units](#architecture-workflows-as-discoverable-composable-units)
 3. [Workflow Manifest](#workflow-manifest)
 4. [Stage Schema](#stage-schema)
-5. [WorkflowRegistry](#workflowregistry)
-6. [Validators & Quality Gates](#validators--quality-gates)
-7. [Completion Criteria & Reports](#completion-criteria--reports)
-8. [What Is Shared vs. Workflow-Specific](#what-is-shared-vs-workflow-specific)
-9. [Director Workflow Authoring](#director-workflow-authoring)
-10. [Workflow Execution Model](#workflow-execution-model)
-11. [Compound Workflows](#compound-workflows)
-12. [auto-code: The First Workflow](#auto-code-the-first-workflow)
+5. [Node-Based Pipeline Schema](#node-based-pipeline-schema)
+6. [WorkflowRegistry](#workflowregistry)
+7. [Quality Gates](#quality-gates)
+8. [Completion Criteria & Reports](#completion-criteria--reports)
+9. [What Is Shared vs. Workflow-Specific](#what-is-shared-vs-workflow-specific)
+10. [Director Workflow Authoring](#director-workflow-authoring)
+11. [Workflow Execution Model](#workflow-execution-model)
+12. [Living Projects & Edit Operations](#living-projects--edit-operations-decision-d5)
+13. [Compound Workflows](#compound-workflows)
+14. [Standard Workflows](#standard-workflows)
 
 ---
 
@@ -43,31 +45,40 @@ A workflow follows the same discovery pattern as skills: a directory with a mani
 ```
 app/workflows/                          # Built-in workflows
 ├── auto-code/
-│   ├── WORKFLOW.yaml                   # Manifest: identity, stages, validators, config
-│   ├── pipeline.py                     # ADK agent composition
+│   ├── WORKFLOW.yaml                   # Manifest: identity, stages, gates, config
+│   ├── pipeline.py                     # Escape hatch (node schema is primary)
 │   ├── agents/                         # Workflow-specific agent definitions (override global by name)
 │   │   ├── planner.md
 │   │   ├── coder.md
 │   │   └── reviewer.md
+│   ├── prompts/                        # Node prompt files (TASK fragments per node)
+│   │   ├── implement.md
+│   │   ├── review.md
+│   │   └── ...
 │   └── skills/                         # Workflow-specific skills (extend global skills)
 │       └── code/
-├── auto-research/
-│   ├── WORKFLOW.yaml
-│   ├── pipeline.py
-│   └── agents/
 └── auto-campaign/
     └── WORKFLOW.yaml                   # Minimal: 2-field manifest is valid
 
 ~/.autobuilder/workflows/               # User-level overrides (Decision #72, configurable via AUTOBUILDER_WORKFLOWS_DIR)
-└── auto-code/                          # Overrides built-in auto-code for all projects
+├── auto-code/                          # Overrides built-in auto-code for all projects
+│   ├── WORKFLOW.yaml
+│   ├── pipeline.py
+│   └── agents/
+├── auto-research/                      # Director-authored, activated after CEO approval
+│   ├── WORKFLOW.yaml                   # Node schema (no pipeline.py — Director-authored)
+│   ├── agents/
+│   └── prompts/
+└── auto-writer/                        # Director-authored, activated after CEO approval
     ├── WORKFLOW.yaml
-    ├── pipeline.py
-    └── agents/
+    ├── agents/
+    └── prompts/
 
 ~/.autobuilder/workflows/.staging/      # Staging area for Director-authored workflows (not scanned by registry)
 └── auto-research/
     ├── WORKFLOW.yaml
-    └── pipeline.py
+    ├── agents/
+    └── prompts/
 ```
 
 Each workflow is a self-contained directory. It declares what it needs (tools, models, configuration) and provides its own pipeline composition and agent definitions. The core system provides shared infrastructure; workflows provide domain-specific orchestration.
@@ -82,7 +93,7 @@ Each workflow is a self-contained directory. It declares what it needs (tools, m
 
 Every workflow directory contains a `WORKFLOW.yaml` manifest that serves as the "operating manual" for that workflow domain (Decision #70). The manifest uses progressive disclosure: a valid manifest requires only `name` and `description`. Everything else has sensible defaults.
 
-**PRD traceability:** PR-4 (stage schema, agents/tools/skills per stage, deliverable format, output format, completion reports), PR-5 (per-stage agent config), PR-8 (resource validation), PR-11 (validator scheduling), PR-22 (three-layer verification).
+**PRD traceability:** PR-4 (stage schema, agents/tools/skills per stage, deliverable format, output format, completion reports), PR-5 (per-stage agent config), PR-8 (resource validation), PR-11 (gate scheduling), PR-22 (three-layer verification).
 
 ### Progressive Disclosure
 
@@ -93,7 +104,7 @@ name: auto-campaign
 description: Generate marketing campaign content from a brief
 ```
 
-Implied defaults: no triggers (explicit-only), no required tools, `pipeline_type: single_pass`, no stages, no validators, generic completion report.
+Implied defaults: no triggers (explicit-only), no required tools, `pipeline_type: single_pass`, no stages, no gates, generic completion report.
 
 **Tier 2 -- Standard (identity + infrastructure + stages):**
 
@@ -114,7 +125,7 @@ stages:
     agents: [writer, reviewer]
 ```
 
-**Tier 3 -- Comprehensive (full operating manual):** Adds validators, resources, deliverable types, outputs, completion reports, brief templates, conventions, Director guidance, and config. See auto-code manifest in [auto-code: The First Workflow](#auto-code-the-first-workflow).
+**Tier 3 -- Comprehensive (full operating manual):** Adds gates, resources, deliverable types, outputs, completion reports, brief templates, conventions, Director guidance, and config. See auto-code manifest in [Standard Workflows](#standard-workflows).
 
 ### Root Fields
 
@@ -129,7 +140,7 @@ stages:
 | `optional_tools` | list[string] | No | `[]` | FunctionTools that enhance but are not required. |
 | `default_models` | dict[ModelRole, string] | No | `{}` | Default model assignments per role. |
 | `stages` | list[StageDef] | No | `[]` | Ordered stage schema. Omit for single-stage workflows. |
-| `validators` | list[ValidatorDef] | No | `[]` | Workflow-level validators (apply across all stages per their `schedule`). |
+| `gates` | list[GateDef] | No | `[]` | Workflow-level gates (apply across all stages per their `schedule`). |
 | `resources` | ResourcesDef | No | `{}` | External resources required before execution. |
 | `deliverable` | DeliverableDef | No | `{}` | How deliverables are structured. |
 | `outputs` | list[OutputDef] | No | `[]` | Artifact types this workflow produces. |
@@ -139,7 +150,7 @@ stages:
 | `director_guidance` | DirectorGuidanceDef | No | `{}` | Guidance the Director needs for this workflow type. |
 | `mcp_servers` | list[McpServerDef] | No | `[]` | MCP servers this workflow can use. McpServerDef has name (str) and required (bool, default false). |
 | `edit_operations` | list[EditOperationDef] | No | `[]` | Permitted edit operations — any-time, any-state project modifications (Decision D5). |
-| `config` | dict[string, object] | No | `{}` | Pipeline-specific configuration consumed by `pipeline.py`. |
+| `config` | dict[string, object] | No | `{}` | Pipeline-specific configuration consumed by the execution engine or `pipeline.py` escape hatch. |
 
 ### Manifest Type Definitions
 
@@ -159,7 +170,7 @@ Each trigger entry contains ONE of `keywords` or `explicit`, not both.
 | `types` | list[object] | Deliverable type definitions |
 | `types[].name` | string | Deliverable type identifier |
 | `types[].description` | string | What this deliverable type produces |
-| `types[].verification` | list[string] | Validator names applied to this type |
+| `types[].verification` | list[string] | Gate names applied to this type |
 
 #### OutputDef
 
@@ -211,7 +222,7 @@ Pre-execution resource validation. Three resource types: `credentials` (env vars
 
 ### Conventions & Director Guidance
 
-`conventions` are string rules injected as GOVERNANCE fragments into all agents. For enforceable rules, use `validators`. `director_guidance` provides the Director with stage transition notes, escalation hints, and resource notes for this workflow type.
+`conventions` are string rules injected as GOVERNANCE fragments into all agents. For enforceable rules, use `gates`. `director_guidance` provides the Director with stage transition notes, escalation hints, and resource notes for this workflow type.
 
 Full field reference with examples: see [manifest design notes](../.notes/260312_manifest-design.md).
 
@@ -245,7 +256,7 @@ stages:
       remove: [git_commit]
     models:
       PLAN: anthropic/claude-opus-4-6
-    validators:
+    gates:
       - name: dependency_validation
         type: deterministic
         schedule: per_stage
@@ -261,7 +272,7 @@ stages:
 | `skills` | list[string] | `[]` | Additional skills to force-load (additive to context matching). |
 | `tools` | StageToolsDef | `{}` | Tool scoping: `required`, `add`, `remove` relative to workflow baseline. |
 | `models` | dict | `{}` | Model overrides for this stage. Merges with workflow `default_models`. |
-| `validators` | list[ValidatorDef] | `[]` | Quality gates for this stage. |
+| `gates` | list[GateDef] | `[]` | Quality gates for this stage. |
 | `completion_criteria` | string | `"all_verified"` | Structured completion condition evaluated by `verify_stage_completion`. |
 | `approval` | `"director"` / `"ceo"` / `"auto"` | `"director"` | Who approves stage completion. |
 
@@ -276,14 +287,14 @@ Workflow defaults  <--  Stage overrides  <--  Runtime PM adjustments
 | `agents` | All available | Restrict to listed agents. Omit = all. |
 | `tools` | `required_tools` + `optional_tools` | `required` validated before stage start; `add` extends, `remove` narrows workflow tool set. |
 | `skills` | Context-matched + role-bound | Stage `skills` force-loads named skills additively. |
-| `validators` | Apply across all stages per `schedule` | Stage defines its own validators; workflow-level validators run alongside. |
+| `gates` | Apply across all stages per `schedule` | Stage defines its own gates; workflow-level gates run alongside. |
 | `completion` | `all_verified` | Stage specifies. Default is `all_verified` if omitted. |
 
 ### PM-Driven Stage Transitions
 
 1. PM executes deliverables within the current stage.
 2. After each batch, PM evaluates completion criteria.
-3. When met, PM runs stage-completion validators, produces a completion report, publishes `STAGE_COMPLETED`.
+3. When met, PM runs stage-completion gates, produces a completion report, publishes `STAGE_COMPLETED`.
 4. If approval required, PM enqueues request and waits.
 5. On approval, PM advances `pm:current_stage` and reconfigures via `reconfigure_stage` tool (state-driven, no agent tree rebuild).
 6. Stages with `approval: auto` auto-advance when `verify_stage_completion()` returns True. PM reasoning is only involved for `approval: director` or `approval: ceo` stages.
@@ -302,6 +313,123 @@ pm:workflow_stages        # list[dict]: full stage schema from manifest
 ```
 
 Full stage schema detail: see [stage-schema-design.md](../.notes/260312_stage-schema-design.md).
+
+---
+
+## Node-Based Pipeline Schema
+
+Nodes are the process units within a stage (Phase 7b, CAP-9). A stage declares an agent pool and a sequence of nodes; each node references an agent from the pool and a prompt file that provides the node's objective. This replaces per-workflow `pipeline.py` as the primary composition model. `pipeline.py` is retained as an escape hatch for workflows requiring imperative logic beyond the schema's expressiveness.
+
+**PRD traceability:** PR-4 (stage schema), PR-5 (per-stage agent config), PR-5a (instruction assembly).
+
+### Node Definition
+
+```yaml
+stages:
+  - name: build
+    description: Implement, lint, test, and review all deliverables
+    agents: [coder, reviewer, fixer, formatter, linter, tester, diagnostics]
+    nodes:
+      - name: implement
+        agent: coder
+        prompt: prompts/implement.md
+        produces: [source_code]
+
+      - name: format
+        agent: formatter
+        prompt: prompts/format.md
+        consumes: [source_code]
+
+      - name: lint
+        agent: linter
+        prompt: prompts/lint.md
+        consumes: [source_code]
+        signals: [lint_results]
+
+      - name: test
+        agent: tester
+        prompt: prompts/test.md
+        consumes: [source_code]
+        signals: [test_results]
+
+      - name: review_loop
+        type: review_loop
+        agents: [reviewer, fixer]
+        prompt: prompts/review.md
+        consumes: [source_code]
+        signals: [review_result]
+        config:
+          max_iterations: 3
+          termination_signal: review_approved
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | **Required** | Unique within the stage. |
+| `agent` | string | **Required** (single-agent nodes) | Agent role from the stage's pool. Resolved via the 3-scope cascade (global -> workflow -> project). |
+| `agents` | list[string] | `[]` | Agent roles for composite nodes (e.g., `review_loop`). Replaces `agent` when the node dispatches multiple agents. |
+| `prompt` | string | **Required** | Path to the external markdown file (relative to workflow directory) loaded as the TASK instruction fragment. |
+| `steps` | list[string] | `[]` | Author-declared sub-units executed sequentially within the node. Not decomposed or reordered by the PM. |
+| `produces` | list[string] | `[]` | Symbolic artifact names registered on completion. Storage allocated via the artifact storage service. |
+| `consumes` | list[string] | `[]` | Symbolic artifact names required before execution. Resolved to artifact locations by the engine. |
+| `signals` | list[string] | `[]` | State keys written after node completion. Gates read signals for pass/fail evaluation. |
+| `type` | string | `"standard"` | Node type. `"standard"` (default) or `"review_loop"` (composite). |
+| `config` | dict | `{}` | Type-specific configuration (e.g., `max_iterations` for review loops). |
+
+### Agent Reuse Across Nodes
+
+The same agent definition can serve multiple nodes with different prompts. The agent's IDENTITY (from its definition file) remains constant across nodes -- the TASK changes, the role stays. No aliasing or duplication required.
+
+```yaml
+# Same reviewer agent, two different objectives
+nodes:
+  - name: code_review
+    agent: reviewer
+    prompt: prompts/code-review.md
+  - name: design_review
+    agent: reviewer
+    prompt: prompts/design-review.md
+```
+
+The TASK instruction fragment is loaded from the node's prompt file by the `InstructionAssembler`. The IDENTITY fragment comes from the agent definition file and is unchanged.
+
+### Artifact Data Flow: Dual-Layer Model
+
+Node communication uses two coordination layers:
+
+**Artifacts** are file-based work products declared via `produces`/`consumes`. When a node declares `produces: [implementation_plan]`, the execution engine registers the symbolic name and allocates storage via the artifact storage service (Phase 8a). When a subsequent node declares `consumes: [implementation_plan]`, the engine resolves the symbol to the artifact's location and makes it available to the agent. Artifacts are the durable output of work -- source code, reports, test results.
+
+**Signals** are lightweight state coordination metadata declared via `signals`. After a node completes, the engine writes the named signal keys to session state. Gates read signals for pass/fail evaluation. Signals are not work products -- they are coordination metadata (e.g., `lint_results`, `test_results`, `review_approved`).
+
+Both layers are optional. Nodes without `produces`/`consumes`/`signals` still execute normally -- the declarations add structured coordination when the workflow author needs it.
+
+When a node declares `consumes` for an artifact that does not yet exist (producer node failed, was skipped, or has not run), the engine surfaces a structured error to the PM with the missing artifact name, the expected producer, and the consumer node. The consumer node does not proceed.
+
+### Composite Node Types
+
+A composite node type declares multi-agent behavior within a single node definition. The first composite type is `review_loop`:
+
+```yaml
+- name: review_cycle
+  type: review_loop
+  agents: [reviewer, fixer]
+  prompt: prompts/review.md
+  config:
+    max_iterations: 3
+    termination_signal: review_approved
+```
+
+The execution engine interprets the composite declaratively: dispatch the agents in sequence, check the termination signal after each iteration, stop when the signal is present or `max_iterations` is reached. No per-workflow Python code required.
+
+Future composite types (e.g., `parallel_group`, `conditional`) follow the same pattern -- declared in the schema, interpreted by the engine. They are not in scope for Phase 7b.
+
+### Relationship to pipeline.py
+
+The node schema is the primary composition model. When a manifest contains a node schema and no `pipeline.py` exists, the execution engine interprets the schema directly -- no Python code generation required.
+
+`pipeline.py` is retained as an escape hatch for workflows that genuinely need imperative logic beyond the schema's expressiveness. When a `pipeline.py` exists, it takes precedence. All `pipeline.py` files (built-in, user, or Director-authored) are validated with AST import allowlisting and dangerous-call detection before execution.
+
+The auto-code workflow's existing `pipeline.py` is migrated to the node-based schema in Phase 7b (FR-7b.47). The `pipeline.py` file is retained only as the escape hatch.
 
 ---
 
@@ -359,13 +487,13 @@ Custom `pipeline.py` modules can use these patterns directly or compose their ow
 
 ### Key Design Points
 
-**Discovery is automatic.** Adding a new workflow = adding a directory with `WORKFLOW.yaml` and `pipeline.py`. No registration code.
+**Discovery is automatic.** Adding a new workflow = adding a directory with `WORKFLOW.yaml`. Node schema in the manifest drives execution; `pipeline.py` is optional (escape hatch). No registration code.
 
 **User-level overrides (Decision #72).** `user_workflows_dir` (default: `~/.autobuilder/workflows/`, configurable via `AUTOBUILDER_WORKFLOWS_DIR`) allows user-authored workflows that override built-in by name or extend the set. No project-scoped workflows exist.
 
 **Pipeline instantiation is deferred.** Manifests are indexed at startup; ADK pipeline construction happens only on `create_pipeline()`.
 
-**get_manifest() enables reasoning.** PM and Director read the parsed manifest to understand stages, validators, and completion structure.
+**get_manifest() enables reasoning.** PM and Director read the parsed manifest to understand stages, gates, and completion structure.
 
 **create_pipeline receives PipelineContext.** The `PipelineContext` bundles `registry`, `instruction_ctx`, `manifest`, `skill_library`, `toolset`, and `before_model_callback` into a single object. Pipeline construction uses `registry.build(agent_name, ctx)` with the 3-scope cascade (global -> workflow -> project) for agents and skills. Workflows themselves are two-tier (built-in -> user-level). This is the composability mechanism (Decision #15).
 
@@ -373,20 +501,20 @@ Custom `pipeline.py` modules can use these patterns directly or compose their ow
 
 Validation runs at scan time. Invalid manifests fail loudly and are excluded from the registry.
 
-**Required:** `name` present and kebab-case, `description` non-empty, `pipeline_type` valid if present, stage names unique, validator names unique across manifest, `deliverable.types[].verification` references declared validators.
+**Required:** `name` present and kebab-case, `description` non-empty, `pipeline_type` valid if present, stage names unique, gate names unique across manifest, `deliverable.types[].verification` references declared gates.
 
-**Warning (non-blocking):** `stages` defined but `pipeline_type` is `single_pass`, validator references agents not in any stage's agent list, resource credentials reference unset env vars.
+**Warning (non-blocking):** `stages` defined but `pipeline_type` is `single_pass`, gate references agents not in any stage's agent list, resource credentials reference unset env vars.
 
 ---
 
-## Validators & Quality Gates
+## Quality Gates
 
-Validators are mandatory quality gates that cannot be skipped by agent judgment (PR-11). They produce machine-generated evidence for completion reports (PR-22). Validators are evaluation functions dispatched by `ValidatorRunner`, not CustomAgent classes (spec DD-2 refines Decision #74). They wrap existing agent output (state keys) and record structured evidence. Skills teach the Director *about* validators; validators themselves are platform code.
+Gates are mandatory quality checks that cannot be skipped by agent judgment (PR-11). They produce machine-generated evidence for completion reports (PR-22). Gates are evaluation functions dispatched by `GateRunner`, not CustomAgent classes (spec DD-2 refines Decision #74). They wrap existing agent output (state keys, signals) and record structured evidence. Skills teach the Director *about* gates; gates themselves are platform code.
 
-### Validator Definition
+### Gate Definition
 
 ```yaml
-validators:
+gates:
   - name: lint_check
     type: deterministic
     agent: linter
@@ -407,12 +535,12 @@ validators:
 |---|---|---|---|
 | `name` | string | **Required** | Unique within the manifest. |
 | `type` | `"deterministic"` / `"llm"` / `"approval"` | **Required** | Execution model. |
-| `agent` | string | `""` | Agent role that runs this validator. |
-| `schedule` | ValidatorSchedule | **Required** | When to run. |
-| `config` | dict | `{}` | Validator-specific configuration. |
+| `agent` | string | `""` | Agent role that runs this gate. |
+| `schedule` | GateSchedule | **Required** | When to run. |
+| `config` | dict | `{}` | Gate-specific configuration. |
 | `required` | bool | `true` | `false` = advisory only (logged, not blocking). |
 
-### Validator Schedule
+### Gate Schedule
 
 | Schedule | When It Runs | Example |
 |----------|-------------|---------|
@@ -421,11 +549,11 @@ validators:
 | `per_taskgroup` | After each TaskGroup completes within a stage | TaskGroup completion report |
 | `per_stage` | Once at stage completion | integration tests, architecture conformance |
 
-`per_deliverable` validators are wired into the DeliverablePipeline by `pipeline.py`. Higher-granularity validators are invoked by the PM's outer loop at the appropriate point.
+`per_deliverable` gates are wired into the DeliverablePipeline by the node schema (or `pipeline.py` escape hatch). Higher-granularity gates are invoked by the PM's outer loop at the appropriate point.
 
-### Standard Validators (Decision #74)
+### Standard Gates (Decision #74)
 
-Ten standard validators ship with the platform (six in Phase 7a; four additional research/integration validators in Phase 7b):
+Thirteen standard gates ship with the platform (eight in Phase 7a; five in Phase 7b -- two integration code-domain and three research-domain):
 
 | Name | Type | Domain | What It Checks |
 |------|------|--------|---------------|
@@ -434,13 +562,16 @@ Ten standard validators ship with the platform (six in Phase 7a; four additional
 | `regression_tests` | deterministic | code | Full test suite passes after batch changes |
 | `dependency_validation` | deterministic | code | Deliverable dependency graph is acyclic |
 | `deliverable_status_check` | deterministic | universal | All deliverables at required status |
+| `code_review` | deterministic | code | Code quality, patterns, correctness |
+| `integration_tests` | deterministic | code | Integration test suite passes with structured results |
+| `architecture_conformance` | llm | code | Implementation matches documented design |
 | `source_verification` | llm | research | Sources are credible, accessible, relevant |
 | `citation_check` | deterministic | research | All claims cite sources, citations valid |
 | `content_review` | llm | research | Content is coherent, complete, well-structured |
-| `code_review` | deterministic | code | Code quality, patterns, correctness |
-| `architecture_conformance` | llm | code | Implementation matches documented design |
+| `spec_completeness` | llm | universal | Specification is complete and unambiguous |
+| `design_consistency` | llm | universal | Design artifacts are internally consistent |
 
-The Director cannot create custom validators (requires Python deployment) but can compose existing validators in novel combinations via the manifest.
+The Director cannot create custom gates (requires Python deployment) but can compose existing gates in novel combinations via the manifest.
 
 ---
 
@@ -453,19 +584,19 @@ Three types of completion criteria compose via AND:
 | Type | Key | What It Checks | Who Evaluates |
 |------|-----|---------------|---------------|
 | **Deliverable** | `deliverables` | All deliverables at required status? | Deterministic: query DB |
-| **Validator** | `validators` | All required validators passed? | Deterministic: check results |
+| **Gate** | `gates` | All required gates passed? | Deterministic: check results |
 | **Approval** | `approval` | Required authority approved? | Human via CEO/Director queue |
 
 Standard deliverable conditions:
 
 | Value | Meaning |
 |-------|---------|
-| `all_verified` | Every deliverable COMPLETED with all validators passed. Default. |
+| `all_verified` | Every deliverable COMPLETED with all gates passed. Default. |
 | `all_deliverables_planned` | Every deliverable has an implementation plan. For planning stages. |
 
 ### TaskGroup Close Conditions (PR-23)
 
-A TaskGroup cannot close while any deliverable is outstanding, any scheduled validator is failing, or any escalation is unresolved. This is enforced deterministically via `verify_taskgroup_completion` -- a hard gate that PM reasoning cannot override. The same pattern applies at stage level via `verify_stage_completion`.
+A TaskGroup cannot close while any deliverable is outstanding, any scheduled gate is failing, or any escalation is unresolved. This is enforced deterministically via `verify_taskgroup_completion` -- a hard gate that PM reasoning cannot override. The same pattern applies at stage level via `verify_stage_completion`.
 
 ### Three-Layer Verification Reports (PR-22, Decision #75)
 
@@ -488,7 +619,7 @@ completion_report:
       description: Lint results, test coverage, review cycle counts
 ```
 
-Each layer requires machine-generated evidence from validators. Assertion alone is never sufficient. Default layers (functional, architectural, contract) apply when `layers` is omitted. Manifests can configure which layers apply.
+Each layer requires machine-generated evidence from gates. Assertion alone is never sufficient. Default layers (functional, architectural, contract) apply when `layers` is omitted. Manifests can configure which layers apply.
 
 Workflows add domain-specific sections via `additional_sections`.
 
@@ -509,7 +640,7 @@ Each workflow defines its own domain-specific concerns:
 - **Workflow-specific skills** -- domain knowledge (e.g., auto-code has `api-endpoint`, `database-migration`)
 - **Stage schema** -- organizational stages with per-stage scoping
 - **Deliverable decomposition** -- how specs decompose into implementable units
-- **Quality gates** -- which validators, at what schedule
+- **Quality gates** -- which gates, at what schedule
 - **Artifact types** -- what the workflow produces
 
 ---
@@ -524,9 +655,9 @@ The Director is a workflow author, not just a workflow executor (Decision #76). 
 
 The Director already has every primitive it needs. Workflow authoring is files-on-disk:
 
-- **WORKFLOW.yaml** -- written via `file_write`
-- **pipeline.py** -- written from established patterns (Decision #73)
+- **WORKFLOW.yaml** -- manifest with node schema, written via `file_write`
 - **agents/*.md** -- markdown files with YAML frontmatter
+- **prompts/*.md** -- node prompt files (TASK fragments)
 - **skills/*/SKILL.md** -- standard skill format
 
 ### 6-Phase Authoring Lifecycle
@@ -535,7 +666,7 @@ The Director already has every primitive it needs. Workflow authoring is files-o
 |-------|----------|--------|
 | **A. Requirements** | Structured conversation with CEO | Process understanding |
 | **B. Resource Discovery** | Query available tools, MCP servers, credentials, skills, workflows | Gap analysis |
-| **C. Draft Composition** | Write manifest, pipeline.py, agents, skills to **staging** | Workflow artifacts |
+| **C. Draft Composition** | Write manifest (with node schema), agents, prompts, skills to **staging** | Workflow artifacts |
 | **D. Validation** | Run L1-L4 validation (schema, references, parse, structural) | Validation report |
 | **E. CEO Review** | Present workflow summary + validation results via CEO queue | Approval/rejection |
 | **F. Activation** | Move from staging to active directory, git commit | Live workflow |
@@ -556,9 +687,9 @@ Five discovery tools let the Director map CEO requirements to available resource
 
 These are thin query facades over existing registries -- no new "Resource Library" entity.
 
-### Pipeline.py Generation (Decision #73)
+### Pipeline Composition (Decision #73)
 
-The Director writes `pipeline.py` from scratch, guided by skills and the three pipeline patterns (`single_pass`, `sequential`, `batch_parallel`). CEO reviews the pipeline code at the activation gate.
+Director-authored workflows use the node-based pipeline schema exclusively. The Director composes manifests with node definitions, agent definitions, and prompt files -- no `pipeline.py`. The node schema is the primary composition model; `pipeline.py` exists only as an escape hatch for built-in workflows requiring imperative logic. The Director does not author `pipeline.py` files.
 
 ### Authoring Skills (Decision #77)
 
@@ -571,14 +702,36 @@ Nine skills support workflow authoring: 1 Director-tier master skill (`director-
 | Write to staging | None (free authoring) |
 | Activate new workflow | CEO approval required |
 | Modify active workflow | CEO approval required |
+| Deactivate workflow | CEO only (Director can propose) |
+| Delete workflow | CEO only, double-confirm |
 | Create `type: llm` agents | Allowed (sandboxed by tool_role ceiling) |
 | Create `type: custom` agents | Cannot do (requires Python deployment) |
 | Create new FunctionTools | Cannot do (separate capability) |
 | Access credential values | Cannot do (names only) |
 
+### Pre-Activation Dry Run
+
+Before activation, the Director can execute a full E2E dry run of the workflow with synthetic input using a lightweight LLM. The dry run exercises the complete pipeline lifecycle.
+
+- **Token budget**: Hard per-node token budget cap prevents any single node from consuming the entire budget. If the budget is exhausted before all nodes complete, the system aborts and produces a partial report with cost guidance.
+- **Multiple passes**: By default, two passes: one happy-path and one error-path (with injected failures to verify escalation and recovery). The CEO can request additional passes or skip the dry run entirely (explicit opt-out).
+- **Lifecycle simulation**: Each dry run includes a pause at a checkpoint boundary followed by resume, and a simulated edit operation mid-execution -- proving state persistence and edit handling.
+- **Isolation**: Dry runs do not write to production databases, modify active workflow registries, or produce artifacts outside a temporary workspace. Cleanup is automatic.
+- **Activation requirement**: Unless the CEO explicitly opts out, dry run results are required as part of the activation gate submission.
+
+### Workflow Deactivation & Deletion
+
+The CEO can deactivate or delete Director-authored workflows. The Director can propose deactivation/deletion to the CEO queue but cannot execute it directly.
+
+**Deactivation** marks the workflow as disabled. The WorkflowRegistry excludes it from discovery, matching, and new project creation. Existing projects retain their workflow reference but cannot start new workflow operations. Each affected project receives a CEO queue item: "Workflow deactivated -- assign replacement workflow before continuing." Reactivation by the CEO restores full availability with no data loss.
+
+**Deletion** requires two confirmation steps. The first states the action; the second states the number of affected projects and that the action is irreversible. Existing projects lose workflow abilities and are flagged via CEO queue for new workflow assignment.
+
+**Built-in platform workflows** (shipped with AutoBuilder) cannot be deleted. They can be deactivated by the CEO, but the system warns that deactivation removes a platform-default capability.
+
 ### Workflow Improvement Loop
 
-Feedback from execution (failure patterns, escalation history, workflow memory) flows back to improvement proposals. The Director drafts changes to staging, presents evidence-backed proposals to the CEO, and activates on approval.
+Feedback from execution (failure patterns, escalation history, workflow memory) flows back to improvement proposals. The Director drafts changes to staging, presents evidence-backed proposals to the CEO, and activates on approval. The previous version is preserved (not deleted) for manual recovery. Automated rollback is not in scope.
 
 Full authoring detail: see [director-authoring-design.md](../.notes/260312_director-authoring-design.md) and [authoring-skills-design.md](../.notes/260312_authoring-skills-design.md).
 
@@ -639,20 +792,22 @@ A compound workflow handles requests spanning multiple workflow types ("Design a
 
 ---
 
-## auto-code: The First Workflow
+## Standard Workflows
 
-auto-code implements autonomous software development from specification to verified output.
+### auto-code
 
-auto-code's `pipeline.py` at `app/workflows/auto-code/pipeline.py` composes the auto-code-specific agent tree (skill_loader -> memory_loader -> planner -> coder -> formatter -> linter -> tester -> diagnostics -> review_cycle) using `PipelineContext`. This is domain-specific orchestration, not shared infrastructure.
+auto-code implements autonomous software development from specification to verified output. It is the platform's built-in reference workflow.
 
-### Stage Schema
+auto-code's node schema (migrated from `pipeline.py` in Phase 7b) defines the agent topology: skill_loader -> memory_loader -> planner -> coder -> formatter -> linter -> tester -> diagnostics -> review_cycle. The original `pipeline.py` is retained as an escape hatch. This is domain-specific orchestration, not shared infrastructure.
+
+#### Stage Schema
 
 ```yaml
 stages:
   - name: shape
     description: Refine brief into unambiguous specification
     agents: [planner]
-    validators:
+    gates:
       - name: spec_completeness
         type: llm
         agent: planner
@@ -662,7 +817,7 @@ stages:
   - name: design
     description: Architecture, data models, API contracts, dependency graph
     agents: [planner, reviewer]
-    validators:
+    gates:
       - name: design_consistency
         type: llm
         agent: reviewer
@@ -672,7 +827,7 @@ stages:
   - name: plan
     description: Decompose design into dependency-ordered deliverables
     agents: [planner]
-    validators:
+    gates:
       - name: dependency_validation
         type: deterministic
         agent: ""
@@ -683,7 +838,7 @@ stages:
   - name: build
     description: Implement, lint, test, and review all deliverables
     agents: [coder, reviewer, fixer, formatter, linter, tester, diagnostics]
-    validators:
+    gates:
       - name: lint_check
         type: deterministic
         agent: linter
@@ -706,12 +861,12 @@ stages:
   - name: integrate
     description: Integration testing and final verification
     agents: [tester, reviewer, diagnostics]
-    validators:
-      - name: integration_tests  # Phase 7b stub
+    gates:
+      - name: integration_tests
         type: deterministic
         agent: tester
         schedule: per_stage
-      - name: architecture_conformance  # Phase 7b stub
+      - name: architecture_conformance
         type: llm
         agent: reviewer
         schedule: per_stage
@@ -722,9 +877,9 @@ stages:
     approval: ceo
 ```
 
-> **Simplified for architectural overview.** The [Tier 3 reference manifest](../build-phase/phase-7a/reference/workflow-manifest-example.yaml) is the authoritative, buildable source for auto-code's `WORKFLOW.yaml` — including per-stage `tools`, `skills`, `models`, validator `config`, and all optional fields.
+> **Simplified for architectural overview.** The [Tier 3 reference manifest](../build-phase/phase-7a/reference/workflow-manifest-example.yaml) is the authoritative, buildable source for auto-code's `WORKFLOW.yaml` -- including per-stage `tools`, `skills`, `models`, gate `config`, and all optional fields.
 
-### PM Execution Flow
+#### PM Execution Flow
 
 ```
 Work session starts -> Load manifest, read stages
@@ -738,7 +893,7 @@ BUILD:  batch_parallel execution (select_ready_batch -> parallel pipelines -> ch
 INTEGRATE: integration tests -> architecture_conformance -> CEO approval -> workflow complete
 ```
 
-### Key Properties
+#### Key Properties
 
 | Property | Value |
 |----------|-------|
@@ -749,17 +904,29 @@ INTEGRATE: integration tests -> architecture_conformance -> CEO approval -> work
 | Isolation | Git worktree per deliverable |
 | Quality gates | Lint, test, review (mandatory, deterministic enforcement) |
 
-### What Makes auto-code a Workflow, Not a Hardcoded Pipeline
+#### What Makes auto-code a Workflow, Not a Hardcoded Pipeline
 
 auto-code defines its own:
 
-- **Pipeline composition** (`pipeline.py`) -- the agent node list and wiring (skill_loader -> memory_loader -> planner -> coder -> formatter -> linter -> tester -> diagnostics -> review_cycle). This is auto-code's domain-specific orchestration, not shared infrastructure.
+- **Node schema** -- the agent topology and node sequence (planner -> coder -> formatter -> linter -> tester -> diagnostics -> review_cycle). This is auto-code's domain-specific orchestration, not shared infrastructure.
 - **Agent definitions** (`agents/`) -- workflow-scoped planner, coder, reviewer with auto-code-specific instructions
 - **Tool requirements** -- file I/O, shell, git tools declared in the manifest
-- **Stage schema** -- 5-stage progression with per-stage agent rosters and validators
-- **Quality gates** -- lint, test, review, regression validators at appropriate schedules
+- **Stage schema** -- 5-stage progression with per-stage agent rosters and gates
+- **Quality gates** -- lint, test, review, regression gates at appropriate schedules
 
 It does not define how tools work, how skills load, how models are selected, how state persists, or how events are distributed. A second workflow reuses all shared infrastructure and provides only its domain-specific concerns.
+
+### auto-research
+
+auto-research is a Director-authored proof workflow (Phase 7b, CAP-13) that performs end-to-end autonomous research from question to cited report. It is authored entirely through the Director authoring pipeline -- not hand-coded -- proving cross-domain workflow composability.
+
+Stages: source discovery, analysis/synthesis, report generation, review/verification. Uses research-domain agents (researcher, writer, reviewer) defined as declarative agent definition files. Declares research-domain gates (`source_verification`, `citation_check`, `content_review`) at appropriate schedules. Passes the full pre-activation dry run cycle before activation.
+
+### auto-writer
+
+auto-writer is a Director-authored proof workflow (Phase 7b, CAP-14) that performs end-to-end research followed by long-form content production. It combines research and writing concerns in a single workflow.
+
+Stages: research, outlining, drafting, revision, final review. Reuses research-domain agents and gates from the platform standard set, demonstrating that workflows compose from shared building blocks. Authored through the Director authoring pipeline and passes the full pre-activation dry run cycle.
 
 ---
 
@@ -773,6 +940,6 @@ It does not define how tools work, how skills load, how models are selected, how
 
 ---
 
-**Document Version:** 5.2
+**Document Version:** 6.0
 **Last Updated:** 2026-04-12
-**Status:** Phase 7a Design Complete -- Phase 8a Shaping
+**Status:** Phase 7b FRD Decisions Propagated

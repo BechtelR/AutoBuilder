@@ -429,15 +429,20 @@ class ValidatorRunner:
 
 
 def _check_deliverable_statuses(state: dict[str, object]) -> tuple[bool, list[str]]:
-    """Check deliverable_statuses state key. Returns (all_done, incomplete_names)."""
+    """Check deliverable_statuses state key. Returns (all_done, incomplete_names).
+
+    A deliverable is "done" (not outstanding) if it has reached any terminal
+    status: COMPLETED, FAILED, or SKIPPED. Non-terminal statuses (PLANNED,
+    PENDING, IN_PROGRESS, BLOCKED) are outstanding per FR-8a.70.
+    """
     statuses = state.get(DELIVERABLE_STATUSES_KEY)
     if statuses is None:
         return (False, [])
     if not isinstance(statuses, dict):
         return (False, [])
     sd = cast("dict[str, object]", statuses)
-    completed = DeliverableStatus.COMPLETED
-    incomplete = [k for k, v in sd.items() if v != completed]
+    terminal = {DeliverableStatus.COMPLETED, DeliverableStatus.FAILED, DeliverableStatus.SKIPPED}
+    incomplete = [k for k, v in sd.items() if v not in terminal]
     return (len(incomplete) == 0, incomplete)
 
 

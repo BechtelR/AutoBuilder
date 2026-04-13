@@ -41,7 +41,9 @@ Domain-specific L2 deep dives linked from `02-ARCHITECTURE.md` §4. Each is self
 | `state.md` | State & memory architecture | 4-scope state system? Memory service? Cross-session persistence? |
 | `tools.md` | Tools & GlobalToolset | FunctionTool patterns? What built-ins does ADK provide? |
 | `workers.md` | Worker architecture (ARQ) | Worker lifecycle? Cron jobs? Concurrency model? |
-| `workflows.md` | Workflow composition system | Manifest format? Stage schema? Registry? Completion criteria? |
+| `workflows.md` | Workflow composition system | Manifest format? Stage schema? Node-based pipeline schema? Registry? Quality gates? Completion criteria? |
+| `workflow-eval.md` | Workflow eval suite (Phase 14) | How do workflows self-improve? Eval dimensions? Regression accumulation? |
+| `context-optimizer.md` | Context optimization (Phase 14) | How is context assembly optimized? Quality signals? A/B testing? |
 
 ---
 
@@ -70,10 +72,10 @@ Domain-specific L2 deep dives linked from `02-ARCHITECTURE.md` §4. Each is self
 | How do agents get context? | `architecture/context.md`, `architecture/skills.md`, `architecture/state.md` |
 | How do I add a new workflow? | `architecture/workflows.md` |
 | What is a workflow manifest? | `architecture/workflows.md` §3 |
-| How do workflow stages and validators work? | `architecture/workflows.md` §4–§6 |
-| How does workflow completion reporting work? | `architecture/workflows.md` §7 |
-| How does the Director author workflows? | `architecture/workflows.md` §9 |
-| What is the `auto-code` workflow? | `architecture/workflows.md` §12 |
+| How do workflow stages and gates work? | `architecture/workflows.md` §4–§7 |
+| How does workflow completion reporting work? | `architecture/workflows.md` §8 |
+| How does the Director author workflows? | `architecture/workflows.md` §10 |
+| What is the `auto-code` workflow? | `architecture/workflows.md` §14 |
 | How does state persist? | `architecture/state.md` |
 | What tools are available? | `architecture/tools.md` |
 | How do I set up local dev? | `05-DEV_SETUP.md` |

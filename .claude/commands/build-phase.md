@@ -143,12 +143,12 @@ Behavior depends on `--review` flag (default: `double`):
 Launch parallel `reviewer` subagents scaled to spec size:
 **USE sufficient reviewer pool size.** Not utilizing enough agents for the work will result in missed errors + incompletions resulting in additional downstream rework and cost. Reviewers MUST fully read ALL relevant context files to complete their review scope, including PRD, L2 Architecture, FRD, spec, and model.
 
-| Deliverables | Reviewers per pass |
+| Deliverables | Reviewers per pass|
 |--------------|-------------------|
-| 1-4          | 2                 |
-| 5-8          | 3                 |
-| 9-19         | 4                 |
-| 20+          | 6+                 |
+| 1-3          | 2                 |
+| 4-8          | 3                 |
+| 9-15         | 4                 |
+| 16+          | 5+                |
 
 Split files evenly across reviewers. Each checks:
 - Correctness against spec.md requirements

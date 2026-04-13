@@ -148,6 +148,7 @@ stages:
 resources:
   credentials:
     - ANTHROPIC_API_KEY            # Primary LLM provider
+    - OPENAI_API_KEY               # OpenAI fallback (optional)
   services: []                     # Health check URLs
   knowledge: []                    # Required files/directories
 

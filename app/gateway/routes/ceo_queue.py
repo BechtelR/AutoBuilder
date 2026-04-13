@@ -106,6 +106,18 @@ async def resolve_ceo_queue_item(
             {"approval_item_id": str(item.id), "approval_resolution": request.resolution},
         )
 
+    # For ESCALATION items that are resolved, apply resolution back to project (FR-8a.60/61)
+    if (
+        request.action == CeoQueueAction.RESOLVE
+        and item.type == CeoItemType.ESCALATION
+        and item.source_project_id is not None
+    ):
+        await arq.enqueue_job(  # type: ignore[reportUnknownMemberType]
+            "apply_resolution",
+            project_id=str(item.source_project_id),
+            resolution=request.resolution or "",
+        )
+
     return _item_to_response(item)
 
 

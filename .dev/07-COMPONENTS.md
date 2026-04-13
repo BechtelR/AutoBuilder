@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 2.4.1*
+*Version: 2.5.0*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -399,16 +399,16 @@ Source: `architecture/skills.md`
 | S26 | Skill: `review/performance-review` | skill | 6 | skills.md §Directory Layout | — |
 | S27 | Skill: `test/unit-test-patterns` | skill | 6 | skills.md §Directory Layout | — |
 | S28 | Skill: `planning/task-decomposition` | skill | 6 | skills.md §Directory Layout | — |
-| S29 | Skill: `research/source-evaluation` | skill | 13 | skills.md §Directory Layout | — |
-| S30 | Skill: `research/citation-standards` | skill | 13 | skills.md §Directory Layout | — |
+| S29 | Skill: `research/source-evaluation` | skill | 7b | skills.md §Directory Layout | — |
+| S30 | Skill: `research/citation-standards` | skill | 7b | skills.md §Directory Layout | — |
 | S33 | Skill: `authoring/skill-authoring` (+ `references/skill-template.md`) | skill | 6 | FRD §CAP-9 (FR-6.41, FR-6.44, FR-6.45) | — |
 | S34 | Skill: `authoring/agent-definition` | skill | 6 | FRD §CAP-9 (FR-6.41) | — |
 | S35 | Skill: `authoring/workflow-authoring` | skill | 6 | FRD §CAP-9 (FR-6.41) | — |
 | S36 | Skill: `authoring/project-conventions` | skill | 6 | FRD §CAP-9 (FR-6.41) | — |
 | S31 | Auto-code skill: `test-generation` | skill | 7 | workflows.md §auto-code: The First Workflow | — |
 | S32 | Director/PM role-bound skills (governance, oversight, management) | skill | 6 | FRD §CAP-10 | SkillLibrary (`always` trigger + `applies_to`) |
-| S37 | `workflow-quality` skill (validator design patterns) | skill | 7 | workflows.md §Validators & Quality Gates | — |
-| S38 | `workflow-testing` skill (dry runs, testing patterns) | skill | 7 | workflows.md §Validators & Quality Gates | — |
+| S37 | `workflow-quality` skill (gate design patterns) | skill | 7 | workflows.md §Quality Gates | — |
+| S38 | `workflow-testing` skill (dry runs, testing patterns) | skill | 7 | workflows.md §Quality Gates | — |
 | S39 | `director-workflow-composition` skill | skill | 7b | workflows.md §Director Workflow Authoring | — |
 | S40 | `software-development-patterns` domain skill | skill | 7b | workflows.md §Director Workflow Authoring | — |
 | S41 | `research-patterns` domain skill | skill | 7b | workflows.md §Director Workflow Authoring | — |
@@ -444,24 +444,24 @@ Source: `architecture/workflows.md`
 | F21 | Manifest validation (L1 schema, required/warning/cross-ref) | mechanism | 7 | workflows.md §WorkflowRegistry | WorkflowManifest |
 | F22 | `StageDef` Pydantic model | module | 7 | workflows.md §Stage Schema | — |
 | F23 | `CompletionCriteria` Pydantic model | module | 7 | workflows.md §Completion Criteria & Reports | — |
-| F24 | `ValidatorDefinition` Pydantic model | module | 7 | workflows.md §Validators & Quality Gates | — |
+| F24 | `GateDefinition` Pydantic model | module | 7 | workflows.md §Quality Gates | — |
 | F25 | Stage state keys (`pm:current_stage`, `pm:stage_*`) | mechanism | 7 | workflows.md §Stage Schema | — |
 | F26 | `reconfigure_stage` FunctionTool | tool | 7 | workflows.md §Stage Schema | Stage state keys |
 | F27 | `verify_stage_completion` deterministic gate | mechanism | 7 | workflows.md §Completion Criteria & Reports | CompletionCriteria |
 | F28 | `verify_taskgroup_completion` deterministic gate | mechanism | 7 | workflows.md §Completion Criteria & Reports | CompletionCriteria |
 | F29 | `StageExecution` DB table | db | 7 | workflows.md §Stage Schema | `workflows` |
 | F30 | `TaskGroupExecution` DB table | db | 7 | workflows.md §Stage Schema | StageExecution |
-| F31 | `ValidatorResult` DB table | db | 7 | workflows.md §Validators & Quality Gates | StageExecution |
-| F32 | Standard validator: `lint_check` | mechanism | 7 | workflows.md §Validators & Quality Gates | LinterAgent |
-| F33 | Standard validator: `test_suite` | mechanism | 7 | workflows.md §Validators & Quality Gates | TestRunnerAgent |
-| F34 | Standard validator: `regression_tests` | mechanism | 7 | workflows.md §Validators & Quality Gates | RegressionTestAgent |
-| F35 | Standard validator: `code_review` | mechanism | 7 | workflows.md §Validators & Quality Gates | ReviewerAgent |
-| F36 | Standard validator: `dependency_validation` | mechanism | 7 | workflows.md §Validators & Quality Gates | — |
-| F37 | Standard validator: `deliverable_status_check` | mechanism | 7 | workflows.md §Validators & Quality Gates | — |
+| F31 | `GateResult` DB table | db | 7 | workflows.md §Quality Gates | StageExecution |
+| F32 | Standard gate: `lint_check` | mechanism | 7 | workflows.md §Quality Gates | LinterAgent |
+| F33 | Standard gate: `test_suite` | mechanism | 7 | workflows.md §Quality Gates | TestRunnerAgent |
+| F34 | Standard gate: `regression_tests` | mechanism | 7 | workflows.md §Quality Gates | RegressionTestAgent |
+| F35 | Standard gate: `code_review` | mechanism | 7 | workflows.md §Quality Gates | ReviewerAgent |
+| F36 | Standard gate: `dependency_validation` | mechanism | 7 | workflows.md §Quality Gates | — |
+| F37 | Standard gate: `deliverable_status_check` | mechanism | 7 | workflows.md §Quality Gates | — |
 | F38 | `CompletionReport` Pydantic model | module | 7 | workflows.md §Completion Criteria & Reports | — |
 | F39 | `StageStatus` enum | module | 7 | workflows.md §Stage Schema | — |
-| F40 | `ValidatorType` enum | module | 7 | workflows.md §Validators & Quality Gates | — |
-| F41 | `ValidatorSchedule` enum | module | 7 | workflows.md §Validators & Quality Gates | — |
+| F40 | `GateType` enum | module | 7 | workflows.md §Quality Gates | — |
+| F41 | `GateSchedule` enum | module | 7 | workflows.md §Quality Gates | — |
 | F42 | Stage lifecycle events (STAGE_STARTED, STAGE_COMPLETED, etc.) | mechanism | 7 | workflows.md §Stage Schema | PipelineEventType |
 | F43 | `ResourcesDef` validation (credentials, services, knowledge) | mechanism | 7 | workflows.md §Workflow Manifest | — |
 | F58 | `PipelineContext` dataclass (stage config, manifest ref, runtime params) | module | 7 | workflows.md §Workflow Manifest | WorkflowManifest, StageDef |
@@ -475,12 +475,24 @@ Source: `architecture/workflows.md`
 | F50 | Director filesystem tool scoping (path-restricted) | mechanism | 7b | workflows.md §Director Workflow Authoring | — |
 | F51 | Staging directory convention | mechanism | 7b | workflows.md §Director Workflow Authoring | — |
 | F52 | Workflow activation gate (CEO queue) | mechanism | 7b | workflows.md §Director Workflow Authoring | CEO queue |
-| F53 | Dry run execution (synthetic input, `dry_run: true`) | mechanism | 7b | workflows.md §Director Workflow Authoring | WorkflowRegistry |
-| F54 | Standard validator: `source_verification` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
-| F55 | Standard validator: `citation_check` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
-| F56 | Auto-code validator: `integration_tests` | mechanism | 7b | workflows.md §Validators & Quality Gates | Stub-referenced from Phase 7a auto-code manifest |
-| F57 | Standard validator: `architecture_conformance` | mechanism | 7b | workflows.md §Validators & Quality Gates | Stub-referenced from Phase 7a auto-code manifest |
-| F60 | Standard validator: `content_review` | mechanism | 7b | workflows.md §Validators & Quality Gates | — |
+| F53 | Dry run execution framework (synthetic input, lightweight LLM, token budget, E2E simulation) | mechanism | 7b | workflows.md §Director Workflow Authoring | F64, WorkflowRegistry |
+| F54 | Standard gate: `source_verification` | mechanism | 7b | workflows.md §Quality Gates | — |
+| F55 | Standard gate: `citation_check` | mechanism | 7b | workflows.md §Quality Gates | — |
+| F56 | Auto-code gate: `integration_tests` | mechanism | 7b | workflows.md §Quality Gates | Stub-referenced from Phase 7a auto-code manifest |
+| F57 | Standard gate: `architecture_conformance` | mechanism | 7b | workflows.md §Quality Gates | Stub-referenced from Phase 7a auto-code manifest |
+| F60 | Standard gate: `content_review` | mechanism | 7b | workflows.md §Quality Gates | — |
+| F61 | `NodeDef` Pydantic model (node schema) | module | 7b | workflows.md §Node-Based Pipeline Schema | StageDef |
+| F62 | `StepDef` Pydantic model (sub-unit within node) | module | 7b | workflows.md §Node-Based Pipeline Schema | NodeDef |
+| F63 | `CompositeNodeDef` Pydantic model (review loop, future composites) | module | 7b | workflows.md §Node-Based Pipeline Schema | NodeDef |
+| F64 | Node schema execution engine (interprets node schema without Python codegen) | module | 7b | workflows.md §Node-Based Pipeline Schema | F61, F63, AgentRegistry, InstructionAssembler |
+| F65 | auto-code node schema migration (pipeline.py to declarative schema) | workflow | 7b | workflows.md §Node-Based Pipeline Schema | F13, F14, F61 |
+| F66 | AST pipeline validator (import allowlist + dangerous-call detection) | mechanism | 7b | workflows.md §Node-Based Pipeline Schema | — |
+| F67 | Workflow deactivation/reactivation mechanism | mechanism | 7b | workflows.md §Workflow Deactivation & Deletion | WorkflowRegistry, CEO queue |
+| F68 | Workflow deletion with double-confirm | mechanism | 7b | workflows.md §Workflow Deactivation & Deletion | WorkflowRegistry, CEO queue |
+| F69 | Import-level sandboxing for pipeline.py | mechanism | 7b | workflows.md §Node-Based Pipeline Schema | F66 |
+| F70 | auto-research workflow (Director-authored) | workflow | 7b | workflows.md §Director Workflow Authoring | F54, F55, F60, F52 |
+| F71 | auto-writer workflow (Director-authored) | workflow | 7b | workflows.md §Director Workflow Authoring | F54, F55, F60, F52 |
+| F73 | Gate rename migration (validator to gate across codebase, DB, manifests, tests, docs) | migration | 7b | workflows.md §Quality Gates, FRD CAP-15 | F24, F31, F40, F41 |
 
 ---
 
@@ -511,7 +523,7 @@ Source: `architecture/state.md`
 | M15 | `MemoryLoaderAgent` (CustomAgent) | agent | 5a | state.md §1.4, agents.md | BaseMemoryService (ADK); InMemoryMemoryService in Phase 5a, PostgresMemoryService in Phase 9 |
 | M16 | `LoadMemory` tool | tool | 9 | state.md §1.4 | PostgresMemoryService |
 | M17 | Memory ingestion strategy (configurable) | mechanism | 9 | state.md §9.2 | — |
-| M18 | pgvector semantic search upgrade | mechanism | 11 | state.md §5 | pgvector, embeddings |
+| M18 | pgvector semantic search | mechanism | 9 | state.md §5 | pgvector, embeddings, LiteLLM |
 
 ### 11.3 Redis Cache
 
@@ -591,7 +603,7 @@ Source: `architecture/execution.md`
 | A63 | *(cross-ref §6.6 Pipelines)* PM outer loop (sequential batch management) | workflow | 8a | execution.md §PM loop | PM agent, `select_ready_batch` |
 | X08 | Autonomous failure handling (retry/reorder/skip) | mechanism | 8a | execution.md §PM loop | PM agent |
 | X11 | Batch failure threshold (consecutive failures → Director suspension) | mechanism | 8a | execution.md §PM loop | PM agent, Director queue, `project_configs` |
-| X14 | Three-layer completion report wiring into INTEGRATE validators | mechanism | 8a | workflows.md §Completion Criteria & Reports | F38, F27 |
+| X14 | Three-layer completion report wiring into INTEGRATE gates | mechanism | 8a | workflows.md §Completion Criteria & Reports | F38, F27 |
 | V19 | *(cross-ref §5 Events)* Batch completion event publishing | mechanism | 8a | events.md §Unified CEO Queue | Redis Streams |
 
 ### 14.3 Parallel Execution & Isolation
@@ -692,6 +704,8 @@ See component entries above for current counts. Use `grep -c '| [0-9]' 07-COMPON
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 2.6.0 | 2026-04-12 | S29 (research/source-evaluation) and S30 (research/citation-standards) moved from Phase 13 to Phase 7b — runtime dependencies for auto-research/auto-writer workflows |
+| 2.5.0 | 2026-04-12 | Phase 7b FRD back-propagation: 12 new components (F61-F71, F73); F53 consolidated (was duplicate of removed F72); gate rename (validator→gate) across all existing entries; F24→GateDefinition, F31→GateResult, F40→GateType, F41→GateSchedule; F54-F57/F60 updated to gate terminology; §Quality Gates source refs corrected; §Workflow Deactivation & Deletion source refs corrected |
 | 2.4.0 | 2026-04-12 | Phase 8a FRD back-propagation: X01 updated (Director-mediated entry, seven entry modes); X28-X30 added (three-layer pause/resume lifecycle); G30-G33 added (pause/resume routes); X31-X32 added (artifact storage); Sections 14.5 and 14.6 added. 9 new components |
 | 2.3.0 | 2026-04-12 | Phase 8a shaping: X20-X27 and CT04b added (project entity, Director creation tools, context recreation resume, project continuity); Section 14.4 added |
 | 2.1.0 | 2026-04-12 | Phase 8a split into 8a + 8b: Section 14 reorganized into phase-aligned subsections; 9 new components (X12-X16, X18-X19, G28-G29) |
@@ -709,5 +723,5 @@ See component entries above for current counts. Use `grep -c '| [0-9]' 07-COMPON
 
 ---
 
-*Document Version: 2.4.2*
+*Document Version: 2.6.0*
 *Last Updated: 2026-04-12*

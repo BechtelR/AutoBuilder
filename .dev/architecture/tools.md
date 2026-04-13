@@ -60,7 +60,7 @@ Each of these is a thin Python function (~5-30 lines) that ADK auto-wraps via `F
 
 All FunctionTools execute inside worker processes. They have direct access to the worker's filesystem and subprocess environment. The gateway never calls these tools directly -- it only enqueues workflow jobs that workers execute.
 
-**46 tools across 8 categories.**
+**47 tools across 8 categories.**
 
 ### 3.1 Filesystem Tools (10 tools)
 
@@ -229,7 +229,7 @@ def task_query(status: TaskStatus | None = None, assignee: str | None = None) ->
     """Query shared tasks with optional status filter and assignee."""
 ```
 
-### 3.7 PM Management Tools (6 tools)
+### 3.7 PM Management Tools (7 tools)
 
 | Tool | Status | Purpose |
 |------|--------|---------|
@@ -239,6 +239,7 @@ def task_query(status: TaskStatus | None = None, assignee: str | None = None) ->
 | `query_deliverables(project_id, status?)` | **New** | Query deliverable state |
 | `reorder_deliverables(project_id, order)` | **New** | Change execution priority |
 | `manage_dependencies(action: DependencyAction, source_id, target_id?)` | **New** | Add/remove/query deliverable deps |
+| `reconfigure_stage(target_stage, reason)` | **New** | Advance workflow to next sequential stage |
 
 ```python
 def select_ready_batch(project_id: str) -> str:
@@ -259,6 +260,9 @@ def reorder_deliverables(project_id: str, order: list[str]) -> str:
 
 def manage_dependencies(action: DependencyAction, source_id: str, target_id: str | None = None) -> str:
     """Add, remove, or query deliverable dependency relationships."""
+
+def reconfigure_stage(target_stage: str, reason: str) -> str:
+    """Advance the workflow to the next sequential stage with validation."""
 ```
 
 **Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment.
@@ -512,7 +516,7 @@ Within each tier, individual agents have scoping based on their role. The table 
 | `coder` | Full | Full | Full | Full | Full | Session todos | -- |
 | `reviewer` | Read-only | Full | -- | Read-only | Full | Session todos | -- |
 | `fixer` | Full | Full | `bash_exec` only | Read-only (no commit) | Full | Session todos | -- |
-| PM | -- | -- | -- | -- | -- | Shared tasks | PM tools (6) |
+| PM | -- | -- | -- | -- | -- | Shared tasks | PM tools (7) |
 | Director | -- | -- | -- | -- | -- | Shared tasks | Director tools (10) |
 
 **Detailed per-role breakdown:**
@@ -521,7 +525,7 @@ Within each tier, individual agents have scoping based on their role. The table 
 - **`coder`** (worker): Full filesystem (all 10), full code intelligence (2), full execution (`bash_exec`, `http_request`), full git (all 8), full web (2), session todos (3)
 - **`reviewer`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
 - **`fixer`** (worker): Full filesystem (all 10), full code intelligence (2), `bash_exec` (no `http_request`), read-only git (`git_status`, `git_diff`, `git_log`, `git_show` -- no `git_commit`, `git_branch`, `git_worktree`, `git_apply`; `coder` handles commits), `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
-- **PM**: `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`. Note: `checkpoint_project` (`after_agent_callback` on DeliverablePipeline) and `run_regression_tests` (`RegressionTestAgent`, CustomAgent in pipeline) are not tools -- they are not LLM-discretionary.
+- **PM**: `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `reconfigure_stage`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`. Note: `checkpoint_project` (`after_agent_callback` on DeliverablePipeline) and `run_regression_tests` (`RegressionTestAgent`, CustomAgent in pipeline) are not tools -- they are not LLM-discretionary.
 - **Director**: `create_project`, `validate_brief`, `check_resources`, `delegate_to_pm`, `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`
 
 `GlobalToolset.get_tools()` enforces this scoping at agent construction time, not through directory placement.
@@ -554,5 +558,5 @@ Director can author new tools (writes Python functions to the tools module). **C
 
 ---
 
-*Document Version: 4.1*
-*Last Updated: 2026-04-12*
+*Document Version: 4.2*
+*Last Updated: 2026-04-13*

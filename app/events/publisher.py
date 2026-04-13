@@ -12,7 +12,7 @@ from app.events.streams import stream_publish
 from app.gateway.models.events import PipelineEvent
 from app.lib.logging import get_logger
 from app.models.constants import TIER_PREFIX_WRITE_ACCESS
-from app.models.enums import AgentTier, PipelineEventType, SupervisionEventType
+from app.models.enums import AgentTier, PipelineEventType, ProjectStatus, SupervisionEventType
 
 logger = get_logger("events.publisher")
 
@@ -211,6 +211,146 @@ class EventPublisher:
         )
         await self.publish(event)
 
+    async def publish_batch_completed(
+        self,
+        workflow_id: str,
+        project_id: str,
+        deliverable_statuses: dict[str, str],
+        validator_results: dict[str, object] | None = None,
+        workflow_type: str | None = None,
+    ) -> None:
+        """Publish a BATCH_COMPLETED event with deliverable statuses and validator results."""
+        metadata: dict[str, object] = {
+            "project_id": project_id,
+            "deliverable_statuses": deliverable_statuses,
+            "validator_results": validator_results or {},
+        }
+        if workflow_type is not None:
+            metadata["workflow_type"] = workflow_type
+        await self.publish_lifecycle(
+            workflow_id=workflow_id,
+            event_type=PipelineEventType.BATCH_COMPLETED,
+            metadata=metadata,
+        )
+
+    async def publish_stage_completed(
+        self,
+        workflow_id: str,
+        project_id: str,
+        stage_name: str,
+        workflow_type: str | None = None,
+    ) -> None:
+        """Publish a STAGE_COMPLETED event on stage transitions."""
+        metadata: dict[str, object] = {
+            "project_id": project_id,
+            "stage_name": stage_name,
+        }
+        if workflow_type is not None:
+            metadata["workflow_type"] = workflow_type
+        await self.publish_lifecycle(
+            workflow_id=workflow_id,
+            event_type=PipelineEventType.STAGE_COMPLETED,
+            metadata=metadata,
+        )
+
+    async def publish_project_status_changed(
+        self,
+        workflow_id: str,
+        project_id: str,
+        old_status: ProjectStatus,
+        new_status: ProjectStatus,
+        actor: str | None = None,
+        scope: str | None = None,
+        workflow_type: str | None = None,
+    ) -> None:
+        """Publish a PROJECT_STATUS_CHANGED event on any project status change."""
+        metadata: dict[str, object] = {
+            "project_id": project_id,
+            "old_status": str(old_status),
+            "new_status": str(new_status),
+        }
+        if actor is not None:
+            metadata["actor"] = actor
+        if scope is not None:
+            metadata["scope"] = scope
+        if workflow_type is not None:
+            metadata["workflow_type"] = workflow_type
+        await self.publish_lifecycle(
+            workflow_id=workflow_id,
+            event_type=PipelineEventType.PROJECT_STATUS_CHANGED,
+            metadata=metadata,
+        )
+
+    async def publish_context_recreated(
+        self,
+        workflow_id: str,
+        project_id: str,
+        old_session_id: str,
+        new_session_id: str,
+        seeded_keys: list[str],
+        remaining_stages: list[str],
+        workflow_type: str | None = None,
+    ) -> None:
+        """Publish a CONTEXT_RECREATED event with old/new session IDs."""
+        metadata: dict[str, object] = {
+            "project_id": project_id,
+            "old_session_id": old_session_id,
+            "new_session_id": new_session_id,
+            "seeded_keys": seeded_keys,
+            "remaining_stages": remaining_stages,
+        }
+        if workflow_type is not None:
+            metadata["workflow_type"] = workflow_type
+        await self.publish_lifecycle(
+            workflow_id=workflow_id,
+            event_type=PipelineEventType.CONTEXT_RECREATED,
+            metadata=metadata,
+        )
+
+    def queue_tool_access_violation(
+        self,
+        agent_name: str,
+        role: str,
+        denied_tools: list[str],
+        workflow_id: str = "",
+    ) -> None:
+        """Log and queue a tool access scope violation for async publishing."""
+        logger.warning(
+            "Tool access violation (queued): agent=%s role=%s denied_tools=%s",
+            agent_name,
+            role,
+            denied_tools,
+        )
+        self._pending_violations.append(
+            {
+                "workflow_id": workflow_id,
+                "author_name": agent_name,
+                "author_tier": role,
+                "unauthorized_keys": denied_tools,
+                "all_keys": [],
+                "_violation_type": "tool_access",
+            }
+        )
+
+    async def publish_tool_access_violation(
+        self,
+        workflow_id: str,
+        agent_name: str,
+        role: str,
+        denied_tools: list[str],
+    ) -> None:
+        """Publish a tool access scope violation as an ERROR event."""
+        await self.publish_lifecycle(
+            workflow_id=workflow_id,
+            event_type=PipelineEventType.ERROR,
+            metadata={
+                "violation": SupervisionEventType.TOOL_ACCESS_VIOLATION,
+                "agent_name": agent_name,
+                "role": role,
+                "denied_tools": denied_tools,
+            },
+        )
+
     def _queue_state_auth_violation(
         self,
         workflow_id: str,
@@ -258,14 +398,22 @@ class EventPublisher:
         )
 
     async def flush_violations(self) -> None:
-        """Publish all queued state auth violations."""
+        """Publish all queued violations (state auth and tool access)."""
         violations = self._pending_violations.copy()
         self._pending_violations.clear()
         for v in violations:
-            await self.publish_state_auth_violation(
-                workflow_id=v["workflow_id"],  # type: ignore[arg-type]
-                author_name=v["author_name"],  # type: ignore[arg-type]
-                author_tier=AgentTier(v["author_tier"]),
-                unauthorized_keys=v["unauthorized_keys"],  # type: ignore[arg-type]
-                all_keys=v["all_keys"],  # type: ignore[arg-type]
-            )
+            if v.get("_violation_type") == "tool_access":
+                await self.publish_tool_access_violation(
+                    workflow_id=v["workflow_id"],  # type: ignore[arg-type]
+                    agent_name=v["author_name"],  # type: ignore[arg-type]
+                    role=v["author_tier"],  # type: ignore[arg-type]
+                    denied_tools=v["unauthorized_keys"],  # type: ignore[arg-type]
+                )
+            else:
+                await self.publish_state_auth_violation(
+                    workflow_id=v["workflow_id"],  # type: ignore[arg-type]
+                    author_name=v["author_name"],  # type: ignore[arg-type]
+                    author_tier=AgentTier(v["author_tier"]),
+                    unauthorized_keys=v["unauthorized_keys"],  # type: ignore[arg-type]
+                    all_keys=v["all_keys"],  # type: ignore[arg-type]
+                )

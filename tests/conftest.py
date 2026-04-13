@@ -21,6 +21,7 @@ import pytest_asyncio  # noqa: E402
 from arq.connections import ArqRedis, create_pool  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from redis.asyncio import Redis  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncEngine,
     AsyncSession,
@@ -142,15 +143,22 @@ def pytest_configure(config: object) -> None:
 
 @pytest_asyncio.fixture
 async def engine() -> AsyncIterator[AsyncEngine]:
-    """Create async engine and tables, tear down after."""
+    """Create async engine, ensure tables exist, truncate between tests.
+
+    Uses TRUNCATE instead of DROP/CREATE SCHEMA for speed — schema is created
+    once and reused.  Tables are truncated in teardown for isolation.
+    """
     if not _pg_available:
         pytest.skip(f"PostgreSQL is not running on localhost:5432. {_INFRA_HINT}")
     eng = create_async_engine(TEST_DB_URL)
+    # Ensure schema + tables exist (idempotent — fast if already present)
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield eng
+    # Truncate all tables in one statement for isolation
+    table_names = ", ".join(t.name for t in Base.metadata.sorted_tables)
     async with eng.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.execute(text(f"TRUNCATE TABLE {table_names} CASCADE"))
     await eng.dispose()
 
 

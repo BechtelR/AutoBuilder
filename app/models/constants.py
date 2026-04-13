@@ -55,3 +55,16 @@ STAGE_INDEX: str = "pm:stage_index"
 STAGE_STATUS: str = "pm:stage_status"
 STAGE_COMPLETED_LIST: str = "pm:stages_completed"
 STAGE_WORKFLOW_STAGES: str = "pm:workflow_stages"
+
+# ---------------------------------------------------------------------------
+# Default workflow/pipeline constants (Phase 8a)
+# ---------------------------------------------------------------------------
+DEFAULT_WORKFLOW_NAME: str = "auto-code"
+DEFAULT_EDIT_STAGE_NAME: str = "build"
+
+# ---------------------------------------------------------------------------
+# Artifact entity_type identifiers (polymorphic association)
+# ---------------------------------------------------------------------------
+ARTIFACT_ENTITY_DELIVERABLE: str = "deliverable"
+ARTIFACT_ENTITY_TASKGROUP: str = "taskgroup_execution"
+ARTIFACT_ENTITY_STAGE: str = "stage_execution"

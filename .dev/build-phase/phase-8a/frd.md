@@ -26,17 +26,17 @@ Phase 8a connects all prior infrastructure — workflow composition (Phase 7a), 
 All work enters through the Director following the supervision hierarchy (CEO → Director → PM → Workers). The Director handles seven entry modes through chat sessions: new (shape from scratch), new-with-materials (evaluate and incorporate user artifacts), extend (add scope to existing project), edit (modify existing deliverables), re-run (same workflow, new inputs), direct execution (completed Brief submitted directly), and workstream (bounded task within a known project). Once a Brief is complete, the Director validates it, creates a Project, and delegates to a PM.
 
 **Requirements:**
-- [ ] **FR-8a.01**: When the CEO initiates a new project through a Director chat session, the Director conducts an intake conversation to understand the project intent, determines the entry mode, and shapes the conversation toward producing a validated Brief according to the target workflow's template.
-- [ ] **FR-8a.02**: When the Director determines the Brief is complete, it validates the Brief against the target workflow's `brief_template` definition. If the Brief fails validation, the Director communicates the specific deficiencies to the CEO and continues the conversation.
-- [ ] **FR-8a.03**: When a Brief passes validation and resources are verified, the Director creates a Project entity in the database with workflow type, brief content, initial status, and project configuration.
-- [ ] **FR-8a.04**: After project creation, the Director delegates to a PM by enqueuing a work session. The CEO is notified via the CEO queue that autonomous execution has begun.
-- [ ] **FR-8a.05**: When the CEO submits pre-existing artifacts (new-with-materials mode), the Director evaluates the submitted artifacts against workflow requirements and produces a Brief that incorporates them — proceeding to project creation without requiring a full shaping conversation.
-- [ ] **FR-8a.06**: When the CEO requests an extension or edit of an existing project, the Director analyzes the existing project state (deliverables, conventions, memory) and produces a Brief scoped to the requested changes, creating new work within the existing project rather than a new project.
-- [ ] **FR-8a.07**: When the CEO requests a re-run of a workflow with new inputs, the Director creates a new project using the same workflow type with the new input parameters.
-- [ ] **FR-8a.08**: When the CEO submits a completed Brief directly (direct execution mode), the Director validates it against the workflow template without requiring a shaping conversation. If valid, the Director proceeds directly to project creation.
-- [ ] **FR-8a.09**: When the CEO routes a bounded task within a known project (workstream mode), the Director identifies the target project and PM, and creates a scoped Brief for the specific task without full project initialization.
-- [ ] **FR-8a.10a**: When workflow resolution is ambiguous (multiple workflows match the user's intent), the Director presents the options to the CEO and waits for clarification before proceeding.
-- [ ] **FR-8a.10b**: When no matching workflow can be resolved for the Brief, the Director surfaces an error to the CEO listing available workflow types and their descriptions.
+- [x] **FR-8a.01**: When the CEO initiates a new project through a Director chat session, the Director conducts an intake conversation to understand the project intent, determines the entry mode, and shapes the conversation toward producing a validated Brief according to the target workflow's template.
+- [x] **FR-8a.02**: When the Director determines the Brief is complete, it validates the Brief against the target workflow's `brief_template` definition. If the Brief fails validation, the Director communicates the specific deficiencies to the CEO and continues the conversation.
+- [x] **FR-8a.03**: When a Brief passes validation and resources are verified, the Director creates a Project entity in the database with workflow type, brief content, initial status, and project configuration.
+- [x] **FR-8a.04**: After project creation, the Director delegates to a PM by enqueuing a work session. The CEO is notified via the CEO queue that autonomous execution has begun.
+- [x] **FR-8a.05**: When the CEO submits pre-existing artifacts (new-with-materials mode), the Director evaluates the submitted artifacts against workflow requirements and produces a Brief that incorporates them — proceeding to project creation without requiring a full shaping conversation.
+- [x] **FR-8a.06**: When the CEO requests an extension or edit of an existing project, the Director analyzes the existing project state (deliverables, conventions, memory) and produces a Brief scoped to the requested changes, creating new work within the existing project rather than a new project.
+- [x] **FR-8a.07**: When the CEO requests a re-run of a workflow with new inputs, the Director creates a new project using the same workflow type with the new input parameters.
+- [x] **FR-8a.08**: When the CEO submits a completed Brief directly (direct execution mode), the Director validates it against the workflow template without requiring a shaping conversation. If valid, the Director proceeds directly to project creation.
+- [x] **FR-8a.09**: When the CEO routes a bounded task within a known project (workstream mode), the Director identifies the target project and PM, and creates a scoped Brief for the specific task without full project initialization.
+- [x] **FR-8a.10a**: When workflow resolution is ambiguous (multiple workflows match the user's intent), the Director presents the options to the CEO and waits for clarification before proceeding.
+- [x] **FR-8a.10b**: When no matching workflow can be resolved for the Brief, the Director surfaces an error to the CEO listing available workflow types and their descriptions.
 
 ---
 
@@ -45,10 +45,10 @@ All work enters through the Director following the supervision hierarchy (CEO �
 Before execution begins, the system validates the Brief against the workflow's template and verifies all required resources. Validation failures surface immediately. Execution never begins with missing resources.
 
 **Requirements:**
-- [ ] **FR-8a.10**: When a Brief is submitted for execution, the system validates all required fields defined in the workflow's `brief_template`. Missing or invalid fields produce a structured validation error listing each deficiency.
-- [ ] **FR-8a.11**: Before the first deliverable is dispatched, the system validates all resources declared in the workflow manifest's `resources` field: credentials are present and non-empty, services are reachable, and knowledge files or directories exist.
-- [ ] **FR-8a.12**: When any pre-execution resource check fails, the system surfaces the failure to the CEO queue immediately with specific details of what is missing and how to resolve it. Execution does not begin until all resources are validated.
-- [ ] **FR-8a.13**: When all resource checks pass, the system records the validation results as audit events. Resource failures declared in the manifest never occur mid-run.
+- [x] **FR-8a.10**: When a Brief is submitted for execution, the system validates all required fields defined in the workflow's `brief_template`. Missing or invalid fields produce a structured validation error listing each deficiency.
+- [x] **FR-8a.11**: Before the first deliverable is dispatched, the system validates all resources declared in the workflow manifest's `resources` field: credentials are present and non-empty, services are reachable, and knowledge files or directories exist.
+- [x] **FR-8a.12**: When any pre-execution resource check fails, the system surfaces the failure to the CEO queue immediately with specific details of what is missing and how to resolve it. Execution does not begin until all resources are validated.
+- [x] **FR-8a.13**: When all resource checks pass, the system records the validation results as audit events. Resource failures declared in the manifest never occur mid-run.
 
 ---
 
@@ -61,25 +61,25 @@ All PM and Director management operations persist durably and produce consistent
 - **Shared**: create task, update task, query tasks
 
 **Requirements:**
-- [ ] **FR-8a.14**: When the PM calls `select_ready_batch`, the system queries deliverable records in the database, evaluates the dependency graph, and returns the set of deliverables whose dependencies are all satisfied, ordered by topological sort.
-- [ ] **FR-8a.15**: When the PM calls `update_deliverable`, the system writes the status change and optional result data to the deliverable's database record. Valid statuses: PLANNED, IN_PROGRESS, COMPLETE, FAILED, SKIPPED.
-- [ ] **FR-8a.16**: When the PM calls `query_deliverables`, the system returns deliverable records from the database filtered by requested criteria (status, project, stage, TaskGroup).
-- [ ] **FR-8a.17**: When the PM calls `reorder_deliverables`, the system updates the execution order of deliverables within a TaskGroup in the database.
-- [ ] **FR-8a.18**: When the PM calls `manage_dependencies`, the system adds, removes, or queries dependency edges between deliverables in the database. Circular dependencies are detected and rejected.
-- [ ] **FR-8a.19**: When the PM or Director calls `query_dependency_graph`, the system returns the full dependency graph for a project's deliverables including the status of each node and any cycles detected.
-- [ ] **FR-8a.20**: When a PM or Worker calls `escalate_to_director`, the system creates a `DirectorQueueItem` record in the database with escalation type, priority, context, and source information. The item is immediately visible via Director queue routes.
-- [ ] **FR-8a.21**: When the Director calls `escalate_to_ceo`, the system creates a `CeoQueueItem` record in the database with item type, priority, context, and source information. The item is immediately visible via existing CEO queue routes.
-- [ ] **FR-8a.22**: When the Director calls `list_projects`, the system returns all project records with current status, workflow type, stage, and cost summary.
-- [ ] **FR-8a.23**: When the Director calls `query_project_status`, the system returns comprehensive project status: deliverable counts by status, current stage, active TaskGroup, pending escalations, accumulated cost, and wall-clock duration.
-- [ ] **FR-8a.24**: When the Director calls `override_pm`, the system applies the requested action (pause, resume, reorder, correct) to the PM's execution state for the specified project and records the override as an audit event.
-- [ ] **FR-8a.25**: When any agent calls `task_create`, `task_update`, or `task_query`, the system creates, updates, or queries task records in the database.
-- [ ] **FR-8a.26**: All management tools access persistent storage through a uniform mechanism. No tool uses an alternative persistence path.
-- [ ] **FR-8a.27**: When a management tool's database operation fails, the tool returns a structured error with an error code and description. No tool returns placeholder strings or succeeds silently on failure.
-- [ ] **FR-8a.28**: When the Director calls `create_project`, the system creates a project record in the database with workflow type, brief content, initial configuration, and SHAPING status.
-- [ ] **FR-8a.29**: When the Director calls `validate_brief`, the system validates the brief content against the resolved workflow's `brief_template` and returns a structured pass/fail result with per-field details.
-- [ ] **FR-8a.30**: When the Director calls `check_resources`, the system verifies all resource requirements from the workflow manifest and returns a structured result indicating which resources passed and which failed.
-- [ ] **FR-8a.31**: When the Director calls `delegate_to_pm`, the system enqueues a work session for the specified project. The project status transitions from SHAPING to ACTIVE.
-- [ ] **FR-8a.32**: When the PM calls `checkpoint_project`, the system persists critical state (deliverable statuses, stage progress, accumulated cost) at the current TaskGroup boundary as a durable checkpoint.
+- [x] **FR-8a.14**: When the PM calls `select_ready_batch`, the system queries deliverable records in the database, evaluates the dependency graph, and returns the set of deliverables whose dependencies are all satisfied, ordered by topological sort.
+- [x] **FR-8a.15**: When the PM calls `update_deliverable`, the system writes the status change and optional result data to the deliverable's database record. Valid statuses: PLANNED, IN_PROGRESS, COMPLETED, FAILED, SKIPPED.
+- [x] **FR-8a.16**: When the PM calls `query_deliverables`, the system returns deliverable records from the database filtered by requested criteria (status, project, stage, TaskGroup).
+- [x] **FR-8a.17**: When the PM calls `reorder_deliverables`, the system updates the execution order of deliverables within a TaskGroup in the database.
+- [x] **FR-8a.18**: When the PM calls `manage_dependencies`, the system adds, removes, or queries dependency edges between deliverables in the database. Circular dependencies are detected and rejected.
+- [x] **FR-8a.19**: When the PM or Director calls `query_dependency_graph`, the system returns the full dependency graph for a project's deliverables including the status of each node and any cycles detected.
+- [x] **FR-8a.20**: When a PM or Worker calls `escalate_to_director`, the system creates a `DirectorQueueItem` record in the database with escalation type, priority, context, and source information. The item is immediately visible via Director queue routes.
+- [x] **FR-8a.21**: When the Director calls `escalate_to_ceo`, the system creates a `CeoQueueItem` record in the database with item type, priority, context, and source information. The item is immediately visible via existing CEO queue routes.
+- [x] **FR-8a.22**: When the Director calls `list_projects`, the system returns all project records with current status, workflow type, stage, and cost summary.
+- [x] **FR-8a.23**: When the Director calls `query_project_status`, the system returns comprehensive project status: deliverable counts by status, current stage, active TaskGroup, pending escalations, accumulated cost, and wall-clock duration.
+- [x] **FR-8a.24**: When the Director calls `override_pm`, the system applies the requested action (pause, resume, reorder, correct) to the PM's execution state for the specified project and records the override as an audit event.
+- [x] **FR-8a.25**: When any agent calls `task_create`, `task_update`, or `task_query`, the system creates, updates, or queries task records in the database.
+- [x] **FR-8a.26**: All management tools access persistent storage through a uniform mechanism. No tool uses an alternative persistence path.
+- [x] **FR-8a.27**: When a management tool's database operation fails, the tool returns a structured error with an error code and description. No tool returns placeholder strings or succeeds silently on failure.
+- [x] **FR-8a.28**: When the Director calls `create_project`, the system creates a project record in the database with workflow type, brief content, initial configuration, and SHAPING status.
+- [x] **FR-8a.29**: When the Director calls `validate_brief`, the system validates the brief content against the resolved workflow's `brief_template` and returns a structured pass/fail result with per-field details.
+- [x] **FR-8a.30**: When the Director calls `check_resources`, the system verifies all resource requirements from the workflow manifest and returns a structured result indicating which resources passed and which failed.
+- [x] **FR-8a.31**: When the Director calls `delegate_to_pm`, the system enqueues a work session for the specified project. The project status transitions from SHAPING to ACTIVE.
+- [x] **FR-8a.32**: When the PM calls `checkpoint_project`, the system persists critical state (deliverable statuses, stage progress, accumulated cost) at the current TaskGroup boundary as a durable checkpoint.
 
 ---
 
@@ -88,11 +88,11 @@ All PM and Director management operations persist durably and produce consistent
 The CEO can list and resolve Director queue items. Escalation tools create real queue records. The Director manages its own queue during standard operations. The CEO has override access for oversight.
 
 **Requirements:**
-- [ ] **FR-8a.33**: When the CEO requests the Director queue listing, the system returns all `DirectorQueueItem` records filtered by status and sorted by priority descending then creation time ascending.
-- [ ] **FR-8a.34**: When the CEO resolves a Director queue item, the system updates the item's status to RESOLVED, records the resolution text and resolver identity, and timestamps the action.
-- [ ] **FR-8a.35**: When the CEO forwards a Director queue item to the CEO queue, the system creates a corresponding `CeoQueueItem` with the original context preserved plus the forwarding rationale, and marks the Director queue item as FORWARDED_TO_CEO.
-- [ ] **FR-8a.36**: When `escalate_to_director` is called, the created `DirectorQueueItem` is visible via the Director queue gateway route immediately after the database transaction commits.
-- [ ] **FR-8a.37**: When `escalate_to_ceo` is called, the created `CeoQueueItem` is visible via the existing CEO queue gateway routes immediately after the database transaction commits.
+- [x] **FR-8a.33**: When the CEO requests the Director queue listing, the system returns all `DirectorQueueItem` records filtered by status and sorted by priority descending then creation time ascending.
+- [x] **FR-8a.34**: When the CEO resolves a Director queue item, the system updates the item's status to RESOLVED, records the resolution text and resolver identity, and timestamps the action.
+- [x] **FR-8a.35**: When the CEO forwards a Director queue item to the CEO queue, the system creates a corresponding `CeoQueueItem` with the original context preserved plus the forwarding rationale, and marks the Director queue item as FORWARDED_TO_CEO.
+- [x] **FR-8a.36**: When `escalate_to_director` is called, the created `DirectorQueueItem` is visible via the Director queue gateway route immediately after the database transaction commits.
+- [x] **FR-8a.37**: When `escalate_to_ceo` is called, the created `CeoQueueItem` is visible via the existing CEO queue gateway routes immediately after the database transaction commits.
 
 ---
 
@@ -101,11 +101,11 @@ The CEO can list and resolve Director queue items. Escalation tools create real 
 The Director execution turn triages the backlog: reads pending Director queue items, resolves items within its authority, and forwards items beyond its authority to the CEO queue. The Director monitors all active projects and can intervene at any point.
 
 **Requirements:**
-- [ ] **FR-8a.38**: When the Director execution turn runs, it reads all pending `DirectorQueueItem` records, prioritized by escalation priority (CRITICAL > HIGH > NORMAL > LOW) then creation time.
-- [ ] **FR-8a.39**: When the Director encounters an item within its decision scope (status reports, resource requests within its authority, pattern alerts with known resolution), it resolves the item autonomously and records the resolution.
-- [ ] **FR-8a.40**: When the Director encounters an item beyond its authority (CEO-level decisions, cost ceiling overrides, project abort requests), it forwards the item to the CEO queue with its assessment and recommended resolution options.
-- [ ] **FR-8a.41**: When the Director detects cross-project patterns (multiple projects escalating similar failures, systemic resource issues), it surfaces a pattern alert to the CEO queue with aggregated evidence.
-- [ ] **FR-8a.42**: When the Director backlog turn completes with no pending items, the loop yields until new items arrive via the existing `process_director_queue` cron mechanism.
+- [x] **FR-8a.38**: When the Director execution turn runs, it reads all pending `DirectorQueueItem` records, prioritized by escalation priority (CRITICAL > HIGH > NORMAL > LOW) then creation time.
+- [x] **FR-8a.39**: When the Director encounters an item within its decision scope (status reports, resource requests within its authority, pattern alerts with known resolution), it resolves the item autonomously and records the resolution.
+- [x] **FR-8a.40**: When the Director encounters an item beyond its authority (CEO-level decisions, cost ceiling overrides, project abort requests), it forwards the item to the CEO queue with its assessment and recommended resolution options.
+- [x] **FR-8a.41**: When the Director detects cross-project patterns (multiple projects escalating similar failures, systemic resource issues), it surfaces a pattern alert to the CEO queue with aggregated evidence.
+- [x] **FR-8a.42**: When the Director backlog turn completes with no pending items, the loop yields until new items arrive via the existing `process_director_queue` cron mechanism.
 
 ---
 
@@ -114,18 +114,18 @@ The Director execution turn triages the backlog: reads pending Director queue it
 The PM drives execution through workflow stages following the hierarchy: Stage → TaskGroup → Batch → Deliverable. Within each stage, the PM creates TaskGroups, selects dependency-ordered batches, executes deliverables sequentially (Phase 8a), runs validators at configured schedules, and checkpoints at TaskGroup completion. Stage transitions are PM-driven and gated by completion verification.
 
 **Requirements:**
-- [ ] **FR-8a.43**: When a work session begins, the PM initializes from the workflow's stage schema and determines the starting point — either the first stage for new projects, or the stage and TaskGroup from a resumed checkpoint for continuing projects.
-- [ ] **FR-8a.44**: Within each stage, the PM creates TaskGroups as runtime planning units. Each TaskGroup represents a bounded scope of autonomous work and contains one or more batches of deliverables.
-- [ ] **FR-8a.45**: Within each TaskGroup, the PM calls `select_ready_batch` to obtain the next set of dependency-ready deliverables and executes them sequentially — one deliverable at a time. Each deliverable passes through the full pipeline: skill loading → memory loading → planning → execution → validation → review.
-- [ ] **FR-8a.46**: After each deliverable completes, the system runs validators at the `PER_DELIVERABLE` schedule. After each batch completes, the system runs validators at the `PER_BATCH` schedule. At TaskGroup completion, all `PER_TASKGROUP` validators run. At stage completion, all `PER_STAGE` validators run.
-- [ ] **FR-8a.47**: Scheduled validators are mandatory pipeline steps. The PM cannot skip, defer, or override validator execution regardless of deliverable outcome.
-- [ ] **FR-8a.48**: After each successful deliverable, the system checkpoints state. A system crash cannot cause a checkpointed deliverable to re-execute.
-- [ ] **FR-8a.49**: When all deliverables in a TaskGroup are complete and all scheduled validators pass, the PM signals TaskGroup completion. The Director approves the TaskGroup (or escalates to CEO if required), a TaskGroup-scoped completion report is generated, and project-scope context is written.
-- [ ] **FR-8a.50**: When a stage's completion criteria are met and `verify_stage_completion` passes, the PM calls `reconfigure_stage` to advance to the next stage. Stage transitions are forward-only and sequential — no skipping, no backtracking.
-- [ ] **FR-8a.51**: The PM publishes a batch completion event to Redis Streams after each batch completes, including deliverable statuses and validator results.
-- [ ] **FR-8a.52**: The execution loop continues autonomously — selecting batches, executing, validating, checkpointing — until all stages complete or work is escalated beyond the PM's authority.
-- [ ] **FR-8a.53**: Between batches, the PM reasons about execution state: retry a failed deliverable, reorder remaining work, skip a blocked deliverable, or escalate. This inter-batch reasoning is observable in the event stream.
-- [ ] **FR-8a.54**: The PM enforces per-project cost ceilings. When accumulated cost exceeds the project's configured cost ceiling, execution pauses and escalates to the Director.
+- [x] **FR-8a.43**: When a work session begins, the PM initializes from the workflow's stage schema and determines the starting point — either the first stage for new projects, or the stage and TaskGroup from a resumed checkpoint for continuing projects.
+- [x] **FR-8a.44**: Within each stage, the PM creates TaskGroups as runtime planning units. Each TaskGroup represents a bounded scope of autonomous work and contains one or more batches of deliverables.
+- [x] **FR-8a.45**: Within each TaskGroup, the PM calls `select_ready_batch` to obtain the next set of dependency-ready deliverables and executes them sequentially — one deliverable at a time. Each deliverable passes through the full pipeline: skill loading → memory loading → planning → execution → validation → review.
+- [x] **FR-8a.46**: After each deliverable completes, the system runs validators at the `PER_DELIVERABLE` schedule. After each batch completes, the system runs validators at the `PER_BATCH` schedule. At TaskGroup completion, all `PER_TASKGROUP` validators run. At stage completion, all `PER_STAGE` validators run.
+- [x] **FR-8a.47**: Scheduled validators are mandatory pipeline steps. The PM cannot skip, defer, or override validator execution regardless of deliverable outcome.
+- [x] **FR-8a.48**: After each successful deliverable, the system checkpoints state. A system crash cannot cause a checkpointed deliverable to re-execute.
+- [x] **FR-8a.49**: When all deliverables in a TaskGroup are complete and all scheduled validators pass, the PM signals TaskGroup completion. The Director approves the TaskGroup (or escalates to CEO if required), a TaskGroup-scoped completion report is generated, and project-scope context is written.
+- [x] **FR-8a.50**: When a stage's completion criteria are met and `verify_stage_completion` passes, the PM calls `reconfigure_stage` to advance to the next stage. Stage transitions are forward-only and sequential — no skipping, no backtracking.
+- [x] **FR-8a.51**: The PM publishes a batch completion event to Redis Streams after each batch completes, including deliverable statuses and validator results.
+- [x] **FR-8a.52**: The execution loop continues autonomously — selecting batches, executing, validating, checkpointing — until all stages complete or work is escalated beyond the PM's authority.
+- [x] **FR-8a.53**: Between batches, the PM reasons about execution state: retry a failed deliverable, reorder remaining work, skip a blocked deliverable, or escalate. This inter-batch reasoning is observable in the event stream.
+- [x] **FR-8a.54**: The PM enforces per-project cost ceilings. When accumulated cost exceeds the project's configured cost ceiling, execution pauses and escalates to the Director.
 
 ---
 
@@ -134,13 +134,13 @@ The PM drives execution through workflow stages following the hierarchy: Stage �
 Failed deliverables do not block independent work. The PM retries within limits, skips blocked paths, reorders around failures, and escalates when budget is exhausted. Only the directly blocked path suspends; unblocked work continues.
 
 **Requirements:**
-- [ ] **FR-8a.55**: When a deliverable fails, the PM retries it up to the configured per-deliverable retry limit. Each retry is logged as an event with the attempt number and failure reason.
-- [ ] **FR-8a.56**: When a deliverable exhausts its retry budget, the PM marks it as FAILED and evaluates the dependency graph to identify which remaining deliverables are blocked vs. independent.
-- [ ] **FR-8a.57**: Failed deliverables do not block deliverables that have no dependency path through the failed one. The PM continues execution with all unblocked work.
-- [ ] **FR-8a.58**: The PM reorders remaining work to maximize progress — executing independent deliverables before returning to blocked paths.
-- [ ] **FR-8a.59**: When the PM cannot resolve a failure autonomously, it escalates to the Director via `escalate_to_director` with failure context, validator evidence, and attempted remediation history.
-- [ ] **FR-8a.60**: When a CEO queue escalation is resolved, the resolution is applied back into the work queue and the suspended path resumes immediately without restarting the project or re-executing verified deliverables.
-- [ ] **FR-8a.61**: Remediation re-executes only the failed deliverable and its direct dependents. Verified independent deliverables are never re-executed.
+- [x] **FR-8a.55**: When a deliverable fails, the PM retries it up to the configured per-deliverable retry limit. Each retry is logged as an event with the attempt number and failure reason.
+- [x] **FR-8a.56**: When a deliverable exhausts its retry budget, the PM marks it as FAILED and evaluates the dependency graph to identify which remaining deliverables are blocked vs. independent.
+- [x] **FR-8a.57**: Failed deliverables do not block deliverables that have no dependency path through the failed one. The PM continues execution with all unblocked work.
+- [x] **FR-8a.58**: The PM reorders remaining work to maximize progress — executing independent deliverables before returning to blocked paths.
+- [x] **FR-8a.59**: When the PM cannot resolve a failure autonomously, it escalates to the Director via `escalate_to_director` with failure context, validator evidence, and attempted remediation history.
+- [x] **FR-8a.60**: When a CEO queue escalation is resolved, the resolution is applied back into the work queue and the suspended path resumes immediately without restarting the project or re-executing verified deliverables.
+- [x] **FR-8a.61**: Remediation re-executes only the failed deliverable and its direct dependents. Verified independent deliverables are never re-executed.
 
 ---
 
@@ -149,11 +149,11 @@ Failed deliverables do not block independent work. The PM retries within limits,
 When consecutive batch failures exceed a configured threshold, the Director suspends the project and surfaces findings to the CEO queue. No autonomous repair beyond the threshold.
 
 **Requirements:**
-- [ ] **FR-8a.62**: The system tracks consecutive batch failures per project. When the count exceeds the configured threshold, the PM escalates to the Director and the Director suspends the project.
-- [ ] **FR-8a.63**: When the Director suspends a project, it diagnoses the failure pattern — reviewing validator evidence, escalation history, and execution state — and surfaces findings and recommended options to the CEO queue.
-- [ ] **FR-8a.64**: The Director does not attempt autonomous repair beyond the batch failure threshold. The CEO must resolve the suspension via the CEO queue.
-- [ ] **FR-8a.65**: When the CEO resolves the suspension, the Director resumes the project from the last checkpoint. Verified deliverables are not re-executed.
-- [ ] **FR-8a.66**: A successful batch resets the consecutive failure counter to zero.
+- [x] **FR-8a.62**: The system tracks consecutive batch failures per project. When the count exceeds the configured threshold, the PM escalates to the Director and the Director suspends the project.
+- [x] **FR-8a.63**: When the Director suspends a project, it diagnoses the failure pattern — reviewing validator evidence, escalation history, and execution state — and surfaces findings and recommended options to the CEO queue.
+- [x] **FR-8a.64**: The Director does not attempt autonomous repair beyond the batch failure threshold. The CEO must resolve the suspension via the CEO queue.
+- [x] **FR-8a.65**: When the CEO resolves the suspension, the Director resumes the project from the last checkpoint. Verified deliverables are not re-executed.
+- [x] **FR-8a.66**: A successful batch resets the consecutive failure counter to zero.
 
 ---
 
@@ -162,12 +162,12 @@ When consecutive batch failures exceed a configured threshold, the Director susp
 At TaskGroup and Stage completion, the system generates completion reports with three verification layers backed by machine-generated evidence from validators. All validator tools must be operational for reporting to be valid.
 
 **Requirements:**
-- [ ] **FR-8a.67**: At TaskGroup completion, the system generates a completion report with three verification layers: functional correctness (do deliverables work as specified?), architectural conformance (do deliverables match the documented architecture?), and contract completion (were all scoped deliverables completed?).
-- [ ] **FR-8a.68**: At Stage completion, the system generates a stage-scoped completion report with the same three layers, aggregating evidence from all TaskGroups within the stage.
-- [ ] **FR-8a.69**: Each verification layer contains machine-generated evidence from validator results. Assertion without evidence is never sufficient — a layer with no validator results is marked as unverified.
-- [ ] **FR-8a.70**: A TaskGroup cannot close while any deliverable is outstanding, any scheduled validator is failing, or any escalation is unresolved. These are hard gates regardless of workflow type.
-- [ ] **FR-8a.71**: Completion reports include: per-deliverable evidence, cost and token usage by agent tier, wall-clock duration, and a decision log distinguishing system-autonomous decisions from user-resolved decisions.
-- [ ] **FR-8a.72**: The INTEGRATE stage's CEO approval gate requires all three verification layers to pass before the stage (and project, if final) can be marked complete.
+- [x] **FR-8a.67**: At TaskGroup completion, the system generates a completion report with three verification layers: functional correctness (do deliverables work as specified?), architectural conformance (do deliverables match the documented architecture?), and contract completion (were all scoped deliverables completed?).
+- [x] **FR-8a.68**: At Stage completion, the system generates a stage-scoped completion report with the same three layers, aggregating evidence from all TaskGroups within the stage.
+- [x] **FR-8a.69**: Each verification layer contains machine-generated evidence from validator results. Assertion without evidence is never sufficient — a layer with no validator results is marked as unverified.
+- [x] **FR-8a.70**: A TaskGroup cannot close while any deliverable is outstanding, any scheduled validator is failing, or any escalation is unresolved. These are hard gates regardless of workflow type.
+- [x] **FR-8a.71**: Completion reports include: per-deliverable evidence, cost and token usage by agent tier, wall-clock duration, and a decision log distinguishing system-autonomous decisions from user-resolved decisions.
+- [x] **FR-8a.72**: The INTEGRATE stage's CEO approval gate requires all three verification layers to pass before the stage (and project, if final) can be marked complete.
 
 ---
 
@@ -176,10 +176,10 @@ At TaskGroup and Stage completion, the system generates completion reports with 
 Projects are first-order persistent entities. All deliverables, queue items, stage executions, and configurations relate to a project. The project is the anchor for the entire execution lifecycle.
 
 **Requirements:**
-- [ ] **FR-8a.73**: The system maintains projects as first-order persistent entities. Each project record tracks: unique identifier, name, workflow type, brief content, current status, current stage, active TaskGroup, accumulated cost, and timestamps (created, updated, started, completed).
-- [ ] **FR-8a.74**: Project status values include: SHAPING (Director is creating the Brief), ACTIVE (PM is executing), PAUSED (user-initiated suspension at next checkpoint), SUSPENDED (Director-initiated due to batch failure threshold), COMPLETED (all stages passed), ABORTED (terminated with reason recorded).
-- [ ] **FR-8a.75**: All deliverables, stage executions, TaskGroup executions, Director queue items, CEO queue items, and project configs reference their parent project.
-- [ ] **FR-8a.76**: When a project's status changes, the system publishes a status change event to Redis Streams and updates the project record's timestamp.
+- [x] **FR-8a.73**: The system maintains projects as first-order persistent entities. Each project record tracks: unique identifier, name, workflow type, brief content, current status, current stage, active TaskGroup, accumulated cost, and timestamps (created, updated, started, completed).
+- [x] **FR-8a.74**: Project status values include: SHAPING (Director is creating the Brief), ACTIVE (PM is executing), PAUSED (user-initiated suspension at next checkpoint), SUSPENDED (Director-initiated due to batch failure threshold), COMPLETED (all stages passed), ABORTED (terminated with reason recorded).
+- [x] **FR-8a.75**: All deliverables, stage executions, TaskGroup executions, Director queue items, CEO queue items, and project configs reference their parent project.
+- [x] **FR-8a.76**: When a project's status changes, the system publishes a status change event to Redis Streams and updates the project record's timestamp.
 
 ---
 
@@ -188,11 +188,11 @@ Projects are first-order persistent entities. All deliverables, queue items, sta
 The CEO can query project status, workflow execution, deliverable details, queue state, and system health. This is the monitoring surface for tracking autonomous execution.
 
 **Requirements:**
-- [ ] **FR-8a.77**: When the CEO queries a project's execution status, the system returns the current stage, active TaskGroup, deliverable progress counts (by status), pending escalation count, and accumulated cost.
-- [ ] **FR-8a.78**: When the CEO queries deliverables, the system returns deliverable records with status filtering (by status, project, stage, TaskGroup) and includes dependency information.
-- [ ] **FR-8a.79**: When the CEO queries a specific deliverable, the system returns the full record including dependencies, validator results, execution history, artifact references, and retry count.
-- [ ] **FR-8a.80**: The Director queue state is queryable via API (pending, in-progress, and resolved items with filtering). The CEO queue state is queryable via existing API routes.
-- [ ] **FR-8a.81**: Every queued work item — pending, in-progress, or blocked — is visible to the CEO at all times. No work executes invisibly.
+- [x] **FR-8a.77**: When the CEO queries a project's execution status, the system returns the current stage, active TaskGroup, deliverable progress counts (by status), pending escalation count, and accumulated cost.
+- [x] **FR-8a.78**: When the CEO queries deliverables, the system returns deliverable records with status filtering (by status, project, stage, TaskGroup) and includes dependency information.
+- [x] **FR-8a.79**: When the CEO queries a specific deliverable, the system returns the full record including dependencies, validator results, execution history, artifact references, and retry count.
+- [x] **FR-8a.80**: The Director queue state is queryable via API (pending, in-progress, and resolved items with filtering). The CEO queue state is queryable via existing API routes.
+- [x] **FR-8a.81**: Every queued work item — pending, in-progress, or blocked — is visible to the CEO at all times. No work executes invisibly.
 
 ---
 
@@ -201,10 +201,10 @@ The CEO can query project status, workflow execution, deliverable details, queue
 When context budget is exceeded during execution, the system saves critical state at the TaskGroup boundary, creates a fresh session, and resumes without re-executing verified work. The checkpoint/resume boundary is the TaskGroup.
 
 **Requirements:**
-- [ ] **FR-8a.82**: When context budget exceeds the configured threshold during execution, the system saves critical state (deliverable statuses, PM-tier state, project config, stage progress, loaded skill names) at the current TaskGroup boundary.
-- [ ] **FR-8a.83**: The system creates a fresh execution context seeded with the critical state and resumes execution from the next unfinished TaskGroup. No lossy summarization occurs — context is reconstructed from durable stores (state, skills, instruction fragments).
-- [ ] **FR-8a.84**: Verified deliverables within completed TaskGroups are never re-executed after context recreation. Mid-work batches within an interrupted TaskGroup are rediscovered during resume via `select_ready_batch`.
-- [ ] **FR-8a.85**: Context recreation publishes observable events (at initiation and completion) including the old session ID, new session ID, seeded keys, and remaining stages.
+- [x] **FR-8a.82**: When context budget exceeds the configured threshold during execution, the system saves critical state (deliverable statuses, PM-tier state, project config, stage progress, loaded skill names) at the current TaskGroup boundary.
+- [x] **FR-8a.83**: The system creates a fresh execution context seeded with the critical state and resumes execution from the next unfinished TaskGroup. No lossy summarization occurs — context is reconstructed from durable stores (state, skills, instruction fragments).
+- [x] **FR-8a.84**: Verified deliverables within completed TaskGroups are never re-executed after context recreation. Mid-work batches within an interrupted TaskGroup are rediscovered during resume via `select_ready_batch`.
+- [x] **FR-8a.85**: Context recreation publishes observable events (at initiation and completion) including the old session ID, new session ID, seeded keys, and remaining stages.
 
 ---
 
@@ -213,10 +213,10 @@ When context budget is exceeded during execution, the system saves critical stat
 Deliverable outputs and completion reports are stored as persistent, retrievable artifacts associated with their execution context. Artifacts support arbitrary file types.
 
 **Requirements:**
-- [ ] **FR-8a.86**: Deliverable outputs (code files, test results, review reports, build artifacts) are stored as persistent artifacts associated with the deliverable record.
-- [ ] **FR-8a.87**: Completion reports are stored as persistent artifacts associated with the TaskGroup or Stage execution record.
-- [ ] **FR-8a.88**: Artifacts support storage and retrieval of arbitrary file types produced during execution.
-- [ ] **FR-8a.89**: When the CEO queries a deliverable or execution record, the response includes artifact references (identifiers and metadata) for retrieval.
+- [x] **FR-8a.86**: Deliverable outputs (code files, test results, review reports, build artifacts) are stored as persistent artifacts associated with the deliverable record.
+- [x] **FR-8a.87**: Completion reports are stored as persistent artifacts associated with the TaskGroup or Stage execution record.
+- [x] **FR-8a.88**: Artifacts support storage and retrieval of arbitrary file types produced during execution.
+- [x] **FR-8a.89**: When the CEO queries a deliverable or execution record, the response includes artifact references (identifiers and metadata) for retrieval.
 
 ---
 
@@ -225,12 +225,12 @@ Deliverable outputs and completion reports are stored as persistent, retrievable
 Each workflow defines permitted edit operations. Edits are a continuous, any-time capability — not limited to post-completion. The CEO issues edits (single or batch) through the Director at any time, regardless of project state. The Director propagates edits down to the project, where they queue as new TaskGroups alongside any in-progress work. The PM handles newly queued work arriving mid-execution. Accumulated project context carries forward into edit work.
 
 **Requirements:**
-- [ ] **FR-8a.90**: Projects are living entities — queryable, observable, and modifiable through the Director at any time, in any project state (SHAPING, ACTIVE, PAUSED, SUSPENDED, COMPLETED).
-- [ ] **FR-8a.91**: Each workflow defines its permitted edit operations in the workflow manifest. For auto-code: add feature, remove feature, fix bug, refactor. For other workflows: operations appropriate to the domain.
-- [ ] **FR-8a.92**: When the CEO requests an edit through the Director, the Director creates new TaskGroups within the existing project. Edits issued during active execution queue alongside in-progress work. Edits issued during paused or suspended state queue for when execution resumes.
-- [ ] **FR-8a.92a**: When the CEO issues a batch edit (multiple edit operations at once), the Director processes them as a single coordinated action, creating appropriately ordered TaskGroups that respect inter-edit dependencies.
-- [ ] **FR-8a.92b**: The PM handles new TaskGroups arriving mid-execution. Newly queued edit work is incorporated into the PM's batch selection via `select_ready_batch` without interrupting the current deliverable.
-- [ ] **FR-8a.93**: Edit operations follow the same execution loop (Stage → TaskGroup → Batch → Deliverable) with the same validation, checkpointing, and completion reporting as initial project execution. The project's accumulated context (conventions, architectural decisions, resolved escalations) carries forward into edit work.
+- [x] **FR-8a.90**: Projects are living entities — queryable, observable, and modifiable through the Director at any time, in any project state (SHAPING, ACTIVE, PAUSED, SUSPENDED, COMPLETED).
+- [x] **FR-8a.91**: Each workflow defines its permitted edit operations in the workflow manifest. For auto-code: add feature, remove feature, fix bug, refactor. For other workflows: operations appropriate to the domain.
+- [x] **FR-8a.92**: When the CEO requests an edit through the Director, the Director creates new TaskGroups within the existing project. Edits issued during active execution queue alongside in-progress work. Edits issued during paused or suspended state queue for when execution resumes.
+- [x] **FR-8a.92a**: When the CEO issues a batch edit (multiple edit operations at once), the Director processes them as a single coordinated action, creating appropriately ordered TaskGroups that respect inter-edit dependencies.
+- [x] **FR-8a.92b**: The PM handles new TaskGroups arriving mid-execution. Newly queued edit work is incorporated into the PM's batch selection via `select_ready_batch` without interrupting the current deliverable.
+- [x] **FR-8a.93**: Edit operations follow the same execution loop (Stage → TaskGroup → Batch → Deliverable) with the same validation, checkpointing, and completion reporting as initial project execution. The project's accumulated context (conventions, architectural decisions, resolved escalations) carries forward into edit work.
 ---
 
 ### CAP-15: Work Layer Pause & Resume Lifecycle
@@ -240,32 +240,32 @@ Every work layer — individual project, all projects, and the Director — supp
 **Requirements:**
 
 **Project-level:**
-- [ ] **FR-8a.94**: When the CEO pauses a project, the PM completes the current deliverable (if in progress), saves all critical state at the next checkpoint boundary, logs the pause reason, and stops execution. No work is left in an inconsistent state.
-- [ ] **FR-8a.95**: When the CEO resumes a paused project, the system loads the project's persisted state, rebuilds the PM's execution context (skills, instruction fragments, stage configuration), and resumes the batch loop from the checkpointed position. Verified deliverables are never re-executed.
-- [ ] **FR-8a.96**: When the CEO aborts a project, the system terminates execution, preserves all completed work and events, records the abort reason, and transitions the project to ABORTED status.
+- [x] **FR-8a.94**: When the CEO pauses a project, the PM completes the current deliverable (if in progress), saves all critical state at the next checkpoint boundary, logs the pause reason, and stops execution. No work is left in an inconsistent state.
+- [x] **FR-8a.95**: When the CEO resumes a paused project, the system loads the project's persisted state, rebuilds the PM's execution context (skills, instruction fragments, stage configuration), and resumes the batch loop from the checkpointed position. Verified deliverables are never re-executed.
+- [x] **FR-8a.96**: When the CEO aborts a project, the system terminates execution, preserves all completed work and events, records the abort reason, and transitions the project to ABORTED status.
 
 **All-projects (system-wide):**
-- [ ] **FR-8a.97**: When the CEO pauses all projects, the system pauses every active project individually using the same project-level pause mechanism. Each project reaches its own safe checkpoint independently.
-- [ ] **FR-8a.98**: When the CEO resumes all paused projects, the system resumes each project individually using the same project-level resume mechanism. Projects resume independently and do not block each other.
+- [x] **FR-8a.97**: When the CEO pauses all projects, the system pauses every active project individually using the same project-level pause mechanism. Each project reaches its own safe checkpoint independently.
+- [x] **FR-8a.98**: When the CEO resumes all paused projects, the system resumes each project individually using the same project-level resume mechanism. Projects resume independently and do not block each other.
 
 **Director work layer:**
-- [ ] **FR-8a.99**: When the CEO pauses the Director, the Director stops processing the backlog queue, stops accepting new project creation requests, and logs the pause. Active project PMs continue executing until they reach their next checkpoint, then pause.
-- [ ] **FR-8a.100**: When the CEO resumes the Director, the Director rebuilds its context, loads pending queue state, and resumes backlog processing. Projects paused by the Director pause are resumed in priority order.
-- [ ] **FR-8a.101**: Pause and resume at any layer publish lifecycle events with the layer scope (project, all-projects, director), the actor (CEO), the timestamp, and the reason.
+- [x] **FR-8a.99**: When the CEO pauses the Director, the Director stops processing the backlog queue, stops accepting new project creation requests, and logs the pause. Active project PMs continue executing until they reach their next checkpoint, then pause.
+- [x] **FR-8a.100**: When the CEO resumes the Director, the Director rebuilds its context, loads pending queue state, and resumes backlog processing. Projects paused by the Director pause are resumed in priority order.
+- [x] **FR-8a.101**: Pause and resume at any layer publish lifecycle events with the layer scope (project, all-projects, director), the actor (CEO), the timestamp, and the reason.
 
 ---
 
 ## Non-Functional Requirements
 
-- [ ] **NFR-8a.01**: Management tool single-record database operations complete within 200ms under normal load. `select_ready_batch` with dependency graph evaluation completes within 500ms for projects with up to 100 deliverables.
-- [ ] **NFR-8a.02**: Batch completion events publish to Redis Streams within 2 seconds of state change. Project status change events publish within 1 second.
-- [ ] **NFR-8a.03**: Project checkpoint (state persistence at TaskGroup boundary) completes atomically. A partial checkpoint is never visible to consumers — either all state is persisted or none is.
-- [ ] **NFR-8a.04**: Context recreation (save critical state + create fresh session + resume) completes within 30 seconds. The pipeline resumes from the correct TaskGroup without manual intervention.
-- [ ] **NFR-8a.05**: All management tool failures produce structured error responses with error codes and human-readable descriptions. No tool returns raw exceptions, placeholder strings, or empty results on failure.
-- [ ] **NFR-8a.06**: Brief validation and resource checks complete before any work session is enqueued. The system never begins autonomous execution with known missing or invalid resources.
-- [ ] **NFR-8a.07**: The batch failure threshold is configurable per project via project configuration (default: 3). The per-deliverable retry limit is configurable (default: 2).
-- [ ] **NFR-8a.08**: Tool access is role-scoped per the supervision hierarchy. Director tools are not accessible to PM or Worker agents. PM tools are not accessible to Worker agents. Scope violations are logged as security events.
-- [ ] **NFR-8a.09**: Adding the project entity is non-destructive — existing data in all related entities (project configs, workflows, deliverables, queue items) is preserved and relationships are established without data loss.
+- [x] **NFR-8a.01**: Management tool single-record database operations complete within 200ms under normal load. `select_ready_batch` with dependency graph evaluation completes within 500ms for projects with up to 100 deliverables.
+- [x] **NFR-8a.02**: Batch completion events publish to Redis Streams within 2 seconds of state change. Project status change events publish within 1 second.
+- [x] **NFR-8a.03**: Project checkpoint (state persistence at TaskGroup boundary) completes atomically. A partial checkpoint is never visible to consumers — either all state is persisted or none is.
+- [x] **NFR-8a.04**: Context recreation (save critical state + create fresh session + resume) completes within 30 seconds. The pipeline resumes from the correct TaskGroup without manual intervention.
+- [x] **NFR-8a.05**: All management tool failures produce structured error responses with error codes and human-readable descriptions. No tool returns raw exceptions, placeholder strings, or empty results on failure.
+- [x] **NFR-8a.06**: Brief validation and resource checks complete before any work session is enqueued. The system never begins autonomous execution with known missing or invalid resources.
+- [x] **NFR-8a.07**: The batch failure threshold is configurable per project via project configuration (default: 3). The per-deliverable retry limit is configurable (default: 2).
+- [x] **NFR-8a.08**: Tool access is role-scoped per the supervision hierarchy. Director tools are not accessible to PM or Worker agents. PM tools are not accessible to Worker agents. Scope violations are logged as security events.
+- [x] **NFR-8a.09**: Adding the project entity is non-destructive — existing data in all related entities (project configs, workflows, deliverables, queue items) is preserved and relationships are established without data loss.
 
 ---
 

@@ -1,5 +1,5 @@
 # AutoBuilder — Product Requirements Document
-*Version: 7.3 | Date: 2026-04-12 | Maps to: `00-VISION.md` v3.0*
+*Version: 7.4 | Date: 2026-04-13 | Maps to: `00-VISION.md` v3.0*
 
 ---
 
@@ -68,7 +68,7 @@ The PM determines the appropriate workflow stage and configures accordingly — 
 
 The user interacts only with the CEO queue: resolves decisions, reviews completion reports, approves stages. The Director approves TaskGroups autonomously within a stage. Each approval — TaskGroup or stage — writes to project memory; the next inherits full context.
 
-*Failure*: Deliverable exhausts retries → CEO queue with validator evidence. User chooses: remediate the specific deliverable (re-executes it and dependents only), redirect, or abort.
+*Failure*: Deliverable exhausts retries → CEO queue with gate evidence. User chooses: remediate the specific deliverable (re-executes it and dependents only), redirect, or abort.
 
 ---
 
@@ -76,7 +76,7 @@ The user interacts only with the CEO queue: resolves decisions, reviews completi
 *Persona: P-3 | Mode: process run*
 
 1. Operator submits a new project instance: workflow type, input materials, instance-specific overrides.
-2. Director routes to a PM. The workflow's encoded agent topology, skill set, and validators apply automatically — no reconfiguration per run.
+2. Director routes to a PM. The workflow's encoded agent topology, skill set, and gates apply automatically — no reconfiguration per run.
 3. Execution draws on accumulated workflow memory: edge cases from prior runs, domain-specific patterns, quality signals.
 4. Ambiguous judgment call → CEO queue. Operator resolves without entering the execution loop.
 5. Output delivered in the workflow-defined format. Workflow memory updated with learnings from this run.
@@ -108,12 +108,12 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 
 | ID | Requirement |
 |----|-------------|
-| PR-4 | Workflows are plugins. A workflow defines its own **stage schema** (e.g., SHAPE → DESIGN → PLAN → BUILD for software), the agents, skills, and tools active at each stage, its mandatory validator pipeline, its deliverable and output format definitions, its completion report structure, and its permitted **edit operations** (domain-specific modifications issued at any time regardless of project state, e.g., add feature, fix bug, refactor for software). Plugins install via WORKFLOW.yaml with zero core code changes. |
+| PR-4 | Workflows are plugins. A workflow defines its own **stage schema** (e.g., SHAPE → DESIGN → PLAN → BUILD for software), the agents, skills, and tools active at each stage, its mandatory gate pipeline, its deliverable and output format definitions, its completion report structure, and its permitted **edit operations** (domain-specific modifications issued at any time regardless of project state, e.g., add feature, fix bug, refactor for software). Execution is defined through a **node-based pipeline schema**: stages contain nodes (process units), each referencing an agent (staff) and a prompt (objective). Nodes declare `produces`/`consumes` for artifact-based data flow and `signals` for lightweight coordination between nodes and gates. Plugins install via WORKFLOW.yaml with zero core code changes. |
 | PR-5 | At each workflow stage, the PM assembles the appropriate agent configuration: research and architecture agents for design stages, coding and verification agents for build stages. Skills and tool authorizations are scoped per stage. |
 | PR-5a | Agent instructions are composed from 6 typed fragments (safety, identity, governance, project context, task context, domain skills) via an InstructionAssembler (see NFR-4a for constitutional SAFETY fragment). The Director controls agent behavior per-project through governance fragments stored in session state — it does not rewrite agent prompts directly. Skills load progressively based on deliverable context. The assembler filters loaded skills per agent using each skill's `applies_to` field — not all agents receive all skills. All fragments are auditable (source-tracked). |
 | PR-5b | Agents are defined as **declarative definition files** (markdown with YAML frontmatter). Frontmatter carries structured metadata (name, type, model routing, tool access, output key). The markdown body provides instruction content. An AgentRegistry scans definition files and builds ADK agents on demand — the filesystem is the registry. No agent identity lives in Python code. |
 | PR-5c | Agent definitions follow a **3-scope file cascade**: global (shipped with platform) → workflow-specific → project-specific. Later scopes override earlier scopes by filename match. A project-scope file with only frontmatter (no body) is a **partial override** — its fields merge over the parent scope, inheriting the parent's instruction body. This parallels the Skill override cascade. |
-| PR-6 | A curated set of default workflow plugins ships with the platform — designed to be directly useful and to model how to compose new workflows, by users or by the Director itself. |
+| PR-6 | A curated set of default workflow plugins ships with the platform — designed to be directly useful and to model how to compose new workflows, by users or by the Director itself. The Director can compose, validate, activate, and propose improvements to workflows through conversation with the CEO. The CEO retains authority over workflow lifecycle: activation requires CEO approval, and only the CEO can deactivate or delete workflows. Built-in platform workflows cannot be deleted. |
 | PR-7 | Project-level conventions override workflow defaults. The workflow manifest is the execution contract for everything it defines. |
 
 ### 3.3 Execution & Work Queues
@@ -123,7 +123,7 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 | PR-8 | The Director decomposes each submitted Brief into a dependency-ordered execution plan, determining the appropriate workflow stage to begin from. Before the first deliverable is dispatched, the system validates all resources required by the workflow stage — credentials, API access, tool authorizations, and input materials. Any missing or invalid resource surfaces to the CEO queue immediately; execution does not begin until resolved. Resource failures never occur mid-run. |
 | PR-9 | All agent work is managed through **observable async work queues**. Every queued item — pending, in-progress, or blocked — is visible to the user at all times. Items can be promoted, demoted, paused, resumed, or cancelled without restarting the project. |
 | PR-10 | The PM's execution loop operates on the work queue: select a Batch of dependency-ready deliverables → dispatch in parallel or sequentially → collect results → repeat until the TaskGroup is complete → run regression tests → fix until pass → checkpoint. |
-| PR-11 | The workflow manifest defines when validators run — per-deliverable for lightweight checks, per-batch or per-TaskGroup for comprehensive validation. At minimum, all workflow validators run at TaskGroup completion. Scheduled validators are mandatory pipeline steps; they cannot be skipped or overridden by agent judgment. |
+| PR-11 | The workflow manifest defines when gates run — per-deliverable for lightweight checks, per-batch or per-TaskGroup for comprehensive validation. At minimum, all workflow gates run at TaskGroup completion. Scheduled gates are mandatory pipeline steps; they cannot be skipped or overridden by agent judgment. |
 | PR-12 | Failed deliverable: auto-retry to configured limit → escalate to PM → escalate to Director → surface to CEO queue. State is checkpointed after each successful deliverable; a crash cannot cause a checkpointed deliverable to re-execute. When a CEO queue item is resolved, the resolution is applied back into the work queue and execution resumes. |
 
 ### 3.4 Agent Hierarchy
@@ -135,7 +135,7 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 | PR-15 | Each tier has bounded authority: a **retry budget** (max retries before escalating), a **decision scope** (categories it can resolve autonomously), and a **cost ceiling** (token/spend limit). Exhausting any dimension triggers escalation to the tier above. Limits cascade: user sets project ceiling → Director enforces across projects → PM enforces within the project → workers operate within per-deliverable budgets. |
 | PR-15a | When an agent's context window approaches capacity, the system recreates the session: persisting important state to memory, creating a fresh session, and reassembling context from durable stores (memory, state, skills, instruction fragments). No lossy summarization. The agent resumes from the same logical point with full relevant context reconstructed. |
 | PR-15b | Cross-session memory context is loaded as a **deterministic pipeline step** (MemoryLoaderAgent) at the start of each deliverable pipeline, not as an LLM-discretionary tool call. The agent searches the memory service for relevant context and writes results to session state before any LLM agent runs. This ensures memory context is always available and never skipped by LLM judgment. |
-| PR-16 | When a PM's consecutive batch failures exceed the configured threshold (default: 3), the Director suspends the project and diagnoses the failure pattern — reviewing validator evidence, escalation history, and execution state. It surfaces findings and options to the CEO queue; it does not attempt autonomous repair. |
+| PR-16 | When a PM's consecutive batch failures exceed the configured threshold (default: 3), the Director suspends the project and diagnoses the failure pattern — reviewing gate evidence, escalation history, and execution state. It surfaces findings and options to the CEO queue; it does not attempt autonomous repair. |
 
 ### 3.5 CEO Queue & Director Queue
 
@@ -152,7 +152,7 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 | ID | Requirement |
 |----|-------------|
 | PR-22 | Workflow Stages and TaskGroups each produce a completion report with three verification layers, scoped to their level. All layers require machine-generated evidence: **Functional correctness** (does it work as specified?), **Architectural conformance** (does the implementation match the documented architecture?), and **Contract completion** (were all deliverables at this level completed?). Assertion alone is never sufficient. |
-| PR-23 | A TaskGroup cannot close while any deliverable is outstanding, any scheduled validator is failing, or any escalation is unresolved. These conditions hold regardless of workflow; workflow verification layers are additive. |
+| PR-23 | A TaskGroup cannot close while any deliverable is outstanding, any scheduled gate is failing, or any escalation is unresolved. These conditions hold regardless of workflow; workflow verification layers are additive. |
 | PR-24 | Reports include: per-deliverable evidence, cost and token usage by agent tier, wall-clock duration, and a decision log — distinguishing system-autonomous from user-resolved decisions. |
 | PR-25 | Remediation re-executes only failed deliverables and their dependents. Verified independent deliverables are not re-executed. |
 
@@ -179,7 +179,7 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 
 | ID | Requirement |
 |----|-------------|
-| PR-34 | Every project has a persistent, replayable event stream (Redis Streams + SSE). Clients reconnect via `Last-Event-ID` with no events lost. The stream covers: agent tier changes, deliverable lifecycle, validator results, escalations, cost per deliverable, checkpoints, and errors. |
+| PR-34 | Every project has a persistent, replayable event stream (Redis Streams + SSE). Clients reconnect via `Last-Event-ID` with no events lost. The stream covers: agent tier changes, deliverable lifecycle, gate results, escalations, cost per deliverable, checkpoints, and errors. |
 | PR-35 | Token usage and cost are tracked per deliverable, TaskGroup, stage, and project — in real-time, no manual calculation. An immutable audit log records all state transitions, decisions, escalations, and interventions. |
 | PR-35a | Agent definition resolution is auditable. For each agent built, the system logs which scope (global, workflow, project) provided the definition, which file path was used, and whether a partial override was applied. The resolution map is available for diagnostic inspection. |
 
@@ -214,7 +214,8 @@ Mid-execution intervention is evaluated for scope: if a directive would cancel v
 |--------|-----------|----------|
 | **Project** | Top-level persistent unit: workflow type, conventions, stage and TaskGroup history, accumulated project memory. Persists after completion. Editable at any time regardless of state. | Create, view, pause, resume, abort, edit |
 | **Brief** | Documented project intent — structure defined by workflow type. Produced collaboratively with the Director or submitted directly. Validated before PM delegation. | Submit, view status |
-| **Workflow** | Plugin defining the complete execution process: stage schema, agent/skill/tool configuration per stage, validators, deliverable format, completion report structure, and available edit operations | Select, install third-party, view |
+| **Workflow** | Plugin defining the complete execution process: stage schema with node-based pipeline definitions, agent/skill/tool configuration per stage, gates, deliverable format, completion report structure, and available edit operations | Select, install third-party, view, activate, deactivate, delete |
+| **Gate** | Mandatory quality checkpoint within the execution pipeline — evaluates deliverable or stage output against defined criteria and produces structured pass/fail evidence. Gates are declared in the workflow manifest and cannot be skipped by agent judgment. Types include deterministic (rule-based) and LLM-evaluated. | View results |
 | **Workflow Stage** | Schema-defined execution stage (e.g., DESIGN, PLAN, BUILD). Contains one or more TaskGroups. Determines active agents, skills, and tools. Visible at portfolio level. CEO approves on completion. | Approve, view, remediate |
 | **TaskGroup** | PM-created runtime planning artifact within a Workflow Stage (~1h work unit). Director approves on completion; produces a completion report scoped to TaskGroup deliverables and a project memory write. Visible at project level. | View |
 | **Batch** | A group of Deliverables within a TaskGroup dispatched together by the PM — parallel or sequential. The PM instructs workers on execution mode based on dependency order. | View |

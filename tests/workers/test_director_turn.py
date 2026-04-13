@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import parse_redis_settings
-from app.db.models import Base, Chat, ChatMessage, DirectorQueueItem
+from app.db.models import Base, Chat, ChatMessage, DirectorQueueItem, Project
 from app.models.enums import (
     ChatMessageRole,
     ChatStatus,
@@ -28,7 +28,9 @@ from app.models.enums import (
     EscalationPriority,
     EscalationRequestType,
     FormationStatus,
+    ProjectStatus,
 )
+from app.tools._context import SESSION_ID_KEY, get_tool_context
 from app.workers.tasks import run_director_turn
 from tests.conftest import TEST_DB_URL, TEST_REDIS_URL, require_infra
 
@@ -129,6 +131,7 @@ async def _cleanup(engine: object, redis: ArqRedis) -> None:
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await eng.dispose()
+    await redis.flushdb()  # type: ignore[reportUnknownMemberType]
     await redis.aclose()
 
 
@@ -167,6 +170,7 @@ async def _insert_chat_and_message(
 def _make_worker_ctx(
     factory: async_sessionmaker[AsyncSession],
     redis: ArqRedis,
+    tmp_path: object = None,
 ) -> dict[str, object]:
     """Build worker context with real DB/Redis and mock session_service."""
     mock_session_service = MagicMock()
@@ -183,6 +187,7 @@ def _make_worker_ctx(
         "llm_router": mock_router,
         "redis": redis,
         "db_session_factory": factory,
+        "artifacts_root": tmp_path,
     }
 
 
@@ -196,11 +201,11 @@ class TestRunDirectorTurnBuildsDirector:
     """Verify Director is built from AgentRegistry."""
 
     @pytest.mark.asyncio
-    async def test_builds_director_via_registry(self) -> None:
+    async def test_builds_director_via_registry(self, tmp_path: object) -> None:
         _, factory, redis, engine = await _make_infra()
         try:
             chat_id, message_id, _ = await _insert_chat_and_message(factory)
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
 
             runner = _mock_runner_with_response("Hello from Director")
 
@@ -219,11 +224,11 @@ class TestRunDirectorTurnPersistsResponse:
     """Verify Director response is saved as ChatMessage(DIRECTOR) in real DB."""
 
     @pytest.mark.asyncio
-    async def test_persists_response_text(self) -> None:
+    async def test_persists_response_text(self, tmp_path: object) -> None:
         _, factory, redis, engine = await _make_infra()
         try:
             chat_id, message_id, _ = await _insert_chat_and_message(factory)
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
 
             runner = _mock_runner_with_response("Director says hi")
 
@@ -246,11 +251,11 @@ class TestRunDirectorTurnPersistsResponse:
             await _cleanup(engine, redis)
 
     @pytest.mark.asyncio
-    async def test_empty_response_gets_fallback(self) -> None:
+    async def test_empty_response_gets_fallback(self, tmp_path: object) -> None:
         _, factory, redis, engine = await _make_infra()
         try:
             chat_id, message_id, _ = await _insert_chat_and_message(factory)
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
 
             with _patch_director_infra():
                 result = await run_director_turn(ctx, chat_id, message_id)
@@ -276,7 +281,7 @@ class TestRunDirectorTurnSettingsMode:
     """Verify Settings session triggers formation/evolution instructions."""
 
     @pytest.mark.asyncio
-    async def test_settings_formation_mode(self) -> None:
+    async def test_settings_formation_mode(self, tmp_path: object) -> None:
         """SETTINGS chat with PENDING formation uses FORMATION_INSTRUCTION."""
         from app.agents.formation import FORMATION_INSTRUCTION
 
@@ -285,7 +290,7 @@ class TestRunDirectorTurnSettingsMode:
             chat_id, message_id, _ = await _insert_chat_and_message(
                 factory, chat_type=ChatType.SETTINGS
             )
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
 
             runner = _mock_runner_with_response("Formation response")
             captured_ctx: list[object] = []
@@ -314,7 +319,7 @@ class TestRunDirectorTurnSettingsMode:
             await _cleanup(engine, redis)
 
     @pytest.mark.asyncio
-    async def test_settings_evolution_mode(self) -> None:
+    async def test_settings_evolution_mode(self, tmp_path: object) -> None:
         """SETTINGS chat with COMPLETE formation uses EVOLUTION_INSTRUCTION."""
         from app.agents.formation import EVOLUTION_INSTRUCTION
 
@@ -323,7 +328,7 @@ class TestRunDirectorTurnSettingsMode:
             chat_id, message_id, _ = await _insert_chat_and_message(
                 factory, chat_type=ChatType.SETTINGS
             )
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
 
             runner = _mock_runner_with_response("Evolution response")
             captured_ctx: list[object] = []
@@ -352,14 +357,14 @@ class TestRunDirectorTurnSettingsMode:
             await _cleanup(engine, redis)
 
     @pytest.mark.asyncio
-    async def test_director_chat_no_task_context(self) -> None:
+    async def test_director_chat_no_task_context(self, tmp_path: object) -> None:
         """DIRECTOR chat does not inject formation/evolution instructions."""
         _, factory, redis, engine = await _make_infra()
         try:
             chat_id, message_id, _ = await _insert_chat_and_message(
                 factory, chat_type=ChatType.DIRECTOR
             )
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
 
             runner = _mock_runner_with_response("Director response")
             captured_ctx: list[object] = []
@@ -392,11 +397,11 @@ class TestRunDirectorTurnErrorHandling:
     """Verify agent build failures are persisted as error messages in real DB."""
 
     @pytest.mark.asyncio
-    async def test_build_failure_persists_error(self) -> None:
+    async def test_build_failure_persists_error(self, tmp_path: object) -> None:
         _, factory, redis, engine = await _make_infra()
         try:
             chat_id, message_id, _ = await _insert_chat_and_message(factory)
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
 
             with (
                 _patch_director_infra(
@@ -425,6 +430,17 @@ class TestRunDirectorTurnErrorHandling:
 # ---------------------------------------------------------------------------
 
 
+def _make_project(project_id: uuid.UUID) -> Project:
+    """Create a minimal Project row to satisfy FK constraints on director_queue."""
+    return Project(
+        id=project_id,
+        name=f"test-project-{project_id}",
+        workflow_type="default",
+        brief="Test brief",
+        status=ProjectStatus.ACTIVE,
+    )
+
+
 def _make_queue_item(project_id: uuid.UUID) -> DirectorQueueItem:
     """Create a PENDING DirectorQueueItem."""
     return DirectorQueueItem(
@@ -448,11 +464,11 @@ class TestRunDirectorTurnQueueMode:
     """Verify run_director_turn queue mode (project_id) with real DB/Redis."""
 
     @pytest.mark.asyncio
-    async def test_queue_mode_skips_when_no_pending_items(self) -> None:
+    async def test_queue_mode_skips_when_no_pending_items(self, tmp_path: object) -> None:
         """No pending items for project → returns skipped, no Director run."""
         _, factory, redis, engine = await _make_infra()
         try:
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
             pid = str(uuid.uuid4())
 
             with _patch_director_infra() as mock_build:
@@ -465,16 +481,18 @@ class TestRunDirectorTurnQueueMode:
             await _cleanup(engine, redis)
 
     @pytest.mark.asyncio
-    async def test_queue_mode_runs_director_with_pending_items(self) -> None:
+    async def test_queue_mode_runs_director_with_pending_items(self, tmp_path: object) -> None:
         """Pending items exist → Director runs with synthetic prompt."""
         _, factory, redis, engine = await _make_infra()
         try:
             pid = uuid.uuid4()
             async with factory() as session:
+                session.add(_make_project(pid))
+                await session.flush()
                 session.add(_make_queue_item(pid))
                 await session.commit()
 
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
             runner = _mock_runner_with_response("Queue evaluated")
 
             with _patch_director_infra(runner=runner) as mock_build:
@@ -486,16 +504,18 @@ class TestRunDirectorTurnQueueMode:
             await _cleanup(engine, redis)
 
     @pytest.mark.asyncio
-    async def test_queue_mode_no_chat_message_persisted(self) -> None:
+    async def test_queue_mode_no_chat_message_persisted(self, tmp_path: object) -> None:
         """Queue mode should NOT persist ChatMessage records."""
         _, factory, redis, engine = await _make_infra()
         try:
             pid = uuid.uuid4()
             async with factory() as session:
+                session.add(_make_project(pid))
+                await session.flush()
                 session.add(_make_queue_item(pid))
                 await session.commit()
 
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
             runner = _mock_runner_with_response("Queue response")
 
             with _patch_director_infra(runner=runner):
@@ -510,12 +530,220 @@ class TestRunDirectorTurnQueueMode:
             await _cleanup(engine, redis)
 
     @pytest.mark.asyncio
-    async def test_invalid_invocation_raises(self) -> None:
+    async def test_invalid_invocation_raises(self, tmp_path: object) -> None:
         """Neither chat_id+message_id nor project_id → ValueError."""
         _, factory, redis, engine = await _make_infra()
         try:
-            ctx = _make_worker_ctx(factory, redis)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
             with pytest.raises(ValueError, match="requires"):
                 await run_director_turn(ctx)
+        finally:
+            await _cleanup(engine, redis)
+
+
+# ---------------------------------------------------------------------------
+# Tool context registration tests
+# ---------------------------------------------------------------------------
+
+
+@require_infra
+class TestRunDirectorTurnToolContext:
+    """Verify tool execution context is registered/unregistered during Director turn."""
+
+    @pytest.mark.asyncio
+    async def test_chat_mode_registers_tool_context_with_session_id(self, tmp_path: object) -> None:
+        """Chat mode: tool context is registered under chat.session_id."""
+        _, factory, redis, engine = await _make_infra()
+        try:
+            chat_id, message_id, session_id = await _insert_chat_and_message(factory)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
+
+            captured_session_ids: list[str] = []
+
+            original_runner = _mock_runner_with_response("Tool context test")
+
+            # Wrap runner to capture state during execution
+            orig_run_async = original_runner.run_async
+
+            async def _capturing_run(  # type: ignore[misc]
+                *args: object, **kwargs: object
+            ) -> None:  # type: ignore[reportInvalidTypeForm]
+                # At this point, tool context should be registered
+                try:
+                    get_tool_context(session_id)
+                    captured_session_ids.append(session_id)
+                except KeyError:
+                    pass
+                async for event in orig_run_async(*args, **kwargs):
+                    yield event  # type: ignore[misc]
+
+            original_runner.run_async = _capturing_run
+
+            with _patch_director_infra(runner=original_runner):
+                result = await run_director_turn(ctx, chat_id, message_id)
+
+            assert result["status"] == "completed"
+            # Tool context was accessible during execution
+            assert session_id in captured_session_ids
+
+            # Tool context should be cleaned up after turn completes
+            with pytest.raises(KeyError):
+                get_tool_context(session_id)
+        finally:
+            await _cleanup(engine, redis)
+
+    @pytest.mark.asyncio
+    async def test_queue_mode_registers_tool_context(self, tmp_path: object) -> None:
+        """Queue mode: tool context is registered under director_queue_{project_id}."""
+        _, factory, redis, engine = await _make_infra()
+        try:
+            pid = uuid.uuid4()
+            async with factory() as session:
+                session.add(_make_project(pid))
+                await session.flush()
+                session.add(_make_queue_item(pid))
+                await session.commit()
+
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
+            expected_sid = f"director_queue_{pid}"
+
+            captured_session_ids: list[str] = []
+            original_runner = _mock_runner_with_response("Queue tool ctx")
+            orig_run_async = original_runner.run_async
+
+            async def _capturing_run(  # type: ignore[misc]
+                *args: object, **kwargs: object
+            ) -> None:  # type: ignore[reportInvalidTypeForm]
+                try:
+                    get_tool_context(expected_sid)
+                    captured_session_ids.append(expected_sid)
+                except KeyError:
+                    pass
+                async for event in orig_run_async(*args, **kwargs):
+                    yield event  # type: ignore[misc]
+
+            original_runner.run_async = _capturing_run
+
+            with _patch_director_infra(runner=original_runner):
+                result = await run_director_turn(ctx, project_id=str(pid))
+
+            assert result["status"] == "completed"
+            assert expected_sid in captured_session_ids
+
+            # Cleaned up after
+            with pytest.raises(KeyError):
+                get_tool_context(expected_sid)
+        finally:
+            await _cleanup(engine, redis)
+
+    @pytest.mark.asyncio
+    async def test_tool_context_cleaned_up_on_error(self, tmp_path: object) -> None:
+        """Tool context is unregistered even when the Director turn fails."""
+        _, factory, redis, engine = await _make_infra()
+        try:
+            chat_id, message_id, session_id = await _insert_chat_and_message(factory)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
+
+            with (
+                _patch_director_infra(
+                    build_side_effect=RuntimeError("Boom"),
+                ),
+                pytest.raises(RuntimeError, match="Boom"),
+            ):
+                await run_director_turn(ctx, chat_id, message_id)
+
+            # Tool context should still be cleaned up
+            with pytest.raises(KeyError):
+                get_tool_context(session_id)
+        finally:
+            await _cleanup(engine, redis)
+
+    @pytest.mark.asyncio
+    async def test_session_state_includes_session_id_key(self, tmp_path: object) -> None:
+        """ADK session is created with _session_id in state."""
+        _, factory, redis, engine = await _make_infra()
+        try:
+            chat_id, message_id, _session_id = await _insert_chat_and_message(factory)
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
+
+            runner = _mock_runner_with_response("State check")
+            mock_session_service: MagicMock = ctx["session_service"]  # type: ignore[assignment]
+
+            with _patch_director_infra(runner=runner):
+                await run_director_turn(ctx, chat_id, message_id)
+
+            # Verify create_session was called with _session_id in state
+            create_calls: list[object] = list(mock_session_service.create_session.call_args_list)
+            assert len(create_calls) >= 1
+            # The first call should include state with SESSION_ID_KEY
+            first_call: object = create_calls[0]
+            call_kwargs: dict[str, object] = getattr(first_call, "kwargs", {})  # type: ignore[assignment]
+            if "state" in call_kwargs:
+                state_val = call_kwargs["state"]
+                assert isinstance(state_val, dict)
+                assert SESSION_ID_KEY in state_val
+        finally:
+            await _cleanup(engine, redis)
+
+    @pytest.mark.asyncio
+    async def test_queue_mode_prompt_includes_item_details(self, tmp_path: object) -> None:
+        """Queue mode prompt includes priority, title, and context of pending items."""
+        _, factory, redis, engine = await _make_infra()
+        try:
+            pid = uuid.uuid4()
+            async with factory() as session:
+                session.add(_make_project(pid))
+                await session.flush()
+                item = DirectorQueueItem(
+                    type=EscalationRequestType.RESOURCE_REQUEST,
+                    priority=EscalationPriority.HIGH,
+                    status=DirectorQueueStatus.PENDING,
+                    title="Need more compute",
+                    source_project_id=pid,
+                    source_agent="pm",
+                    context="GPU allocation insufficient for training",
+                )
+                session.add(item)
+                await session.commit()
+
+            ctx = _make_worker_ctx(factory, redis, tmp_path)
+            captured_prompts: list[str] = []
+
+            runner = _mock_runner_empty()
+            orig_run_async = runner.run_async
+
+            async def _capturing_run(  # type: ignore[misc]
+                *args: object, **kwargs: object
+            ) -> None:  # type: ignore[reportInvalidTypeForm]
+                from google.genai.types import Content
+
+                for arg in args:
+                    if isinstance(arg, Content):
+                        parts = getattr(arg, "parts", [])
+                        for p in parts:
+                            text = getattr(p, "text", None)
+                            if text:
+                                captured_prompts.append(str(text))
+                new_msg = kwargs.get("new_message")
+                if isinstance(new_msg, Content):
+                    parts = getattr(new_msg, "parts", [])
+                    for p in parts:
+                        text = getattr(p, "text", None)
+                        if text:
+                            captured_prompts.append(str(text))
+                async for event in orig_run_async(*args, **kwargs):
+                    yield event  # type: ignore[misc]
+
+            runner.run_async = _capturing_run
+
+            with _patch_director_infra(runner=runner):
+                result = await run_director_turn(ctx, project_id=str(pid))
+
+            assert result["status"] == "completed"
+            assert len(captured_prompts) >= 1
+            prompt = captured_prompts[0]
+            assert "Need more compute" in prompt
+            assert "HIGH" in prompt
+            assert "GPU allocation insufficient" in prompt
         finally:
             await _cleanup(engine, redis)

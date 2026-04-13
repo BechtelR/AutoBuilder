@@ -63,7 +63,7 @@ class TestRunWorkflowIntegration:
     """Integration tests for run_workflow with real PostgreSQL, Redis, and LLM."""
 
     @pytest.mark.asyncio
-    async def test_run_workflow_completes(self) -> None:
+    async def test_run_workflow_completes(self, tmp_path: object) -> None:
         """Create a real Workflow, run it through ADK, verify COMPLETED status and events."""
         engine = create_async_engine(TEST_DB_URL)
         redis_settings = parse_redis_settings(TEST_REDIS_URL)
@@ -98,6 +98,7 @@ class TestRunWorkflowIntegration:
                 "llm_router": router,
                 "redis": redis,
                 "db_session_factory": factory,
+                "artifacts_root": tmp_path,
             }
 
             # Execute the workflow
@@ -128,7 +129,7 @@ class TestRunWorkflowIntegration:
             await redis.aclose()
 
     @pytest.mark.asyncio
-    async def test_run_workflow_not_found(self) -> None:
+    async def test_run_workflow_not_found(self, tmp_path: object) -> None:
         """Calling run_workflow with a non-existent UUID raises NotFoundError."""
         engine = create_async_engine(TEST_DB_URL)
         redis_settings = parse_redis_settings(TEST_REDIS_URL)
@@ -148,6 +149,7 @@ class TestRunWorkflowIntegration:
                 "llm_router": router,
                 "redis": redis,
                 "db_session_factory": factory,
+                "artifacts_root": tmp_path,
             }
 
             fake_id = str(uuid.uuid4())
@@ -161,7 +163,7 @@ class TestRunWorkflowIntegration:
             await redis.aclose()
 
     @pytest.mark.asyncio
-    async def test_run_workflow_error_sets_message(self) -> None:
+    async def test_run_workflow_error_sets_message(self, tmp_path: object) -> None:
         """A broken LlmRouter model causes FAILED status with error_message set."""
         engine = create_async_engine(TEST_DB_URL)
         redis_settings = parse_redis_settings(TEST_REDIS_URL)
@@ -201,6 +203,7 @@ class TestRunWorkflowIntegration:
                 "llm_router": broken_router,
                 "redis": redis,
                 "db_session_factory": factory,
+                "artifacts_root": tmp_path,
             }
 
             # The workflow should raise but update status to FAILED.
@@ -235,7 +238,7 @@ class TestRunDirectorTurnIntegration:
     """Integration tests for run_director_turn with real infrastructure."""
 
     @pytest.mark.asyncio
-    async def test_director_turn_stores_response(self) -> None:
+    async def test_director_turn_stores_response(self, tmp_path: object) -> None:
         """Verify Director turn persists a response via mocked ADK runner."""
         engine = create_async_engine(TEST_DB_URL)
         redis_settings = parse_redis_settings(TEST_REDIS_URL)
@@ -280,6 +283,7 @@ class TestRunDirectorTurnIntegration:
                 "llm_router": router,
                 "redis": redis,
                 "db_session_factory": factory,
+                "artifacts_root": tmp_path,
             }
 
             # Mock the ADK runner to return a text response
@@ -330,7 +334,7 @@ class TestRunWorkflowDeliverablePipeline:
     """Integration tests for deliverable pipeline code path in run_workflow."""
 
     @pytest.mark.asyncio
-    async def test_deliverable_pipeline_triggers_new_path(self) -> None:
+    async def test_deliverable_pipeline_triggers_new_path(self, tmp_path: object) -> None:
         """Verify pipeline_type=deliverable triggers create_workflow_pipeline."""
         from google.adk.agents import SequentialAgent
 
@@ -368,6 +372,7 @@ class TestRunWorkflowDeliverablePipeline:
                 "llm_router": router,
                 "redis": redis,
                 "db_session_factory": factory,
+                "artifacts_root": tmp_path,
             }
 
             mock_pipeline = SequentialAgent(name="mock_pipeline", sub_agents=[])
@@ -413,7 +418,7 @@ class TestRunWorkflowDeliverablePipeline:
             await redis.aclose()
 
     @pytest.mark.asyncio
-    async def test_context_recreation_caught_not_reraised(self) -> None:
+    async def test_context_recreation_caught_not_reraised(self, tmp_path: object) -> None:
         """Verify ContextRecreationRequired triggers recreation pipeline, not re-raised.
 
         Phase 5b: catches ContextRecreationRequired, runs recreate_context, completes.
@@ -454,6 +459,7 @@ class TestRunWorkflowDeliverablePipeline:
                 "llm_router": router,
                 "redis": redis,
                 "db_session_factory": factory,
+                "artifacts_root": tmp_path,
             }
 
             err = ContextRecreationRequired(usage_pct=85.0, model="test-model", threshold_pct=80.0)
@@ -494,7 +500,7 @@ class TestRunWorkflowDeliverablePipeline:
             await redis.aclose()
 
     @pytest.mark.asyncio
-    async def test_echo_pipeline_still_works(self) -> None:
+    async def test_echo_pipeline_still_works(self, tmp_path: object) -> None:
         """Verify existing echo pipeline is backward compatible (no pipeline_type)."""
         engine = create_async_engine(TEST_DB_URL)
         redis_settings = parse_redis_settings(TEST_REDIS_URL)
@@ -527,6 +533,7 @@ class TestRunWorkflowDeliverablePipeline:
                 "llm_router": router,
                 "redis": redis,
                 "db_session_factory": factory,
+                "artifacts_root": tmp_path,
             }
 
             with (

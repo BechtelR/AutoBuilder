@@ -13,7 +13,7 @@ dependencies = [
     "google-adk",
     "litellm",
     "fastapi",
-    "uvicorn",
+    "uvicorn[standard]",
     "sqlalchemy[asyncio]",
     "alembic",
     "asyncpg",
@@ -77,4 +77,9 @@ testpaths = ["tests"]
 addopts = "--ignore=tests/phase1"
 markers = [
     "network: marks tests requiring network access (may be slow or flaky)",
+    "require_postgres: requires PostgreSQL on localhost:5432",
+    "require_redis: requires Redis on localhost:6379",
+    "require_infra: requires both PostgreSQL and Redis",
+    "require_llm: requires ANTHROPIC_API_KEY",
+    "require_tavily_key: requires TAVILY_API_KEY",
 ]

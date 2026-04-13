@@ -305,15 +305,31 @@ Redis Streams enable reliable SSE: when a dashboard client disconnects and recon
 
 **Choice**: PostgreSQL for all environments (dev via Docker, production native)
 
-**Rationale**: Gateway + ARQ workers are separate processes. SQLite serializes writes -- concurrent workers would hit SQLITE_BUSY. PostgreSQL handles concurrent access natively. pgvector provides vector search without a separate service. Docker makes local PostgreSQL trivial -- and Redis already requires Docker/install.
+**Rationale**: Gateway + ARQ workers are separate processes. SQLite serializes writes -- concurrent workers would hit SQLITE_BUSY. PostgreSQL handles concurrent access natively. pgvector provides vector search without a separate service.
 
 **Single database** -- the gateway API is THE system. The dashboard is a pure consumer via the API. There is no reason for separate databases per concern. All persistence (sessions, workflow state, task results, metadata) lives in one database accessed through SQLAlchemy.
 
 **Async driver**: `asyncpg`
 
-**Note**: Docker required for local dev (PostgreSQL + Redis)
+### 3.3 Docker Compose: Full Stack
 
-### 3.3 Observability: OpenTelemetry + Langfuse
+**Choice**: Docker Compose for local development and E2E testing
+
+**Services**: `docker compose up -d` starts the full stack:
+
+| Service | Image | Purpose |
+|---------|-------|---------|
+| `postgres` | pgvector/pgvector:pg16 | Database with vector search |
+| `redis` | redis:7-alpine | Task queue, event bus, cache |
+| `gateway` | Dockerfile (uvicorn) | FastAPI API server on port 8000 |
+| `worker` | Dockerfile (arq) | ARQ worker processing jobs |
+| `migrate` | Dockerfile (alembic) | Schema migrations (on-demand: `docker compose run --rm migrate`) |
+
+Gateway and worker override `AUTOBUILDER_DB_URL` and `AUTOBUILDER_REDIS_URL` to use Docker hostnames (`postgres`, `redis`). API keys and other config inherited from `.env`.
+
+The gateway container runs uvicorn with `--reload` and a bind mount (`./app:/app/app`), so code changes are picked up instantly without rebuilding. The worker uses `sync+restart` via Compose's `develop.watch`, which requires `docker compose watch` (or `docker compose up --watch`) to activate file watching. For local development, run `docker compose up -d postgres redis` for infrastructure only, then start gateway and worker on the host.
+
+### 3.4 Observability: OpenTelemetry + Langfuse
 
 **OpenTelemetry**: ADK has native OpenTelemetry integration for distributed tracing. All agent executions, tool calls, and state transitions are traced automatically.
 
@@ -514,5 +530,4 @@ testpaths = ["tests"]
 
 ---
 
-*Document Version: 2.1*
-*Last Updated: 2026-03-11*
+*Document Version: 2.2*

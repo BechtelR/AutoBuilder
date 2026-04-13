@@ -45,6 +45,7 @@ htmlcov/
 *.db
 .ruff_cache/
 .pyright/
+artifacts/
 
 # Local development (keep .claude/rules/ and .dev/ docs)
 .claude/loop-state.local.md

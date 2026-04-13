@@ -46,7 +46,7 @@ All LLM agent instructions are composed from **typed fragments** by the `Instruc
 | **IDENTITY** | Agent definition file body | Role, persona, behavioral boundaries | Static per agent role |
 | **GOVERNANCE** | Agent definition file body | Hard limits, escalation rules, safety constraints | Static per agent role |
 | **PROJECT** | Database (project entity) | Coding standards, conventions, project-specific patterns | Dynamic per invocation |
-| **TASK** | Session state | Current deliverable spec, implementation plan, review feedback | Dynamic per invocation |
+| **TASK** | Session state or node prompt file | Current deliverable spec, implementation plan, review feedback. In the node-based pipeline model (Phase 7b), loaded from the node's external prompt file. | Dynamic per invocation |
 | **SKILL** | SkillLoaderAgent output | Loaded skill content, filtered by `applies_to` per agent role | Dynamic per invocation |
 
 ### Assembly Interface
@@ -307,5 +307,5 @@ This is also why agent communication flows through session state (`output_key`, 
 
 ---
 
-*Document Version: 1.3*
-*Last Updated: 2026-03-11*
+*Document Version: 1.4*
+*Last Updated: 2026-04-12*

@@ -126,7 +126,7 @@ Detailed architecture documentation is organized by domain in the `architecture/
 |--------|------|---------|
 | Context | [context.md](./architecture/context.md) | Context assembly lifecycle, budgeting, recreation, knowledge loading |
 | Skills | [skills.md](./architecture/skills.md) | Skill-based knowledge injection, three-layer deterministic loading, trigger matching, supervision-tier resolution |
-| Workflows | [workflows.md](./architecture/workflows.md) | Pluggable workflow system, manifest, stage schema, validators, quality framework, Director authoring |
+| Workflows | [workflows.md](./architecture/workflows.md) | Pluggable workflow system, manifest, stage schema, node-based pipeline schema, quality gates, Director authoring |
 | Observability | [observability.md](./architecture/observability.md) | OpenTelemetry + Langfuse, tracing, logging, event stream |
 
 ---
@@ -147,12 +147,12 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | PR-5a | Composable agent instructions | [agents.md](./architecture/agents.md) §Agent Definitions, [context.md](./architecture/context.md) §InstructionAssembler Pipeline |
 | PR-5b | Declarative agent definition files | [agents.md](./architecture/agents.md) §Agent Definition Files, §AgentRegistry |
 | PR-5c | 3-scope agent definition cascade | [agents.md](./architecture/agents.md) §Definition Cascade |
-| PR-6 | Default workflow plugins | [workflows.md](./architecture/workflows.md) §auto-code: The First Workflow |
+| PR-6 | Default workflow plugins | [workflows.md](./architecture/workflows.md) §Standard Workflows |
 | PR-7 | Project conventions override | [workflows.md](./architecture/workflows.md) §Workflow Manifest, [state.md](./architecture/state.md) §1.2 |
 | PR-8 | Resource pre-flight validation | [execution.md](./architecture/execution.md) §Director Execution Turn, [workflows.md](./architecture/workflows.md) §Workflow Manifest (resources) |
 | PR-9 | Observable async work queues | [workers.md](./architecture/workers.md) §ARQ Workers, [events.md](./architecture/events.md) §Redis Streams |
 | PR-10 | PM execution loop | [execution.md](./architecture/execution.md) §PM-Level Loop, [agents.md](./architecture/agents.md) §PM Agent |
-| PR-11 | Validator pipeline | [workflows.md](./architecture/workflows.md) §Validators & Quality Gates |
+| PR-11 | Quality gate pipeline | [workflows.md](./architecture/workflows.md) §Quality Gates |
 | PR-12 | Failed deliverable escalation | [agents.md](./architecture/agents.md) §PM Agent, [events.md](./architecture/events.md) §Unified CEO Queue |
 | PR-13 | Director as executive partner | [agents.md](./architecture/agents.md) §Director Agent, [execution.md](./architecture/execution.md) §Multi-Session |
 | PR-14 | Dedicated PM per project | [agents.md](./architecture/agents.md) §PM Agent, [engine.md](./architecture/engine.md) §5 |
@@ -220,7 +220,7 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | — | Hybrid CustomAgent model | CustomAgents span deterministic to hybrid (internal LiteLLM calls); `type` is always `llm` or `custom` | [agents.md](./architecture/agents.md) |
 | — | Agent security model | Project-scope restricted to `type: llm` + tool_role ceiling; state key authorization via tier prefixes | [agents.md](./architecture/agents.md) |
 | — | Deterministic skill loading | Three-layer model: role-bound (always trigger), context-matched (deliverable triggers), explicit override. No LLM in matching. Applies to all tiers — Director/PM at build time, workers at pipeline runtime. | [skills.md](./architecture/skills.md) |
-| — | Manifest progressive disclosure | 2-field minimum scales to full operating manual; stages, validators, completion reports | [workflows.md](./architecture/workflows.md) |
+| — | Manifest progressive disclosure | 2-field minimum scales to full operating manual; stages, gates, completion reports | [workflows.md](./architecture/workflows.md) |
 | — | Stage schema | Organizational groupings (not execution contexts); PM-driven transitions; AND-composed completion | [workflows.md](./architecture/workflows.md) |
 | — | Workflow override model | User-level workflows override built-in by name; two-tier (not three-scope like agents/skills) | [workflows.md](./architecture/workflows.md) |
 | — | Director workflow authoring | 6-phase lifecycle; staging gate; CEO approval; Phase 7b | [workflows.md](./architecture/workflows.md) |

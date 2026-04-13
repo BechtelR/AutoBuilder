@@ -47,17 +47,17 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** —
 **Description:** Add `Project` as a first-order DB entity. Add `artifacts` table with polymorphic entity association (per execution.md). Add `ProjectStatus` enum. Extend `DeliverableStatus` with PLANNED and SKIPPED values. Establish foreign key relationships from existing tables to projects. Migration is additive.
 **BOM Components:**
-- [ ] `X20` — `projects` table (first-order entity)
+- [x] `X20` — `projects` table (first-order entity)
 **Requirements:**
-- [ ] `Project` model: id (UUID), name, workflow_type, brief (text), status (ProjectStatus), current_stage, current_taskgroup_id (nullable FK), accumulated_cost (Numeric), created_at, updated_at, started_at, completed_at, error_message
-- [ ] `ProjectStatus` enum added to `app/models/enums.py`: SHAPING, ACTIVE, PAUSED, SUSPENDED, COMPLETED, ABORTED
-- [ ] `DeliverableStatus` enum extended with PLANNED and SKIPPED (existing values PENDING, IN_PROGRESS, COMPLETED, FAILED, BLOCKED preserved)
-- [ ] `Artifact` model: id (UUID), entity_type (str), entity_id (UUID), path (str), content_type (str), size_bytes (int), created_at. Polymorphic via entity_type + entity_id (deliverable, taskgroup_execution, stage_execution)
-- [ ] FK columns added: deliverables.project_id, stage_executions.project_id, taskgroup_executions.project_id. Existing `source_project_id` columns in director_queue and ceo_queue converted to FK references to projects table. project_configs gains project_id FK
-- [ ] `deliverables` table gains `retry_count` int (default 0), `execution_order` int
-- [ ] `taskgroup_executions` gains `checkpoint_data` JSONB (nullable)
-- [ ] Migration is sequential numbered (NNN format), additive, non-destructive
-- [ ] All models pass pyright strict
+- [x] `Project` model: id (UUID), name, workflow_type, brief (text), status (ProjectStatus), current_stage, current_taskgroup_id (nullable FK), accumulated_cost (Numeric), created_at, updated_at, started_at, completed_at, error_message
+- [x] `ProjectStatus` enum added to `app/models/enums.py`: SHAPING, ACTIVE, PAUSED, SUSPENDED, COMPLETED, ABORTED
+- [x] `DeliverableStatus` enum extended with PLANNED and SKIPPED (existing values PENDING, IN_PROGRESS, COMPLETED, FAILED, BLOCKED preserved)
+- [x] `Artifact` model: id (UUID), entity_type (str), entity_id (UUID), path (str), content_type (str), size_bytes (int), created_at. Polymorphic via entity_type + entity_id (deliverable, taskgroup_execution, stage_execution)
+- [x] FK columns added: deliverables.project_id, stage_executions.project_id, taskgroup_executions.project_id. Existing `source_project_id` columns in director_queue and ceo_queue converted to FK references to projects table. project_configs gains project_id FK
+- [x] `deliverables` table gains `retry_count` int (default 0), `execution_order` int
+- [x] `taskgroup_executions` gains `checkpoint_data` JSONB (nullable)
+- [x] Migration is sequential numbered (NNN format), additive, non-destructive
+- [x] All models pass pyright strict
 **Validation:**
 - `uv run alembic upgrade head`
 - `uv run pyright app/db/models.py app/models/enums.py`
@@ -69,16 +69,16 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D1
 **Description:** Establish the DB session + ARQ pool injection pattern for management tools. Inject `_db_session_factory` and `_arq_pool` into session state at session creation time in `tasks.py` (both `run_work_session` and `run_director_turn`). Convert all management tool stubs from sync to async and add `tool_context: ToolContext` parameter. Create `_get_db_session` and `_get_arq_pool` helpers. Implement `escalate_to_ceo` as the reference DB-writing tool. Add role-scoped tool access violation logging (NFR-8a.08).
 **BOM Components:**
-- [ ] `X12` — Management tool DB wiring (replace placeholder strings with real persistence)
+- [x] `X12` — Management tool DB wiring (replace placeholder strings with real persistence)
 **Requirements:**
-- [ ] `_db_session_factory` and `_arq_pool` keys injected into session state at session creation in `run_work_session()` and `run_director_turn()` in `app/workers/tasks.py`
-- [ ] All management tool functions converted from `def` to `async def` with `tool_context: ToolContext` parameter added
-- [ ] `_get_db_session(tool_context)` async context manager yields session from factory; raises structured error if unavailable
-- [ ] `_get_arq_pool(tool_context)` returns ARQ pool from state; raises structured error if unavailable
-- [ ] `escalate_to_ceo` writes a real `CeoQueueItem` record to the database (reference implementation)
-- [ ] All tool stubs gain consistent error response: `{"error": {"code": "...", "message": "..."}}`
-- [ ] Tool access scope violations (e.g., PM invoking Director-only tool) logged as security events via EventPublisher (NFR-8a.08)
-- [ ] Pattern documented in module docstring
+- [x] `_db_session_factory` and `_arq_pool` keys injected into session state at session creation in `run_work_session()` and `run_director_turn()` in `app/workers/tasks.py`
+- [x] All management tool functions converted from `def` to `async def` with `tool_context: ToolContext` parameter added
+- [x] `_get_db_session(tool_context)` async context manager yields session from factory; raises structured error if unavailable
+- [x] `_get_arq_pool(tool_context)` returns ARQ pool from state; raises structured error if unavailable
+- [x] `escalate_to_ceo` writes a real `CeoQueueItem` record to the database (reference implementation)
+- [x] All tool stubs gain consistent error response: `{"error": {"code": "...", "message": "..."}}`
+- [x] Tool access scope violations (e.g., PM invoking Director-only tool) logged as security events via EventPublisher (NFR-8a.08)
+- [x] Pattern documented in module docstring
 **Validation:**
 - `uv run pytest tests/tools/test_management.py -v`
 - `uv run pyright app/tools/management.py`
@@ -90,17 +90,17 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D1, P8a.D2
 **Description:** Implement PM FunctionTools with real database persistence. `select_ready_batch` performs topological sort (Kahn's algorithm). `update_deliverable` writes status changes. `query_deliverables` queries with filters. `reorder_deliverables` updates execution order. `manage_dependencies` manages edges with cycle detection. `escalate_to_director` writes real DirectorQueueItem rows. Note: `checkpoint_project` is NOT a FunctionTool (see DD-7) — it is implemented as a callback in D9.
 **BOM Components:**
-- [ ] `X02` — Deliverable status tracking (lifecycle management via management tools)
-- [ ] `X13` — `escalate_to_director` real implementation (write to `director_queue` table)
+- [x] `X02` — Deliverable status tracking (lifecycle management via management tools)
+- [x] `X13` — `escalate_to_director` real implementation (write to `director_queue` table)
 **Requirements:**
-- [ ] `select_ready_batch` queries deliverables by project_id, filters by status (PENDING + retryable FAILED), builds dependency graph, returns frontier set via topological sort; completes within 500ms for 100 deliverables
-- [ ] `update_deliverable` writes status + optional notes + timestamp; validates status transitions (PENDING→IN_PROGRESS→COMPLETED|FAILED|SKIPPED); rejects invalid transitions with error
-- [ ] `query_deliverables` returns records filtered by project_id, status, stage, taskgroup; includes dependency info
-- [ ] `reorder_deliverables` updates execution_order column within a TaskGroup
-- [ ] `manage_dependencies` adds/removes dependency edges; rejects circular dependencies with specific error message identifying the cycle
-- [ ] `escalate_to_director` creates DirectorQueueItem with type, priority, context, source_project_id, source_agent; item immediately visible via DB query
-- [ ] All tools return structured JSON strings (not plain text placeholders)
-- [ ] All DB writes within a single tool call execute in one transaction; on failure, transaction rolls back and no partial state is visible (NFR-8a.03)
+- [x] `select_ready_batch` queries deliverables by project_id, filters by status (PENDING + retryable FAILED), builds dependency graph, returns frontier set via topological sort; completes within 500ms for 100 deliverables
+- [x] `update_deliverable` writes status + optional notes + timestamp; validates status transitions (PENDING→IN_PROGRESS→COMPLETED|FAILED|SKIPPED); rejects invalid transitions with error
+- [x] `query_deliverables` returns records filtered by project_id, status, stage, taskgroup; includes dependency info
+- [x] `reorder_deliverables` updates execution_order column within a TaskGroup
+- [x] `manage_dependencies` adds/removes dependency edges; rejects circular dependencies with specific error message identifying the cycle
+- [x] `escalate_to_director` creates DirectorQueueItem with type, priority, context, source_project_id, source_agent; item immediately visible via DB query
+- [x] All tools return structured JSON strings (not plain text placeholders)
+- [x] All DB writes within a single tool call execute in one transaction; on failure, transaction rolls back and no partial state is visible (NFR-8a.03)
 **Validation:**
 - `uv run pytest tests/tools/test_management.py -v`
 - `uv run pyright app/tools/management.py`
@@ -112,24 +112,24 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D1, P8a.D2
 **Description:** Implement Director management tools with real database persistence. These are **new functions** added to management.py (not modifications of existing stubs): `create_project`, `validate_brief`, `check_resources`, `delegate_to_pm`. Plus convert existing stubs: `list_projects`, `query_project_status`, `override_pm`, `query_dependency_graph`. Register new tools in `_toolset.py`. Note: `escalate_to_ceo` is already implemented in D2 as the reference tool.
 **BOM Components:**
-- [ ] `X21` — Director `create_project` tool
-- [ ] `X22` — Director `validate_brief` tool
-- [ ] `X23` — Director `check_resources` tool
-- [ ] `X24` — Director `delegate_to_pm` tool
-- [ ] `X18` — Brief validation against workflow `brief_template`
-- [ ] `X19` — Pre-execution resource validation
+- [x] `X21` — Director `create_project` tool
+- [x] `X22` — Director `validate_brief` tool
+- [x] `X23` — Director `check_resources` tool
+- [x] `X24` — Director `delegate_to_pm` tool
+- [x] `X18` — Brief validation against workflow `brief_template`
+- [x] `X19` — Pre-execution resource validation
 **Requirements:**
-- [ ] `create_project` creates Project record with workflow_type, brief, entry_mode, status=SHAPING; returns project_id
-- [ ] `validate_brief` resolves workflow via WorkflowRegistry, validates brief fields against `brief_template`; returns structured pass/fail with per-field details
-- [ ] `check_resources` reads workflow manifest `resources` field, validates: credentials (env var present and non-empty), services (reachable via health check), knowledge (file/dir exists); returns structured result per resource
-- [ ] `delegate_to_pm` enqueues ARQ `run_work_session` job via `_get_arq_pool(tool_context)`; transitions project status SHAPING→ACTIVE
-- [ ] `list_projects` returns project records with optional status filter, including workflow_type, stage, cost summary
-- [ ] `query_project_status` returns comprehensive status: deliverable counts by status, current stage, active TaskGroup, pending escalations, accumulated cost, duration
-- [ ] `override_pm` applies pause/resume/reorder/correct action; records override as audit event
-- [ ] `query_dependency_graph` returns full dependency graph with node statuses and cycle detection
-- [ ] When workflow resolution is ambiguous, `validate_brief` returns available matches for Director to present to user
-- [ ] When no workflow matches, `validate_brief` returns error listing available workflow types
-- [ ] New tools registered in `GlobalToolset` via `_toolset.py` with Director role scope
+- [x] `create_project` creates Project record with workflow_type, brief, entry_mode, status=SHAPING; returns project_id
+- [x] `validate_brief` resolves workflow via WorkflowRegistry, validates brief fields against `brief_template`; returns structured pass/fail with per-field details
+- [x] `check_resources` reads workflow manifest `resources` field, validates: credentials (env var present and non-empty), services (reachable via health check), knowledge (file/dir exists); returns structured result per resource
+- [x] `delegate_to_pm` enqueues ARQ `run_work_session` job via `_get_arq_pool(tool_context)`; transitions project status SHAPING→ACTIVE
+- [x] `list_projects` returns project records with optional status filter, including workflow_type, stage, cost summary
+- [x] `query_project_status` returns comprehensive status: deliverable counts by status, current stage, active TaskGroup, pending escalations, accumulated cost, duration
+- [x] `override_pm` applies pause/resume/reorder/correct action; records override as audit event
+- [x] `query_dependency_graph` returns full dependency graph with node statuses and cycle detection
+- [x] When workflow resolution is ambiguous, `validate_brief` returns available matches for Director to present to user
+- [x] When no workflow matches, `validate_brief` returns error listing available workflow types
+- [x] New tools registered in `GlobalToolset` via `_toolset.py` with Director role scope
 **Validation:**
 - `uv run pytest tests/tools/test_management.py -v`
 - `uv run pyright app/tools/management.py app/tools/_toolset.py`
@@ -141,13 +141,13 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D1
 **Description:** Add gateway routes for querying and resolving Director queue items. Mirrors existing CEO queue route pattern (`app/gateway/routes/ceo_queue.py`).
 **BOM Components:**
-- [ ] `G28` — `GET /director/queue` (list Director queue items)
-- [ ] `G29` — `PATCH /director/queue/{id}` (resolve/forward Director queue item)
+- [x] `G28` — `GET /director/queue` (list Director queue items)
+- [x] `G29` — `PATCH /director/queue/{id}` (resolve/forward Director queue item)
 **Requirements:**
-- [ ] `GET /director/queue` returns DirectorQueueItem records filtered by type, priority, status; sorted by priority desc then created_at asc
-- [ ] `PATCH /director/queue/{id}` supports RESOLVE (with resolution text) and FORWARD_TO_CEO (creates CeoQueueItem with original context + rationale, marks original as FORWARDED_TO_CEO)
-- [ ] Response models use Pydantic; no ADK types exposed
-- [ ] Routes registered in gateway app factory
+- [x] `GET /director/queue` returns DirectorQueueItem records filtered by type, priority, status; sorted by priority desc then created_at asc
+- [x] `PATCH /director/queue/{id}` supports RESOLVE (with resolution text) and FORWARD_TO_CEO (creates CeoQueueItem with original context + rationale, marks original as FORWARDED_TO_CEO)
+- [x] Response models use Pydantic; no ADK types exposed
+- [x] Routes registered in gateway app factory
 **Validation:**
 - `uv run pytest tests/gateway/ -v -k director_queue`
 - `uv run pyright app/gateway/routes/director_queue.py`
@@ -159,18 +159,18 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D1
 **Description:** Add gateway routes for project lifecycle and deliverable queries. Enhance existing workflow routes to reference project entities.
 **BOM Components:**
-- [ ] `G02` — `POST /specs` (brief submission)
-- [ ] `G03` — `POST /workflows/{id}/run`
-- [ ] `G04` — `GET /workflows/{id}/status`
-- [ ] `G07` — `GET /deliverables`
-- [ ] `G08` — `GET /deliverables/{id}`
+- [x] `G02` — `POST /specs` (brief submission)
+- [x] `G03` — `POST /workflows/{id}/run`
+- [x] `G04` — `GET /workflows/{id}/status`
+- [x] `G07` — `GET /deliverables`
+- [x] `G08` — `GET /deliverables/{id}`
 **Requirements:**
-- [ ] `POST /projects` accepts brief content and optional workflow_type; enqueues Director turn for project creation; returns 202
-- [ ] `GET /projects/{id}` returns project record with status, stage, deliverable counts, cost, timestamps
-- [ ] `GET /deliverables` returns records filtered by project_id, status, stage; includes dependency info
-- [ ] `GET /deliverables/{id}` returns full record including dependencies, validator results, artifact references (from `artifacts` table), retry count
-- [ ] `POST /workflows/{id}/run` and `GET /workflows/{id}/status` enhanced to reference project entities
-- [ ] All response models use Pydantic with proper typing
+- [x] `POST /projects` accepts brief content and optional workflow_type; enqueues Director turn for project creation; returns 202
+- [x] `GET /projects/{id}` returns project record with status, stage, deliverable counts, cost, timestamps
+- [x] `GET /deliverables` returns records filtered by project_id, status, stage; includes dependency info
+- [x] `GET /deliverables/{id}` returns full record including dependencies, validator results, artifact references (from `artifacts` table), retry count
+- [x] `POST /workflows/{id}/run` and `GET /workflows/{id}/status` enhanced to reference project entities
+- [x] All response models use Pydantic with proper typing
 **Validation:**
 - `uv run pytest tests/gateway/ -v -k "project or deliverable"`
 - `uv run pyright app/gateway/routes/projects.py app/gateway/routes/deliverables.py`
@@ -182,16 +182,16 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D1, P8a.D6
 **Description:** Add gateway routes for the three-layer pause/resume lifecycle.
 **BOM Components:**
-- [ ] `G30` — `POST /projects/{id}/pause`
-- [ ] `G31` — `POST /projects/{id}/resume`
-- [ ] `G32` — `POST /director/pause`
-- [ ] `G33` — `POST /director/resume`
+- [x] `G30` — `POST /projects/{id}/pause`
+- [x] `G31` — `POST /projects/{id}/resume`
+- [x] `G32` — `POST /director/pause`
+- [x] `G33` — `POST /director/resume`
 **Requirements:**
-- [ ] `POST /projects/{id}/pause` accepts reason; validates project is ACTIVE; enqueues pause action; returns 202
-- [ ] `POST /projects/{id}/resume` validates project is PAUSED; enqueues resume action; returns 202
-- [ ] `POST /director/pause` accepts reason; cascades pause to all active projects; returns 202
-- [ ] `POST /director/resume` resumes Director backlog processing; resumes paused projects in priority order; returns 202
-- [ ] All routes return 409 on invalid state transitions
+- [x] `POST /projects/{id}/pause` accepts reason; validates project is ACTIVE; enqueues pause action; returns 202
+- [x] `POST /projects/{id}/resume` validates project is PAUSED; enqueues resume action; returns 202
+- [x] `POST /director/pause` accepts reason; cascades pause to all active projects; returns 202
+- [x] `POST /director/resume` resumes Director backlog processing; resumes paused projects in priority order; returns 202
+- [x] All routes return 409 on invalid state transitions
 **Validation:**
 - `uv run pytest tests/gateway/ -v -k "pause or resume"`
 - `uv run pyright app/gateway/routes/`
@@ -203,19 +203,19 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D3, P8a.D4
 **Description:** Enhance `run_director_turn` to support the seven entry modes. Enhance `process_director_queue` to process backlog: read pending items, resolve within authority, forward unresolvable to CEO queue.
 **BOM Components:**
-- [ ] `X01` — Director-mediated project entry (seven entry modes)
-- [ ] `X03` — Director execution loop (backlog processing, PM delegation, escalation forwarding)
+- [x] `X01` — Director-mediated project entry (seven entry modes)
+- [x] `X03` — Director execution loop (backlog processing, PM delegation, escalation forwarding)
 **Requirements:**
-- [ ] Director chat sessions support all seven entry modes via natural conversation — Director determines mode from user intent and uses appropriate tools
-- [ ] Director validates brief via `validate_brief` before project creation
-- [ ] Director checks resources via `check_resources` before PM delegation
-- [ ] Director creates project via `create_project` and delegates via `delegate_to_pm`
-- [ ] For extend/edit/workstream modes, Director identifies existing project and creates scoped work within it
-- [ ] `process_director_queue` reads pending DirectorQueueItems prioritized by escalation priority (CRITICAL > HIGH > NORMAL > LOW)
-- [ ] Director resolves items within its authority: status reports (auto-acknowledge), resource requests with known resolution (apply fix), pattern alerts with prior precedent (apply same resolution)
-- [ ] Director forwards items beyond authority to CEO queue with assessment and recommended resolution options
-- [ ] When 2+ projects escalate the same failure type within a configurable window (default: 1 hour), Director surfaces a cross-project pattern alert to CEO queue with aggregated evidence
-- [ ] When backlog is empty, loop yields until new items arrive via existing cron mechanism
+- [x] Director chat sessions support all seven entry modes via natural conversation — Director determines mode from user intent and uses appropriate tools
+- [x] Director validates brief via `validate_brief` before project creation
+- [x] Director checks resources via `check_resources` before PM delegation
+- [x] Director creates project via `create_project` and delegates via `delegate_to_pm`
+- [x] For extend/edit/workstream modes, Director identifies existing project and creates scoped work within it
+- [x] `process_director_queue` reads pending DirectorQueueItems prioritized by escalation priority (CRITICAL > HIGH > NORMAL > LOW)
+- [x] Director resolves items within its authority: status reports (auto-acknowledge), resource requests with known resolution (apply fix), pattern alerts with prior precedent (apply same resolution)
+- [x] Director forwards items beyond authority to CEO queue with assessment and recommended resolution options
+- [x] When 2+ projects escalate the same failure type within a configurable window (default: 1 hour), Director surfaces a cross-project pattern alert to CEO queue with aggregated evidence
+- [x] When backlog is empty, loop yields until new items arrive via existing cron mechanism
 **Validation:**
 - `uv run pytest tests/workers/ -v -k "director"`
 - `uv run pyright app/workers/tasks.py`
@@ -227,24 +227,24 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D3, P8a.D8
 **Description:** Implement the PM's autonomous Stage → TaskGroup → Batch → Deliverable execution loop within `run_work_session`. Two-tier checkpointing per DD-7: Tier 1 `after_agent_callback` on DeliverablePipeline persists per-deliverable state automatically; Tier 2 PM-triggered at TaskGroup boundary. `RegressionTestAgent` (CustomAgent) wired into pipeline after each batch. Stage transitions gated by `verify_stage_completion`.
 **BOM Components:**
-- [ ] `X04` — PM batch loop (autonomous, stage-driven, sequential)
-- [ ] `A63` — PM outer loop (sequential batch management)
-- [ ] `X25` — PM checkpoint_project (after_agent_callback, NOT a FunctionTool)
+- [x] `X04` — PM batch loop (autonomous, stage-driven, sequential)
+- [x] `A63` — PM outer loop (sequential batch management)
+- [x] `X25` — PM checkpoint_project (after_agent_callback, NOT a FunctionTool)
 **Requirements:**
-- [ ] PM initializes from workflow stage schema; determines starting point (first stage for new, checkpoint for resume)
-- [ ] PM creates TaskGroups as bounded planning units within each stage
-- [ ] Within each TaskGroup, PM calls `select_ready_batch` and executes deliverables sequentially (one at a time)
-- [ ] Each deliverable passes through full pipeline: skill loading → planning → execution → validation → review
-- [ ] **Tier 1 checkpoint**: `after_agent_callback` on DeliverablePipeline fires after each deliverable, persists deliverable status and result to DB via `CallbackContext`. A checkpointed deliverable never re-executes after crash (FR-8a.48)
-- [ ] **Tier 2 checkpoint**: At TaskGroup completion, persist critical PM state (stage progress, cost, loaded skills) to `taskgroup_executions.checkpoint_data`. Checkpoint writes execute in a single DB transaction; on failure, rolls back completely (NFR-8a.03)
-- [ ] **RegressionTestAgent** (CustomAgent) wired into pipeline after each batch — reads PM's regression policy from session state, runs tests when policy requires, no-ops otherwise. Always present, not LLM-discretionary
-- [ ] Validators run at configured schedules: PER_DELIVERABLE, PER_BATCH, PER_TASKGROUP, PER_STAGE. Validators are mandatory — PM cannot skip or defer
-- [ ] At TaskGroup completion: verify all batches done, generate completion report, publish event
-- [ ] Stage transitions: forward-only, sequential, gated by `verify_stage_completion` + approval
-- [ ] PM publishes batch completion events to Redis Streams
-- [ ] Loop continues autonomously until all stages complete or escalation required
-- [ ] Between batches, PM evaluates execution state and selects one action: retry failed deliverable (if retries remain), reorder to prioritize unblocked work, skip blocked deliverable (mark SKIPPED), or escalate to Director. Decision logged as event
-- [ ] PM enforces per-project cost ceiling from `project_configs`; escalates to Director when exceeded
+- [x] PM initializes from workflow stage schema; determines starting point (first stage for new, checkpoint for resume)
+- [x] PM creates TaskGroups as bounded planning units within each stage
+- [x] Within each TaskGroup, PM calls `select_ready_batch` and executes deliverables sequentially (one at a time)
+- [x] Each deliverable passes through full pipeline: skill loading → planning → execution → validation → review
+- [x] **Tier 1 checkpoint**: `after_agent_callback` on DeliverablePipeline fires after each deliverable, persists deliverable status and result to DB via `CallbackContext`. A checkpointed deliverable never re-executes after crash (FR-8a.48)
+- [x] **Tier 2 checkpoint**: At TaskGroup completion, persist critical PM state (stage progress, cost, loaded skills) to `taskgroup_executions.checkpoint_data`. Checkpoint writes execute in a single DB transaction; on failure, rolls back completely (NFR-8a.03)
+- [x] **RegressionTestAgent** (CustomAgent) wired into pipeline after each batch — reads PM's regression policy from session state, runs tests when policy requires, no-ops otherwise. Always present, not LLM-discretionary
+- [x] Validators run at configured schedules: PER_DELIVERABLE, PER_BATCH, PER_TASKGROUP, PER_STAGE. Validators are mandatory — PM cannot skip or defer
+- [x] At TaskGroup completion: verify all batches done, generate completion report, publish event
+- [x] Stage transitions: forward-only, sequential, gated by `verify_stage_completion` + approval
+- [x] PM publishes batch completion events to Redis Streams
+- [x] Loop continues autonomously until all stages complete or escalation required
+- [x] Between batches, PM evaluates execution state and selects one action: retry failed deliverable (if retries remain), reorder to prioritize unblocked work, skip blocked deliverable (mark SKIPPED), or escalate to Director. Decision logged as event
+- [x] PM enforces per-project cost ceiling from `project_configs`; escalates to Director when exceeded
 **Validation:**
 - `uv run pytest tests/workers/ -v -k "work_session"`
 - `uv run pyright app/workers/tasks.py app/agents/supervision.py`
@@ -256,22 +256,22 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D9
 **Description:** Implement autonomous failure handling and batch failure threshold. Extend supervision callbacks.
 **BOM Components:**
-- [ ] `X08` — Autonomous failure handling (retry/reorder/skip)
-- [ ] `X11` — Batch failure threshold (consecutive failures → Director suspension)
+- [x] `X08` — Autonomous failure handling (retry/reorder/skip)
+- [x] `X11` — Batch failure threshold (consecutive failures → Director suspension)
 **Requirements:**
-- [ ] PM retries failed deliverables up to per-deliverable retry limit (default: 2, configurable per project via NFR-8a.07); each retry logged as event
-- [ ] On retry exhaustion, PM marks deliverable FAILED and evaluates dependency graph for blocked vs independent work
-- [ ] Failed deliverables do not block deliverables with no dependency path through the failure
-- [ ] PM reorders remaining work to maximize progress — independent deliverables first
-- [ ] When PM cannot resolve, escalates to Director with context, validator evidence, and remediation history
-- [ ] When CEO resolves escalation, resolution applies to work queue; suspended path resumes without restarting
-- [ ] Remediation re-executes only failed deliverable and direct dependents — verified independent work never re-executed
-- [ ] Consecutive batch failure counter tracked in session state (`pm:consecutive_batch_failures`)
-- [ ] When counter exceeds threshold (default: 3, configurable per project), PM escalates to Director
-- [ ] Director suspends project, diagnoses failure pattern, surfaces findings to CEO queue
-- [ ] Director does not attempt autonomous repair beyond threshold — CEO must resolve
-- [ ] CEO resolution resumes project from last checkpoint; verified deliverables not re-executed
-- [ ] Successful batch resets consecutive failure counter to zero
+- [x] PM retries failed deliverables up to per-deliverable retry limit (default: 2, configurable per project via NFR-8a.07); each retry logged as event
+- [x] On retry exhaustion, PM marks deliverable FAILED and evaluates dependency graph for blocked vs independent work
+- [x] Failed deliverables do not block deliverables with no dependency path through the failure
+- [x] PM reorders remaining work to maximize progress — independent deliverables first
+- [x] When PM cannot resolve, escalates to Director with context, validator evidence, and remediation history
+- [x] When CEO resolves escalation, resolution applies to work queue; suspended path resumes without restarting
+- [x] Remediation re-executes only failed deliverable and direct dependents — verified independent work never re-executed
+- [x] Consecutive batch failure counter tracked in session state (`pm:consecutive_batch_failures`)
+- [x] When counter exceeds threshold (default: 3, configurable per project), PM escalates to Director
+- [x] Director suspends project, diagnoses failure pattern, surfaces findings to CEO queue
+- [x] Director does not attempt autonomous repair beyond threshold — CEO must resolve
+- [x] CEO resolution resumes project from last checkpoint; verified deliverables not re-executed
+- [x] Successful batch resets consecutive failure counter to zero
 **Validation:**
 - `uv run pytest tests/agents/test_supervision.py tests/tools/test_management.py -v`
 - `uv run pyright app/agents/supervision.py`
@@ -283,16 +283,16 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D9
 **Description:** Implement completion report generation at TaskGroup and Stage boundaries with three verification layers backed by validator evidence. Reports stored in execution record JSONB.
 **BOM Components:**
-- [ ] `X14` — Three-layer completion report wiring into INTEGRATE validators
+- [x] `X14` — Three-layer completion report wiring into INTEGRATE validators
 **Requirements:**
-- [ ] `CompletionReportBuilder` collects validator results, maps to verification layers, adds metrics
-- [ ] TaskGroup completion report generated when all deliverables complete and validators pass
-- [ ] Stage completion report aggregates TaskGroup reports within the stage
-- [ ] Each layer contains machine evidence from validators — assertion without evidence marked as unverified
-- [ ] TaskGroup cannot close while: any deliverable outstanding, any scheduled validator failing, any escalation unresolved
-- [ ] Reports include: per-deliverable evidence, cost/token usage by agent tier, duration, decision log
-- [ ] INTEGRATE stage CEO approval gate requires all three layers to pass
-- [ ] Reports stored in `taskgroup_executions.completion_report` and `stage_executions.completion_report` JSONB
+- [x] `CompletionReportBuilder` collects validator results, maps to verification layers, adds metrics
+- [x] TaskGroup completion report generated when all deliverables complete and validators pass
+- [x] Stage completion report aggregates TaskGroup reports within the stage
+- [x] Each layer contains machine evidence from validators — assertion without evidence marked as unverified
+- [x] TaskGroup cannot close while: any deliverable outstanding, any scheduled validator failing, any escalation unresolved
+- [x] Reports include: per-deliverable evidence, cost/token usage by agent tier, duration, decision log
+- [x] INTEGRATE stage CEO approval gate requires all three layers to pass
+- [x] Reports stored in `taskgroup_executions.completion_report` and `stage_executions.completion_report` JSONB
 **Validation:**
 - `uv run pytest tests/workflows/ -v -k completion`
 - `uv run pyright app/workflows/completion.py`
@@ -304,17 +304,17 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D1, P8a.D9
 **Description:** Implement persistent artifact storage per execution.md: content stored on filesystem organized by project/entity, metadata in `artifacts` DB table. Post-pipeline step copies session artifacts to persistent store with DB association. Query API returns artifact references (path, content_type, size) — not inline content.
 **BOM Components:**
-- [ ] `CT03` — Artifact storage (`save_artifact`/`load_artifact`)
-- [ ] `X31` — Deliverable artifact association
-- [ ] `X32` — Completion report artifact association
+- [x] `CT03` — Artifact storage (`save_artifact`/`load_artifact`)
+- [x] `X31` — Deliverable artifact association
+- [x] `X32` — Completion report artifact association
 **Requirements:**
-- [ ] `ArtifactStore` class with `save(entity_type, entity_id, filename, content, content_type)` → writes file to `{project_dir}/{entity_type}/{entity_id}/{filename}`, creates `Artifact` DB record
-- [ ] `ArtifactStore.load(artifact_id)` → reads file from path stored in DB record
-- [ ] `ArtifactStore.list(entity_type, entity_id)` → queries `artifacts` table for entity
-- [ ] Post-pipeline callback copies ADK session artifacts to persistent store via `ArtifactStore.save()`
-- [ ] Artifact records include: entity_type, entity_id, path, content_type, size_bytes, created_at
-- [ ] Deliverable and execution record query responses include artifact references
-- [ ] Arbitrary file types supported (code, test results, reports)
+- [x] `ArtifactStore` class with `save(entity_type, entity_id, filename, content, content_type)` → writes file to `{project_dir}/{entity_type}/{entity_id}/{filename}`, creates `Artifact` DB record
+- [x] `ArtifactStore.load(artifact_id)` → reads file from path stored in DB record
+- [x] `ArtifactStore.list(entity_type, entity_id)` → queries `artifacts` table for entity
+- [x] Post-pipeline callback copies ADK session artifacts to persistent store via `ArtifactStore.save()`
+- [x] Artifact records include: entity_type, entity_id, path, content_type, size_bytes, created_at
+- [x] Deliverable and execution record query responses include artifact references
+- [x] Arbitrary file types supported (code, test results, reports)
 **Validation:**
 - `uv run pytest tests/agents/test_artifacts.py -v`
 - `uv run pyright app/agents/artifacts.py`
@@ -326,15 +326,15 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D9, P8a.D12
 **Description:** Enhance existing context recreation for TaskGroup-aware resume. When ContextRecreationRequired fires mid-TaskGroup, complete current deliverable, checkpoint, create fresh session, resume.
 **BOM Components:**
-- [ ] `CT04b` — Context recreation resume at TaskGroup boundary
+- [x] `CT04b` — Context recreation resume at TaskGroup boundary
 **Requirements:**
-- [ ] On ContextRecreationRequired, system completes current deliverable then checkpoints
-- [ ] Seeded state includes: deliverable statuses, stage progress, current_taskgroup_id, accumulated cost, loaded skill names, project config
-- [ ] Fresh session created; conversation history dropped; context reconstructed from durable stores
-- [ ] Verified deliverables within completed TaskGroups never re-executed
-- [ ] Mid-work batches rediscovered via `select_ready_batch` on resume
-- [ ] Context recreation publishes events: initiation (old session ID) and completion (new session ID, seeded keys, remaining stages)
-- [ ] Recreation completes within 30 seconds (NFR-8a.04)
+- [x] On ContextRecreationRequired, system completes current deliverable then checkpoints
+- [x] Seeded state includes: deliverable statuses, stage progress, current_taskgroup_id, accumulated cost, loaded skill names, project config
+- [x] Fresh session created; conversation history dropped; context reconstructed from durable stores
+- [x] Verified deliverables within completed TaskGroups never re-executed
+- [x] Mid-work batches rediscovered via `select_ready_batch` on resume
+- [x] Context recreation publishes events: initiation (old session ID) and completion (new session ID, seeded keys, remaining stages)
+- [x] Recreation completes within 30 seconds (NFR-8a.04)
 **Validation:**
 - `uv run pytest tests/agents/test_context_recreation.py -v`
 - `uv run pyright app/agents/context_recreation.py`
@@ -346,15 +346,15 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D1
 **Description:** Extend EventPublisher with new lifecycle event types. Add `publish_batch_completed`, `publish_stage_completed`, `publish_project_status_changed` methods alongside existing `publish_lifecycle`.
 **BOM Components:**
-- [ ] `V19` — Batch completion event publishing
+- [x] `V19` — Batch completion event publishing
 **Requirements:**
-- [ ] `BATCH_COMPLETED` event published after each batch with deliverable statuses and validator results
-- [ ] `STAGE_COMPLETED` event published on stage transitions
-- [ ] `PROJECT_STATUS_CHANGED` event published on any project status change
-- [ ] `CONTEXT_RECREATED` event published on context recreation with old/new session IDs
-- [ ] Events publish within 2 seconds of state change (NFR-8a.02)
-- [ ] Event types added to `PipelineEventType` enum in `app/models/enums.py`
-- [ ] Events include project_id, workflow_type, and timestamp
+- [x] `BATCH_COMPLETED` event published after each batch with deliverable statuses and validator results
+- [x] `STAGE_COMPLETED` event published on stage transitions
+- [x] `PROJECT_STATUS_CHANGED` event published on any project status change
+- [x] `CONTEXT_RECREATED` event published on context recreation with old/new session IDs
+- [x] Events publish within 2 seconds of state change (NFR-8a.02)
+- [x] Event types added to `PipelineEventType` enum in `app/models/enums.py`
+- [x] Events include project_id, workflow_type, and timestamp
 **Validation:**
 - `uv run pytest tests/events/ -v`
 - `uv run pyright app/events/publisher.py`
@@ -366,17 +366,17 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D8, P8a.D9
 **Description:** Add `edit_operations` field to WorkflowManifest. Update `auto-code` WORKFLOW.yaml with edit operations and `resources` entries. Implement project edit flow.
 **BOM Components:**
-- [ ] `X26` — Workflow-defined edit operations manifest field (`edit_operations` in WORKFLOW.yaml)
-- [ ] `X27` — Project edit request flow (Director receives edit → creates new TaskGroup)
+- [x] `X26` — Workflow-defined edit operations manifest field (`edit_operations` in WORKFLOW.yaml)
+- [x] `X27` — Project edit request flow (Director receives edit → creates new TaskGroup)
 **Requirements:**
-- [ ] `EditOperationDef` added to manifest.py: name, description, entry_stage (optional), requires_approval (bool, default false)
-- [ ] Existing manifests without `edit_operations` remain valid (default: empty list)
-- [ ] `auto-code` WORKFLOW.yaml updated with: edit_operations (add-feature, remove-feature, fix-bug, refactor) and resources (at minimum one credential entry for testability of D4's `check_resources`)
-- [ ] Projects modifiable in any state (SHAPING, ACTIVE, PAUSED, SUSPENDED, COMPLETED)
-- [ ] Single edit creates one new TaskGroup; batch edit creates ordered TaskGroups respecting inter-edit dependencies
-- [ ] PM incorporates new TaskGroups via `select_ready_batch` without interrupting current deliverable
-- [ ] Edit work follows same execution loop with same validation, checkpointing, and reporting
-- [ ] Project's accumulated context carries forward into edit work
+- [x] `EditOperationDef` added to manifest.py: name, description, entry_stage (optional), requires_approval (bool, default false)
+- [x] Existing manifests without `edit_operations` remain valid (default: empty list)
+- [x] `auto-code` WORKFLOW.yaml updated with: edit_operations (add-feature, remove-feature, fix-bug, refactor) and resources (at minimum one credential entry for testability of D4's `check_resources`)
+- [x] Projects modifiable in any state (SHAPING, ACTIVE, PAUSED, SUSPENDED, COMPLETED)
+- [x] Single edit creates one new TaskGroup; batch edit creates ordered TaskGroups respecting inter-edit dependencies
+- [x] PM incorporates new TaskGroups via `select_ready_batch` without interrupting current deliverable
+- [x] Edit work follows same execution loop with same validation, checkpointing, and reporting
+- [x] Project's accumulated context carries forward into edit work
 **Validation:**
 - `uv run pytest tests/workflows/ -v -k "edit or manifest"`
 - `uv run pyright app/workflows/manifest.py`
@@ -388,18 +388,18 @@ Per tools.md: `checkpoint_project` and `run_regression_tests` are **not Function
 **Depends on:** P8a.D7, P8a.D9, P8a.D13
 **Description:** Implement the three-layer pause/resume lifecycle per DD-5.
 **BOM Components:**
-- [ ] `X28` — Project-level pause/resume mechanism
-- [ ] `X29` — Director work layer pause/resume mechanism
-- [ ] `X30` — System-wide pause/resume
+- [x] `X28` — Project-level pause/resume mechanism
+- [x] `X29` — Director work layer pause/resume mechanism
+- [x] `X30` — System-wide pause/resume
 **Requirements:**
-- [ ] Project pause: PM completes current deliverable, checkpoints at next boundary, logs reason, stops; no inconsistent state
-- [ ] Project resume: loads persisted state, rebuilds PM context (skills, instructions, stage config), resumes from checkpoint; verified deliverables never re-executed
-- [ ] Project abort: terminates execution, preserves completed work and events, records reason, transitions to ABORTED
-- [ ] System-wide pause: pauses every active project individually; each reaches safe checkpoint independently
-- [ ] System-wide resume: resumes each project individually; projects resume independently
-- [ ] Director pause: stops backlog queue processing, stops new project creation, cascades pause to active projects
-- [ ] Director resume: rebuilds Director context, loads pending queue state, resumes backlog processing, resumes paused projects in priority order
-- [ ] All pause/resume operations publish lifecycle events with layer scope, actor, timestamp, reason
+- [x] Project pause: PM completes current deliverable, checkpoints at next boundary, logs reason, stops; no inconsistent state
+- [x] Project resume: loads persisted state, rebuilds PM context (skills, instructions, stage config), resumes from checkpoint; verified deliverables never re-executed
+- [x] Project abort: terminates execution, preserves completed work and events, records reason, transitions to ABORTED
+- [x] System-wide pause: pauses every active project individually; each reaches safe checkpoint independently
+- [x] System-wide resume: resumes each project individually; projects resume independently
+- [x] Director pause: stops backlog queue processing, stops new project creation, cascades pause to active projects
+- [x] Director resume: rebuilds Director context, loads pending queue state, resumes backlog processing, resumes paused projects in priority order
+- [x] All pause/resume operations publish lifecycle events with layer scope, actor, timestamp, reason
 **Validation:**
 - `uv run pytest tests/workers/test_lifecycle.py -v`
 - `uv run pyright app/workers/lifecycle.py`

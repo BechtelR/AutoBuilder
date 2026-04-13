@@ -80,11 +80,18 @@ cp .env.example .env
 ### 4.3 Start Infrastructure Services
 
 ```bash
-# Start PostgreSQL + Redis via Docker
-docker compose up -d
+# Start PostgreSQL + Redis via Docker (infrastructure only for local dev)
+docker compose up -d postgres redis
 
 # Verify services are running
 docker compose ps
+```
+
+Alternatively, start the full stack (gateway + worker + infrastructure):
+
+```bash
+docker compose up -d                  # All services: postgres, redis, gateway, worker
+docker compose run --rm migrate       # Apply migrations (first time / schema changes)
 ```
 
 ### 4.4 Create Virtual Environment and Install Dependencies
@@ -98,24 +105,34 @@ uv sync
 
 ```bash
 # Verify ADK is available
-python -c "import google.adk; print(google.adk.__version__)"
+uv run python -c "import google.adk; print(google.adk.__version__)"
 
 # Verify LiteLLM is available
-python -c "import litellm; print(litellm.__version__)"
+uv run python -c "import litellm; print(litellm.__version__)"
 ```
 
-### 4.6 Running the CLI
+### 4.6 Run Gateway and Worker (Local Dev)
+
+When running infrastructure via Docker and gateway/worker locally:
 
 ```bash
-# TBD: CLI interface is Phase 1
-# Expected usage pattern:
-app run --spec ./spec.md --workflow auto-code
-app run --spec ./spec.md --workflow auto-code --resume
-app status
-app list-workflows
+# Apply migrations
+uv run alembic upgrade head
+
+# Terminal 1: Gateway (hot-reloads on app/ changes)
+uv run uvicorn app.gateway.main:app --reload
+
+# Terminal 2: ARQ worker
+uv run arq app.workers.settings.WorkerSettings
 ```
 
-### 4.7 Running the ADK Dev UI
+### 4.7 Running the CLI
+
+```bash
+uv run python -m app --help
+```
+
+### 4.8 Running the ADK Dev UI
 
 ADK provides a built-in development UI for debugging agent interactions:
 
@@ -138,45 +155,42 @@ adk web app/app.py
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
 # Run with coverage
-pytest --cov=app --cov-report=html
+uv run pytest --cov=app
 
 # Run specific test directory
-pytest tests/test_tools/
-
-# Run specific test directory
-pytest tests/test_memory/
+uv run pytest tests/tools/
 
 # Run with verbose output
-pytest -v
+uv run pytest -v
 
 # Run only fast tests (exclude integration)
-pytest -m "not integration"
+uv run pytest -m "not integration"
 ```
 
 ### 5.2 Linting
 
 ```bash
 # Lint check
-ruff check app/ tests/
+uv run ruff check .
 
 # Lint with auto-fix
-ruff check --fix app/ tests/
+uv run ruff check . --fix
 
 # Type checking
-pyright app/
+uv run pyright
 ```
 
 ### 5.3 Formatting
 
 ```bash
 # Format code
-ruff format app/ tests/
+uv run ruff format .
 
 # Check formatting without changes
-ruff format --check app/ tests/
+uv run ruff format --check .
 ```
 
 ---
@@ -309,10 +323,10 @@ Dev dependencies:
 
 ```bash
 # Check Python version
-python --version
+uv run python --version
 
 # Check installed packages
-uv pip list | grep -E "google-adk|litellm|asyncpg"
+uv run pip list | grep -E "google-adk|litellm|asyncpg"
 
 # Check infrastructure services
 docker compose ps
@@ -371,5 +385,4 @@ Maximum ~500 per module. If a module grows beyond this, decompose into sub-modul
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2026-02-11*
+*Document Version: 1.1*

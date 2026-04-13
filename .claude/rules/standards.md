@@ -59,13 +59,14 @@ Sequential `NNN_description.py` naming. Never hash-based IDs. `--rev-id NNN` on 
 ## Testing: Real Infrastructure, Never Mocked
 
 - **Never mock** local infrastructure (PostgreSQL, Redis) — use real services; skip when unavailable
-- Only mock **external** APIs (LLM, third-party webhooks)
+- Only mock **external** APIs (LLM, third-party webhooks); MUST leave comments explaining why
 - Degraded-path tests use broken connection URLs, not mock objects
 
 ## Common Violations to Watch
 
 - **String Literals**: Use enums/constants, not magic strings.
 - **DRY**: Search for existing code before implementing. Check shared utilities and hooks.
+- **Mocked Tests**
 
 ## Boundary Type Safety
 

@@ -12,7 +12,17 @@ from app.lib import get_logger, setup_logging
 from app.models.constants import APP_NAME, INIT_SESSION_ID, SYSTEM_USER_ID
 from app.router import LlmRouter
 from app.workers.adk import create_session_service
+from app.workers.lifecycle import (
+    abort_project,
+    pause_all_projects,
+    pause_director,
+    pause_project,
+    resume_all_projects,
+    resume_director,
+    resume_project,
+)
 from app.workers.tasks import (
+    apply_resolution,
     heartbeat,
     process_director_queue,
     run_director_turn,
@@ -133,7 +143,20 @@ async def shutdown(ctx: dict[str, object]) -> None:
 class WorkerSettings:
     """ARQ worker settings -- entry point: ``arq app.workers.settings.WorkerSettings``."""
 
-    functions = [test_task, run_workflow, run_director_turn, run_work_session]
+    functions = [
+        test_task,
+        run_workflow,
+        run_director_turn,
+        run_work_session,
+        apply_resolution,
+        pause_project,
+        resume_project,
+        abort_project,
+        pause_director,
+        resume_director,
+        pause_all_projects,
+        resume_all_projects,
+    ]
     redis_settings = parse_redis_settings(get_settings().redis_url)
     cron_jobs = [
         cron(heartbeat, second=0),  # every minute at :00

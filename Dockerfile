@@ -6,8 +6,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# Copy dependency files and README (required by hatchling)
-COPY pyproject.toml uv.lock README.md ./
+# Copy dependency files, README, and LICENSE (required by hatchling)
+COPY pyproject.toml uv.lock README.md LICENSE ./
 
 # Copy app directory (required for editable install)
 COPY app/ app/

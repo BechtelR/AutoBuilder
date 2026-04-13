@@ -1,17 +1,64 @@
-"""Session-scoped todo tools and shared task placeholders.
+"""Session-scoped todo tools and cross-session task tools with DB persistence.
 
 Todo tools use ADK ToolContext for session state persistence.
-Shared task tools are sync placeholders for Phase 5 persistence.
+Shared task tools use ToolExecutionContext for real DB persistence (FR-8a.25).
 """
 
+from __future__ import annotations
+
+import contextlib
+import json
 import uuid
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 
-from google.adk.tools.tool_context import ToolContext
+from google.adk.tools.tool_context import (
+    ToolContext,  # noqa: TC002 - runtime import required by ADK FunctionTool
+)
+from sqlalchemy import select
 
+from app.db.models import ProjectTask
 from app.lib.logging import get_logger
 from app.models.enums import TaskStatus, TodoAction, TodoStatus
+from app.tools._context import SESSION_ID_KEY, get_tool_context
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger("tools.task")
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+@asynccontextmanager
+async def _get_db_session(tool_context: ToolContext) -> AsyncIterator[AsyncSession]:
+    """Get a DB session from the tool execution context registry."""
+    session_id = tool_context.state.get(SESSION_ID_KEY)  # type: ignore[union-attr]
+    if session_id is None:
+        raise ValueError("Session ID not available in tool context")
+    ctx = get_tool_context(str(session_id))
+    async with ctx.db_session_factory() as session:
+        yield session
+
+
+def _task_to_dict(task: ProjectTask) -> dict[str, object]:
+    """Convert a ProjectTask row to a serializable dict."""
+    return {
+        "id": str(task.id),
+        "title": task.title,
+        "description": task.description,
+        "status": task.status.value,
+        "assignee": task.assignee,
+        "tags": task.tags,
+        "notes": task.notes,
+        "created_at": task.created_at.isoformat(),
+        "updated_at": task.updated_at.isoformat(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -154,13 +201,14 @@ def todo_list(
 
 
 # ---------------------------------------------------------------------------
-# Shared task tools (Phase 5 persistence placeholders)
+# Shared task tools — DB-persisted (FR-8a.25)
 # ---------------------------------------------------------------------------
 
 
-def task_create(
+async def task_create(
     title: str,
     description: str,
+    tool_context: ToolContext,
     assignee: str | None = None,
     tags: list[str] | None = None,
 ) -> str:
@@ -169,25 +217,55 @@ def task_create(
     Args:
         title: Short title for the task.
         description: Detailed description of what needs to be done.
+        tool_context: ADK-injected session context (excluded from LLM schema).
         assignee: Optional agent or user to assign the task to.
         tags: Optional list of tags for categorization.
 
     Returns:
-        Confirmation message with the generated task ID.
+        JSON with the created task record.
     """
-    task_id = uuid.uuid4().hex[:8]
-    logger.debug(
-        "Task created (placeholder): %s title=%s assignee=%s tags=%s",
-        task_id,
-        title,
-        assignee,
-        tags,
-    )
-    return f"Task {task_id} created: {title} (placeholder — persistence in Phase 5)"
+    # Check both unprefixed and PM-prefixed state keys (PM sets "pm:project_id",
+    # Director may set "project_id" directly)
+    project_id_raw = tool_context.state.get("project_id") or tool_context.state.get("pm:project_id")  # type: ignore[union-attr]
+    project_uuid: uuid.UUID | None = None
+    if project_id_raw is not None:
+        try:
+            project_uuid = uuid.UUID(str(project_id_raw))
+        except ValueError:
+            return json.dumps(
+                {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": f"Invalid project_id in state: {project_id_raw}",
+                    }
+                }
+            )
+
+    try:
+        task = ProjectTask(
+            title=title,
+            description=description,
+            assignee=assignee,
+            tags=tags or [],
+            project_id=project_uuid,
+        )
+
+        async with _get_db_session(tool_context) as db:
+            db.add(task)
+            await db.commit()
+            await db.refresh(task)
+            result = _task_to_dict(task)
+
+        logger.debug("Task created: %s title=%s", result["id"], title)
+        return json.dumps(result)
+    except Exception as e:
+        logger.exception("Failed to create task")
+        return json.dumps({"error": {"code": "DB_ERROR", "message": str(e)}})
 
 
-def task_update(
+async def task_update(
     task_id: str,
+    tool_context: ToolContext,
     status: str | None = None,
     notes: str | None = None,
 ) -> str:
@@ -195,11 +273,12 @@ def task_update(
 
     Args:
         task_id: The unique identifier of the task to update.
+        tool_context: ADK-injected session context (excluded from LLM schema).
         status: New status value (OPEN, IN_PROGRESS, DONE, BLOCKED), if changing.
         notes: Additional notes to append, if any.
 
     Returns:
-        Confirmation message.
+        JSON with the updated task record, or an error message.
     """
     resolved_status: TaskStatus | None = None
     if status is not None:
@@ -207,28 +286,62 @@ def task_update(
             resolved_status = TaskStatus(status)
         except ValueError:
             valid = ", ".join(s.value for s in TaskStatus)
-            return f"Error: invalid status '{status}'. Valid values: {valid}"
-    logger.debug(
-        "Task updated (placeholder): %s status=%s notes=%s",
-        task_id,
-        resolved_status,
-        notes,
-    )
-    return f"Task {task_id} updated (placeholder — persistence in Phase 5)"
+            return json.dumps(
+                {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": f"Invalid status '{status}'. Valid: {valid}",
+                    }
+                }
+            )
+
+    try:
+        task_uuid = uuid.UUID(task_id)
+    except ValueError:
+        return json.dumps(
+            {"error": {"code": "INVALID_INPUT", "message": f"Invalid task_id '{task_id}'"}}
+        )
+
+    try:
+        async with _get_db_session(tool_context) as db:
+            stmt = select(ProjectTask).where(ProjectTask.id == task_uuid)
+            row = (await db.execute(stmt)).scalar_one_or_none()
+            if row is None:
+                return json.dumps(
+                    {"error": {"code": "NOT_FOUND", "message": f"Task '{task_id}' not found"}}
+                )
+
+            if resolved_status is not None:
+                row.status = resolved_status
+            if notes is not None:
+                existing = row.notes or ""
+                row.notes = f"{existing}\n{notes}".strip() if existing else notes
+
+            await db.commit()
+            await db.refresh(row)
+            result = _task_to_dict(row)
+
+        logger.debug("Task updated: %s status=%s", task_id, resolved_status)
+        return json.dumps(result)
+    except Exception as e:
+        logger.exception("Failed to update task")
+        return json.dumps({"error": {"code": "DB_ERROR", "message": str(e)}})
 
 
-def task_query(
+async def task_query(
+    tool_context: ToolContext,
     filter: str | None = None,
     assignee: str | None = None,
 ) -> str:
     """Query shared tasks with optional status filter and assignee.
 
     Args:
+        tool_context: ADK-injected session context (excluded from LLM schema).
         filter: Filter tasks by status (OPEN, IN_PROGRESS, DONE, BLOCKED).
         assignee: Filter tasks by assigned agent or user.
 
     Returns:
-        Query result placeholder message.
+        JSON array of matching task records.
     """
     resolved_filter: TaskStatus | None = None
     if filter is not None:
@@ -236,10 +349,40 @@ def task_query(
             resolved_filter = TaskStatus(filter)
         except ValueError:
             valid = ", ".join(s.value for s in TaskStatus)
-            return f"Error: invalid filter '{filter}'. Valid values: {valid}"
-    logger.debug(
-        "Task query (placeholder): filter=%s assignee=%s",
-        resolved_filter,
-        assignee,
-    )
-    return "Task query (placeholder — persistence in Phase 5)"
+            return json.dumps(
+                {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": f"Invalid filter '{filter}'. Valid: {valid}",
+                    }
+                }
+            )
+
+    # Check both unprefixed and PM-prefixed state keys (PM sets "pm:project_id",
+    # Director may set "project_id" directly)
+    project_id_raw = tool_context.state.get("project_id") or tool_context.state.get("pm:project_id")  # type: ignore[union-attr]
+    project_uuid: uuid.UUID | None = None
+    if project_id_raw is not None:
+        with contextlib.suppress(ValueError):
+            project_uuid = uuid.UUID(str(project_id_raw))
+
+    try:
+        async with _get_db_session(tool_context) as db:
+            stmt = select(ProjectTask)
+            if project_uuid is not None:
+                stmt = stmt.where(ProjectTask.project_id == project_uuid)
+            if resolved_filter is not None:
+                stmt = stmt.where(ProjectTask.status == resolved_filter)
+            if assignee is not None:
+                stmt = stmt.where(ProjectTask.assignee == assignee)
+
+            rows = (await db.execute(stmt)).scalars().all()
+            results = [_task_to_dict(r) for r in rows]
+
+        logger.debug(
+            "Task query: filter=%s assignee=%s count=%d", resolved_filter, assignee, len(results)
+        )
+        return json.dumps(results)
+    except Exception as e:
+        logger.exception("Failed to query tasks")
+        return json.dumps({"error": {"code": "DB_ERROR", "message": str(e)}})

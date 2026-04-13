@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from google.adk.tools.base_toolset import BaseToolset
 from google.adk.tools.function_tool import FunctionTool
 
+from app.lib.logging import get_logger
+from app.tools._context import SESSION_ID_KEY, get_tool_context
 from app.tools.code import code_symbols, run_diagnostics
 from app.tools.execution import bash_exec, http_request
 from app.tools.filesystem import (
@@ -32,6 +34,9 @@ from app.tools.git import (
     git_worktree,
 )
 from app.tools.management import (
+    check_resources,
+    create_project,
+    delegate_to_pm,
     escalate_to_ceo,
     escalate_to_director,
     get_project_context,
@@ -45,6 +50,7 @@ from app.tools.management import (
     reorder_deliverables,
     select_ready_batch,
     update_deliverable,
+    validate_brief,
 )
 from app.tools.task import (
     task_create,
@@ -56,6 +62,8 @@ from app.tools.task import (
 )
 from app.tools.web import web_fetch, web_search
 
+logger = get_logger("tools._toolset")
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -63,7 +71,7 @@ if TYPE_CHECKING:
     from google.adk.tools.base_tool import BaseTool
 
 # ---------------------------------------------------------------------------
-# All 43 tool functions, grouped by category
+# All 47 tool functions, grouped by category
 # ---------------------------------------------------------------------------
 
 _FILESYSTEM_TOOLS: list[Callable[..., object]] = [
@@ -129,6 +137,10 @@ _PM_MANAGEMENT_TOOLS: list[Callable[..., object]] = [
 
 _DIRECTOR_MANAGEMENT_TOOLS: list[Callable[..., object]] = [
     escalate_to_ceo,
+    create_project,
+    validate_brief,
+    check_resources,
+    delegate_to_pm,
     list_projects,
     query_project_status,
     override_pm,
@@ -266,12 +278,87 @@ class GlobalToolset(BaseToolset):
         self,
         readonly_context: ReadonlyContext | None = None,
     ) -> list[BaseTool]:
-        """Return tools filtered by the agent's role."""
+        """Return tools filtered by the agent's role.
+
+        Tools outside the agent's role scope are not vended. Filtered tools are
+        logged as security events (NFR-8a.08: tool access violation logging).
+        """
         role = resolve_role(readonly_context)
         allowed = ROLE_PERMISSIONS.get(role, ROLE_PERMISSIONS["default"])
-        return [t for t in self._all_tools if t.name in allowed and t.name not in self._excluded]
+        agent_name = readonly_context.agent_name if readonly_context is not None else "<unknown>"
+
+        result: list[BaseTool] = []
+        filtered: list[str] = []
+        for t in self._all_tools:
+            if t.name in self._excluded:
+                continue
+            if t.name in allowed:
+                result.append(t)
+            else:
+                filtered.append(t.name)
+
+        if filtered:
+            logger.warning(
+                "Tool access scope filtered: agent=%s role=%s denied_tools=%s",
+                agent_name,
+                role,
+                filtered,
+            )
+            # NFR-8a.08: publish via EventPublisher when tool context is available
+            self._queue_tool_access_violation(readonly_context, agent_name, role, filtered)
+
+        return result
+
+    @staticmethod
+    def _queue_tool_access_violation(
+        readonly_context: ReadonlyContext | None,
+        agent_name: str,
+        role: str,
+        denied_tools: list[str],
+    ) -> None:
+        """Attempt to queue a tool access violation via EventPublisher.
+
+        Falls back silently to logger-only when tool context is unavailable
+        (e.g., during tests or non-worker contexts).
+        """
+        if readonly_context is None:
+            return
+        session_id: object = readonly_context.state.get(SESSION_ID_KEY)
+        if not isinstance(session_id, str):
+            return
+        try:
+            tool_ctx = get_tool_context(session_id)
+        except KeyError:
+            return
+        tool_ctx.publisher.queue_tool_access_violation(
+            agent_name=agent_name,
+            role=role,
+            denied_tools=denied_tools,
+        )
 
     def get_tools_for_role(self, role: str) -> list[BaseTool]:
         """Return tools for an explicit role string, bypassing agent name lookup."""
         allowed = ROLE_PERMISSIONS.get(role, ROLE_PERMISSIONS["default"])
         return [t for t in self._all_tools if t.name in allowed and t.name not in self._excluded]
+
+    @staticmethod
+    def check_tool_access(agent_name: str, tool_name: str) -> bool:
+        """Check if an agent has access to a tool. Logs violation if denied.
+
+        Returns True if access is allowed, False otherwise.
+        This enables explicit access checks (NFR-8a.08) beyond the
+        prevention-by-design approach in get_tools().
+        """
+        role = AGENT_ROLE_MAP.get(agent_name, "default")
+        if agent_name.startswith("pm_"):
+            role = "pm"
+        allowed = ROLE_PERMISSIONS.get(role, ROLE_PERMISSIONS["default"])
+        if tool_name in allowed:
+            return True
+        logger.warning(
+            "Tool access violation: agent=%s role=%s tool=%s",
+            agent_name,
+            role,
+            tool_name,
+        )
+        return False

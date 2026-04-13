@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import uuid
 from typing import TYPE_CHECKING
 
-from app.models.enums import TaskStatus, TodoAction, TodoStatus
+import pytest
+
+from app.models.enums import TodoAction, TodoStatus
 from app.tools.task import (
-    task_create,
     task_query,
     task_update,
     todo_list,
@@ -244,29 +247,58 @@ class TestTodoRemove:
 
 
 # ---------------------------------------------------------------------------
-# Shared task placeholders
+# Shared task tools — validation / early-return paths (no DB required)
 # ---------------------------------------------------------------------------
 
 
-class TestTaskCreate:
-    def test_returns_confirmation_with_uuid_and_placeholder(self) -> None:
-        result = task_create("My Title", "My Description")
-        assert "My Title" in result
-        assert "placeholder" in result
-        # UUID hex prefix is 8 chars
-        parts = result.split()
-        task_id = parts[1]
-        assert len(task_id) == 8
+class FakeActions:
+    def __init__(self) -> None:
+        self.state_delta: dict[str, object] = {}
 
 
+class FakeTaskToolContext:
+    """Minimal ToolContext stand-in for task tool unit tests."""
+
+    def __init__(self, session_id: str = "test-session") -> None:
+        self._state: dict[str, object] = {"_session_id": session_id}
+        self.actions = FakeActions()
+
+    @property
+    def state(self) -> dict[str, object]:
+        merged = dict(self._state)
+        merged.update(self.actions.state_delta)
+        return merged
+
+
+@pytest.mark.asyncio
 class TestTaskUpdate:
-    def test_returns_confirmation(self) -> None:
-        result = task_update("abc", status=TaskStatus.DONE)
-        assert "abc" in result
-        assert "placeholder" in result
+    async def test_invalid_task_id_returns_error_json(self) -> None:
+        ctx = FakeTaskToolContext()
+        result = await task_update("not-a-uuid", ctx)  # type: ignore[arg-type]
+        parsed = json.loads(result)
+        assert "error" in parsed
+        assert parsed["error"]["code"] == "INVALID_INPUT"
+        assert "not-a-uuid" in parsed["error"]["message"]
+
+    async def test_invalid_status_returns_error_json(self) -> None:
+        ctx = FakeTaskToolContext()
+        result = await task_update(
+            str(uuid.uuid4()),
+            ctx,  # type: ignore[reportArgumentType]
+            status="INVALID",  # type: ignore[arg-type]
+        )
+        parsed = json.loads(result)
+        assert "error" in parsed
+        assert parsed["error"]["code"] == "INVALID_INPUT"
+        assert "INVALID" in parsed["error"]["message"]
 
 
+@pytest.mark.asyncio
 class TestTaskQuery:
-    def test_returns_placeholder_message(self) -> None:
-        result = task_query()
-        assert "placeholder" in result
+    async def test_invalid_filter_returns_error_json(self) -> None:
+        ctx = FakeTaskToolContext()
+        result = await task_query(ctx, filter="NOTASTATE")  # type: ignore[arg-type]
+        parsed = json.loads(result)
+        assert "error" in parsed
+        assert parsed["error"]["code"] == "INVALID_INPUT"
+        assert "NOTASTATE" in parsed["error"]["message"]

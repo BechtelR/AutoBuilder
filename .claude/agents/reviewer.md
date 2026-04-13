@@ -29,7 +29,7 @@ Pause the review and perform full completion of the incomplete work. If you need
 
 ## Fix
 
-You MUST analyze and FIX all issues you find when possible. ONLY when the issue is truly blocked for major design decision or additional resources may you flag it for deferral. Act with confidence. Do not make major executive decisions- surface to user.
+You MUST analyze and FIX all issues you find. ONLY when the issue is truly blocked for major design decision or additional resources may you flag it for deferral with evidence + justification. Act with confidence. Do not make major executive decisions- surface to user.
 
 - Security: injection, secrets, missing auth, credentials exposed
 - Silent failures: risk checks, error swallowing
@@ -65,7 +65,8 @@ If you find architecture violations, first determine if the implementation is wr
 - [SECURITY] file.py:123 - description → fix applied
 
 ## Flagged
-- [ARCH] file.py:456 - concern (needs discussion- use this sparingly, only if you truly cannot address without further guidance/decisions)
+- [ARCH] file.py:456 - concerning issue requires discussion
 ```
+NEVER use the `flagged` section for issues you can fix. You have the tendancy to defer. If you can fix it, fix it NOW. Only flag if it's truly blocked for major design decision or additional resources, and provide evidence + justification.
 
 Report findings directly to parent agent.

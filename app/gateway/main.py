@@ -15,7 +15,11 @@ from app.gateway.middleware.errors import ErrorHandlingMiddleware
 from app.gateway.middleware.logging import RequestLoggingMiddleware
 from app.gateway.routes.ceo_queue import router as ceo_queue_router
 from app.gateway.routes.chat import router as chat_router
+from app.gateway.routes.deliverables import router as deliverables_router
+from app.gateway.routes.director_lifecycle import router as director_lifecycle_router
+from app.gateway.routes.director_queue import router as director_queue_router
 from app.gateway.routes.health import router as health_router
+from app.gateway.routes.projects import router as projects_router
 from app.gateway.routes.skills import router as skills_router
 from app.gateway.routes.workflows import router as workflow_router
 from app.lib import get_logger, setup_logging
@@ -113,6 +117,10 @@ def create_app() -> FastAPI:
     app.include_router(workflow_router)
     app.include_router(chat_router)
     app.include_router(ceo_queue_router)
+    app.include_router(director_lifecycle_router)
+    app.include_router(director_queue_router)
+    app.include_router(deliverables_router)
+    app.include_router(projects_router)
     app.include_router(skills_router)
 
     return app

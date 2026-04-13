@@ -119,7 +119,7 @@ class EditOperationDef(BaseModel):
     name: str
     description: str = ""
     entry_stage: str = ""  # Which stage to enter on edit; empty = first stage
-    requires_approval: bool = True
+    requires_approval: bool = False
 
 
 class WorkflowManifest(BaseModel):

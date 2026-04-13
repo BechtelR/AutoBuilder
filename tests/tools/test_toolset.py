@@ -20,10 +20,10 @@ def make_context(agent_name: str) -> object:
 
 
 class TestToolCount:
-    async def test_default_returns_all_43_tools(self) -> None:
+    async def test_default_returns_all_47_tools(self) -> None:
         toolset = GlobalToolset()
         tools = await toolset.get_tools(None)
-        assert len(tools) == 43
+        assert len(tools) == 47
 
     async def test_all_tool_names_unique(self) -> None:
         toolset = GlobalToolset()
@@ -111,13 +111,17 @@ class TestRoleFiltering:
         }
         assert names == expected
 
-    async def test_director_gets_12_tools(self) -> None:
+    async def test_director_gets_16_tools(self) -> None:
         toolset = GlobalToolset()
         tools = await toolset.get_tools(make_context("director"))  # type: ignore[arg-type]
         names = {t.name for t in tools}
-        assert len(tools) == 12
+        assert len(tools) == 16
         expected = {
             "escalate_to_ceo",
+            "create_project",
+            "validate_brief",
+            "check_resources",
+            "delegate_to_pm",
             "list_projects",
             "query_project_status",
             "override_pm",
@@ -152,12 +156,12 @@ class TestExcludedTools:
         names = {t.name for t in tools}
         assert "bash_exec" not in names
         assert "http_request" not in names
-        assert len(tools) == 41  # 43 - 2
+        assert len(tools) == 45  # 47 - 2
 
     async def test_excluding_nonexistent_tool_is_harmless(self) -> None:
         toolset = GlobalToolset(excluded_tools={"nonexistent_tool"})
         tools = await toolset.get_tools(None)
-        assert len(tools) == 43
+        assert len(tools) == 47
 
 
 # ---------------------------------------------------------------------------

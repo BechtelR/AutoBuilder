@@ -43,7 +43,7 @@ scripts/
 tests/
 *.md
 !README.md
-LICENSE
+!LICENSE
 
 # OS
 .DS_Store

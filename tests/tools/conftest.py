@@ -10,15 +10,10 @@ from pathlib import Path
 import pytest
 
 _tavily_available: bool = bool(os.environ.get("TAVILY_API_KEY"))
-_brave_available: bool = bool(os.environ.get("BRAVE_API_KEY"))
 
 require_tavily_key = pytest.mark.skipif(
     not _tavily_available,
     reason="TAVILY_API_KEY not set",
-)
-require_brave_key = pytest.mark.skipif(
-    not _brave_available,
-    reason="BRAVE_API_KEY not set",
 )
 
 

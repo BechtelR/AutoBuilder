@@ -24,6 +24,7 @@ from app.workflows.manifest import (
     CompletionCriteria,
     CompletionReport,
     DeliverableTypeDef,
+    EditOperationDef,
     McpServerDef,
     ReportSection,
     ResourcesDef,
@@ -430,3 +431,109 @@ class TestReferenceManifest:
             for v in stage.validators:
                 all_names.append(v.name)
         assert len(all_names) == len(set(all_names))
+
+
+class TestEditOperationDef:
+    """EditOperationDef model — default and explicit values."""
+
+    def test_requires_approval_defaults_false(self) -> None:
+        """spec: requires_approval defaults to False (not True)."""
+        op = EditOperationDef(name="fix_bug")
+        assert op.requires_approval is False
+
+    def test_explicit_requires_approval_true(self) -> None:
+        op = EditOperationDef(name="add_feature", requires_approval=True)
+        assert op.requires_approval is True
+
+    def test_entry_stage_defaults_empty(self) -> None:
+        op = EditOperationDef(name="refactor")
+        assert op.entry_stage == ""
+
+    def test_description_defaults_empty(self) -> None:
+        op = EditOperationDef(name="remove_feature")
+        assert op.description == ""
+
+    def test_all_fields(self) -> None:
+        op = EditOperationDef(
+            name="add_feature",
+            description="Add a new feature",
+            entry_stage="shape",
+            requires_approval=True,
+        )
+        assert op.name == "add_feature"
+        assert op.description == "Add a new feature"
+        assert op.entry_stage == "shape"
+        assert op.requires_approval is True
+
+    def test_parsed_from_dict(self) -> None:
+        op = EditOperationDef.model_validate(
+            {"name": "fix_bug", "entry_stage": "plan", "requires_approval": False}
+        )
+        assert op.name == "fix_bug"
+        assert op.entry_stage == "plan"
+        assert op.requires_approval is False
+
+    def test_manifest_with_edit_operations(self) -> None:
+        """WorkflowManifest accepts a list of EditOperationDef."""
+        m = WorkflowManifest.model_validate(
+            {
+                "name": "test-workflow",
+                "description": "Test",
+                "edit_operations": [
+                    {"name": "fix_bug", "entry_stage": "plan"},
+                    {"name": "add_feature", "requires_approval": True},
+                ],
+            }
+        )
+        assert len(m.edit_operations) == 2
+        assert m.edit_operations[0].name == "fix_bug"
+        assert m.edit_operations[0].requires_approval is False  # default
+        assert m.edit_operations[1].name == "add_feature"
+        assert m.edit_operations[1].requires_approval is True
+
+    def test_manifest_without_edit_operations_valid(self) -> None:
+        """Manifests without edit_operations field are valid; default is empty list."""
+        m = WorkflowManifest.model_validate(
+            {"name": "minimal-workflow", "description": "No edit ops"}
+        )
+        assert m.edit_operations == []
+
+
+class TestAutoCodeWorkflowYaml:
+    """Parse the auto-code WORKFLOW.yaml and verify key invariants."""
+
+    @pytest.fixture
+    def auto_code_manifest(self) -> WorkflowManifest:
+        yaml_path = (
+            Path(__file__).resolve().parent.parent.parent
+            / "app"
+            / "workflows"
+            / "auto-code"
+            / "WORKFLOW.yaml"
+        )
+        data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+        return WorkflowManifest.model_validate(data)
+
+    def test_parses_successfully(self, auto_code_manifest: WorkflowManifest) -> None:
+        assert auto_code_manifest.name == "auto-code"
+
+    def test_resources_has_credentials(self, auto_code_manifest: WorkflowManifest) -> None:
+        assert len(auto_code_manifest.resources.credentials) >= 1
+
+    def test_resources_contains_anthropic_key(self, auto_code_manifest: WorkflowManifest) -> None:
+        assert "ANTHROPIC_API_KEY" in auto_code_manifest.resources.credentials
+
+    def test_edit_operations_present(self, auto_code_manifest: WorkflowManifest) -> None:
+        assert len(auto_code_manifest.edit_operations) > 0
+
+    def test_fix_bug_edit_operation(self, auto_code_manifest: WorkflowManifest) -> None:
+        ops_by_name = {op.name: op for op in auto_code_manifest.edit_operations}
+        assert "fix_bug" in ops_by_name
+        fix_bug = ops_by_name["fix_bug"]
+        assert fix_bug.requires_approval is False
+        assert fix_bug.entry_stage == "plan"
+
+    def test_add_feature_requires_approval(self, auto_code_manifest: WorkflowManifest) -> None:
+        ops_by_name = {op.name: op for op in auto_code_manifest.edit_operations}
+        assert "add_feature" in ops_by_name
+        assert ops_by_name["add_feature"].requires_approval is True

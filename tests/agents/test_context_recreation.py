@@ -5,27 +5,29 @@ from __future__ import annotations
 import importlib.util
 import sys
 import types  # noqa: TC003
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.agents.context_recreation import (
     RecreationResult,
     create_fresh_session,
-    determine_remaining_stages,
-    identify_critical_keys,
+    load_taskgroup_checkpoint,
     persist_to_memory,
     recreate_context,
-    seed_critical_keys,
+    recreate_context_at_taskgroup,
 )
+from app.db.models import StageExecution, TaskGroupExecution, Workflow
 from app.lib.exceptions import WorkerError
 from app.models.constants import (
     APP_NAME,
-    DELIVERABLE_STATUS_PREFIX,
-    PM_BATCH_POSITION_KEY,
     SYSTEM_USER_ID,
 )
+from app.models.enums import StageStatus, WorkflowStatus
+from tests.conftest import require_infra
 
 # Load auto-code pipeline constants (directory name has a hyphen, can't use normal import)
 _AUTO_CODE_PIPELINE_PATH = (
@@ -110,173 +112,6 @@ class MockEventPublisher:
         metadata: dict[str, object] | None = None,
     ) -> None:
         self.events.append((workflow_id, str(event_type), metadata))
-
-
-# ---------------------------------------------------------------------------
-# TestIdentifyCriticalKeys
-# ---------------------------------------------------------------------------
-
-
-class TestIdentifyCriticalKeys:
-    def test_empty_state(self) -> None:
-        assert identify_critical_keys({}) == []
-
-    def test_matches_deliverable_status(self) -> None:
-        state: dict[str, object] = {
-            f"{DELIVERABLE_STATUS_PREFIX}d1": "COMPLETED",
-            f"{DELIVERABLE_STATUS_PREFIX}d2": "FAILED",
-            "unrelated": "ignored",
-        }
-        keys = identify_critical_keys(state)
-        assert f"{DELIVERABLE_STATUS_PREFIX}d1" in keys
-        assert f"{DELIVERABLE_STATUS_PREFIX}d2" in keys
-        assert "unrelated" not in keys
-
-    def test_matches_pm_keys(self) -> None:
-        state: dict[str, object] = {
-            PM_BATCH_POSITION_KEY: 3,
-            "pm:some_other": "data",
-        }
-        keys = identify_critical_keys(state)
-        assert PM_BATCH_POSITION_KEY in keys
-        assert "pm:some_other" in keys
-
-    def test_matches_director_keys(self) -> None:
-        state: dict[str, object] = {"director:governance_override": "strict"}
-        keys = identify_critical_keys(state)
-        assert "director:governance_override" in keys
-
-    def test_matches_project_config(self) -> None:
-        state: dict[str, object] = {"project_config": {"retry_budget": 5}}
-        keys = identify_critical_keys(state)
-        assert "project_config" in keys
-
-    def test_matches_workflow_id(self) -> None:
-        state: dict[str, object] = {"workflow_id": "wf-1"}
-        keys = identify_critical_keys(state)
-        assert "workflow_id" in keys
-
-    def test_matches_output_key_suffixes(self) -> None:
-        state: dict[str, object] = {
-            "plan_output": "some plan",
-            "code_result": "some code",
-            "agent_response": "text",
-            "random_key": "ignored",
-        }
-        keys = identify_critical_keys(state)
-        assert "plan_output" in keys
-        assert "code_result" in keys
-        assert "agent_response" in keys
-        assert "random_key" not in keys
-
-    def test_result_is_sorted(self) -> None:
-        state: dict[str, object] = {
-            "workflow_id": "x",
-            "director:a": "y",
-            "pm:b": "z",
-        }
-        keys = identify_critical_keys(state)
-        assert keys == sorted(keys)
-
-    def test_loaded_skill_names_prefix(self) -> None:
-        state: dict[str, object] = {"loaded_skill_names": ["skill1"]}
-        keys = identify_critical_keys(state)
-        assert "loaded_skill_names" in keys
-
-
-# ---------------------------------------------------------------------------
-# TestDetermineRemainingStages
-# ---------------------------------------------------------------------------
-
-
-class TestDetermineRemainingStages:
-    def test_no_completed_returns_all(self) -> None:
-        remaining = determine_remaining_stages(PIPELINE_STAGES)
-        assert remaining == PIPELINE_STAGES
-
-    def test_explicit_completed_stages(self) -> None:
-        completed = ["skill_loader", "memory_loader", "planner"]
-        remaining = determine_remaining_stages(PIPELINE_STAGES, completed_stages=completed)
-        assert "skill_loader" not in remaining
-        assert "memory_loader" not in remaining
-        assert "planner" not in remaining
-        assert "coder" in remaining
-        assert remaining[0] == "coder"
-
-    def test_state_based_detection(self) -> None:
-        state: dict[str, object] = {
-            "loaded_skill_names": ["s1"],
-            "memory_context": "ctx",
-            "implementation_plan": "plan data",
-        }
-        remaining = determine_remaining_stages(
-            PIPELINE_STAGES, state=state, stage_completion_keys=STAGE_COMPLETION_KEYS
-        )
-        assert "skill_loader" not in remaining
-        assert "memory_loader" not in remaining
-        assert "planner" not in remaining
-        assert "coder" in remaining
-
-    def test_completed_stages_takes_precedence_over_state(self) -> None:
-        state: dict[str, object] = {"plan_output": "plan data"}
-        # Explicit completed_stages overrides state
-        remaining = determine_remaining_stages(
-            PIPELINE_STAGES, completed_stages=["coder"], state=state
-        )
-        # planner still in remaining because completed_stages doesn't include it
-        assert "planner" in remaining
-        assert "coder" not in remaining
-
-    def test_all_completed(self) -> None:
-        remaining = determine_remaining_stages(
-            PIPELINE_STAGES, completed_stages=list(PIPELINE_STAGES)
-        )
-        assert remaining == []
-
-    def test_preserves_order(self) -> None:
-        completed = ["planner", "coder"]
-        remaining = determine_remaining_stages(PIPELINE_STAGES, completed_stages=completed)
-        expected_order = [s for s in PIPELINE_STAGES if s not in completed]
-        assert remaining == expected_order
-
-    def test_none_values_in_state_not_counted(self) -> None:
-        state: dict[str, object] = {"implementation_plan": None}
-        remaining = determine_remaining_stages(
-            PIPELINE_STAGES, state=state, stage_completion_keys=STAGE_COMPLETION_KEYS
-        )
-        assert "planner" in remaining
-
-
-# ---------------------------------------------------------------------------
-# TestSeedCriticalKeys
-# ---------------------------------------------------------------------------
-
-
-class TestSeedCriticalKeys:
-    def test_extracts_critical_keys_only(self) -> None:
-        state: dict[str, object] = {
-            "workflow_id": "wf-1",
-            "project_config": {"retry_budget": 5},
-            "unrelated": "ignored",
-            "temp_data": "also ignored",
-        }
-        seed = seed_critical_keys(state)
-        assert "workflow_id" in seed
-        assert "project_config" in seed
-        assert "unrelated" not in seed
-        assert "temp_data" not in seed
-
-    def test_preserves_values(self) -> None:
-        state: dict[str, object] = {
-            "pm:batch_position": 42,
-            f"{DELIVERABLE_STATUS_PREFIX}d1": "COMPLETED",
-        }
-        seed = seed_critical_keys(state)
-        assert seed["pm:batch_position"] == 42
-        assert seed[f"{DELIVERABLE_STATUS_PREFIX}d1"] == "COMPLETED"
-
-    def test_empty_state(self) -> None:
-        assert seed_critical_keys({}) == {}
 
 
 # ---------------------------------------------------------------------------
@@ -514,17 +349,381 @@ class TestRecreationResult:
 
 
 # ---------------------------------------------------------------------------
-# TestPipelineStageConstants
+# Helpers for infra tests (TaskGroup checkpoint tests)
 # ---------------------------------------------------------------------------
 
 
-class TestPipelineStageConstants:
-    """Verify auto-code pipeline constants (canonical source: auto-code/pipeline.py)."""
+def _make_session_factory(engine: object) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)  # type: ignore[arg-type]
 
-    def test_stages_count(self) -> None:
-        assert len(PIPELINE_STAGES) == 9
 
-    def test_completion_keys_match_stages(self) -> None:
-        """Every stage has a corresponding completion key."""
-        for stage in PIPELINE_STAGES:
-            assert stage in STAGE_COMPLETION_KEYS, f"Missing completion key for {stage}"
+async def _create_workflow(factory: async_sessionmaker[AsyncSession]) -> uuid.UUID:
+    """Insert a minimal Workflow and return its ID."""
+    async with factory() as db:
+        wf = Workflow(workflow_type="test", status=WorkflowStatus.RUNNING)
+        db.add(wf)
+        await db.commit()
+        await db.refresh(wf)
+        return wf.id
+
+
+async def _create_stage_execution(
+    factory: async_sessionmaker[AsyncSession],
+    workflow_id: uuid.UUID,
+) -> uuid.UUID:
+    """Insert a minimal StageExecution and return its ID."""
+    async with factory() as db:
+        se = StageExecution(
+            workflow_id=workflow_id,
+            stage_name="build",
+            stage_index=0,
+            status=StageStatus.ACTIVE,
+        )
+        db.add(se)
+        await db.commit()
+        await db.refresh(se)
+        return se.id
+
+
+async def _create_taskgroup_execution(
+    factory: async_sessionmaker[AsyncSession],
+    stage_execution_id: uuid.UUID,
+    *,
+    checkpoint_data: dict[str, object] | None = None,
+) -> uuid.UUID:
+    """Insert a TaskGroupExecution and return its ID."""
+    async with factory() as db:
+        tge = TaskGroupExecution(
+            stage_execution_id=stage_execution_id,
+            taskgroup_number=1,
+            status=StageStatus.ACTIVE,
+            checkpoint_data=checkpoint_data,
+        )
+        db.add(tge)
+        await db.commit()
+        await db.refresh(tge)
+        return tge.id
+
+
+# ---------------------------------------------------------------------------
+# TestLoadTaskgroupCheckpoint
+# ---------------------------------------------------------------------------
+
+
+@require_infra
+class TestLoadTaskgroupCheckpoint:
+    @pytest.mark.asyncio
+    async def test_load_existing_checkpoint(self, engine: object) -> None:
+        """TaskGroupExecution with checkpoint_data returns the dict."""
+        factory = _make_session_factory(engine)
+        wf_id = await _create_workflow(factory)
+        se_id = await _create_stage_execution(factory, wf_id)
+        checkpoint: dict[str, object] = {
+            "deliverable_statuses": {"d1": "COMPLETED"},
+            "stage_progress": {"build": "COMPLETED"},
+            "accumulated_cost": 1.23,
+            "loaded_skill_names": ["skill_a"],
+            "workflow_id": "wf-test",
+            "completed_stages": ["skill_loader", "planner"],
+        }
+        tge_id = await _create_taskgroup_execution(factory, se_id, checkpoint_data=checkpoint)
+
+        result = await load_taskgroup_checkpoint(factory, tge_id)  # type: ignore[arg-type]
+
+        assert result is not None
+        assert result["deliverable_statuses"] == {"d1": "COMPLETED"}
+        assert result["accumulated_cost"] == 1.23
+        assert result["loaded_skill_names"] == ["skill_a"]
+        assert result["completed_stages"] == ["skill_loader", "planner"]
+
+    @pytest.mark.asyncio
+    async def test_load_checkpoint_none_when_no_data(self, engine: object) -> None:
+        """TaskGroupExecution without checkpoint_data returns None."""
+        factory = _make_session_factory(engine)
+        wf_id = await _create_workflow(factory)
+        se_id = await _create_stage_execution(factory, wf_id)
+        tge_id = await _create_taskgroup_execution(factory, se_id, checkpoint_data=None)
+
+        result = await load_taskgroup_checkpoint(factory, tge_id)  # type: ignore[arg-type]
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_load_checkpoint_nonexistent_id(self, engine: object) -> None:
+        """Nonexistent TaskGroupExecution ID returns None."""
+        factory = _make_session_factory(engine)
+        result = await load_taskgroup_checkpoint(factory, uuid.uuid4())  # type: ignore[arg-type]
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# TestRecreateContextAtTaskgroup
+# ---------------------------------------------------------------------------
+
+
+class TestRecreateContextAtTaskgroup:
+    @pytest.mark.asyncio
+    async def test_merges_checkpoint_into_state(self) -> None:
+        """Checkpoint data merges into old session state, checkpoint wins on conflict."""
+        svc = FakeSessionService()
+        old_session = FakeSession(
+            id="old-session",
+            state={
+                "workflow_id": "wf-original",
+                "pm:batch_position": 2,
+                "project_config": {"retry_budget": 5},
+                "loaded_skill_names": ["old_skill"],
+            },
+        )
+
+        # Simulate checkpoint that overrides loaded_skill_names
+        checkpoint: dict[str, object] = {
+            "loaded_skill_names": ["new_skill_a", "new_skill_b"],
+            "completed_stages": ["skill_loader", "planner"],
+            "accumulated_cost": 4.56,
+            "workflow_id": "wf-original",
+        }
+
+        # We can't use real DB here, so test without db_session_factory.
+        # The checkpoint must be injected via the old session state merge path.
+        # To test the full DB path, see TestLoadTaskgroupCheckpointIntegration below.
+        merged_session = FakeSession(
+            id="old-session",
+            state={**old_session.state, **checkpoint},
+        )
+
+        result = await recreate_context_at_taskgroup(
+            session_service=svc,  # type: ignore[arg-type]
+            old_session=merged_session,  # type: ignore[arg-type]
+            app_name=APP_NAME,
+            user_id=SYSTEM_USER_ID,
+            stages=PIPELINE_STAGES,
+            stage_completion_keys=STAGE_COMPLETION_KEYS,
+        )
+
+        assert isinstance(result, RecreationResult)
+        assert result.new_session_id != "old-session"
+
+        # Verify seeded state includes checkpoint keys
+        assert "loaded_skill_names" in result.seeded_keys
+        assert "completed_stages" in result.seeded_keys
+        assert "workflow_id" in result.seeded_keys
+
+        # Verify the new session has merged values
+        new_session = await svc.get_session(
+            app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=result.new_session_id
+        )
+        assert new_session is not None
+        assert new_session.state["loaded_skill_names"] == ["new_skill_a", "new_skill_b"]
+        assert new_session.state["completed_stages"] == ["skill_loader", "planner"]
+
+    @pytest.mark.asyncio
+    async def test_publishes_events(self) -> None:
+        """Context recreation at TaskGroup boundary publishes started+completed events."""
+        svc = FakeSessionService()
+        publisher = MockEventPublisher()
+
+        old_session = FakeSession(
+            id="old-sess",
+            state={"workflow_id": "wf-1"},
+        )
+
+        result = await recreate_context_at_taskgroup(
+            session_service=svc,  # type: ignore[arg-type]
+            old_session=old_session,  # type: ignore[arg-type]
+            app_name=APP_NAME,
+            user_id=SYSTEM_USER_ID,
+            publisher=publisher,  # type: ignore[arg-type]
+            workflow_id="wf-1",
+            stages=PIPELINE_STAGES,
+        )
+
+        assert isinstance(result, RecreationResult)
+        # Should have started + completed events
+        assert len(publisher.events) == 2
+        started_meta = publisher.events[0][2]
+        assert started_meta is not None
+        assert started_meta["recreation"] == "started"
+        assert started_meta["recreation_type"] == "taskgroup_boundary"
+        assert started_meta["old_session_id"] == "old-sess"
+
+        completed_meta = publisher.events[1][2]
+        assert completed_meta is not None
+        assert completed_meta["recreation"] == "completed"
+        assert completed_meta["recreation_type"] == "taskgroup_boundary"
+        assert completed_meta["new_session_id"] == result.new_session_id
+        assert isinstance(completed_meta["seeded_keys"], list)
+        assert isinstance(completed_meta["remaining_stages"], list)
+
+    @pytest.mark.asyncio
+    async def test_seeded_state_includes_checkpoint_keys(self) -> None:
+        """completed_stages and loaded_skill_names from checkpoint always appear in seed."""
+        svc = FakeSessionService()
+
+        old_session = FakeSession(
+            id="old-sess",
+            state={
+                "workflow_id": "wf-1",
+                # These keys don't match _CRITICAL_KEY_PREFIXES but should be seeded
+                # from checkpoint path
+                "completed_stages": ["skill_loader", "memory_loader"],
+                "loaded_skill_names": ["my_skill"],
+                "accumulated_cost": 2.5,
+                "deliverable_statuses": {"d1": "COMPLETED"},
+            },
+        )
+
+        result = await recreate_context_at_taskgroup(
+            session_service=svc,  # type: ignore[arg-type]
+            old_session=old_session,  # type: ignore[arg-type]
+            app_name=APP_NAME,
+            user_id=SYSTEM_USER_ID,
+            stages=PIPELINE_STAGES,
+        )
+
+        # loaded_skill_names matches _CRITICAL_KEY_PREFIXES directly
+        assert "loaded_skill_names" in result.seeded_keys
+        # completed_stages and deliverable_statuses should be seeded via checkpoint path
+        assert "completed_stages" in result.seeded_keys
+        assert "deliverable_statuses" in result.seeded_keys
+        assert "accumulated_cost" in result.seeded_keys
+        assert "workflow_id" in result.seeded_keys
+
+    @pytest.mark.asyncio
+    async def test_no_publisher_no_workflow(self) -> None:
+        """Works correctly without publisher and workflow_id."""
+        svc = FakeSessionService()
+        old_session = FakeSession(id="old-sess", state={"workflow_id": "wf-1"})
+
+        result = await recreate_context_at_taskgroup(
+            session_service=svc,  # type: ignore[arg-type]
+            old_session=old_session,  # type: ignore[arg-type]
+            app_name=APP_NAME,
+            user_id=SYSTEM_USER_ID,
+            stages=PIPELINE_STAGES,
+        )
+
+        assert isinstance(result, RecreationResult)
+        assert result.new_session_id != "old-sess"
+
+    @pytest.mark.asyncio
+    async def test_empty_old_state(self) -> None:
+        """Handles empty old session state without errors."""
+        svc = FakeSessionService()
+        old_session = FakeSession(id="old-sess", state={})
+
+        result = await recreate_context_at_taskgroup(
+            session_service=svc,  # type: ignore[arg-type]
+            old_session=old_session,  # type: ignore[arg-type]
+            app_name=APP_NAME,
+            user_id=SYSTEM_USER_ID,
+        )
+
+        assert isinstance(result, RecreationResult)
+        assert result.seeded_keys == []
+        assert result.remaining_stages == []
+
+
+# ---------------------------------------------------------------------------
+# TestRecreateContextAtTaskgroupWithDB
+# ---------------------------------------------------------------------------
+
+
+@require_infra
+class TestRecreateContextAtTaskgroupWithDB:
+    """Integration tests that use real PostgreSQL for checkpoint loading."""
+
+    @pytest.mark.asyncio
+    async def test_full_checkpoint_merge_from_db(self, engine: object) -> None:
+        """End-to-end: checkpoint from DB merges into recreation seed."""
+        factory = _make_session_factory(engine)
+        wf_id = await _create_workflow(factory)
+        se_id = await _create_stage_execution(factory, wf_id)
+
+        checkpoint: dict[str, object] = {
+            "deliverable_statuses": {"d1": "COMPLETED", "d2": "FAILED"},
+            "stage_progress": {"build": "COMPLETED"},
+            "accumulated_cost": 7.89,
+            "loaded_skill_names": ["skill_x"],
+            "workflow_id": "wf-test",
+            "completed_stages": ["skill_loader", "planner", "coder"],
+        }
+        tge_id = await _create_taskgroup_execution(factory, se_id, checkpoint_data=checkpoint)
+
+        svc = FakeSessionService()
+        publisher = MockEventPublisher()
+
+        old_session = FakeSession(
+            id="old-work-session",
+            state={
+                "workflow_id": "wf-test",
+                "project_config": {"retry_budget": 10},
+                "pm:batch_position": 3,
+            },
+        )
+
+        result = await recreate_context_at_taskgroup(
+            session_service=svc,  # type: ignore[arg-type]
+            old_session=old_session,  # type: ignore[arg-type]
+            app_name=APP_NAME,
+            user_id=SYSTEM_USER_ID,
+            db_session_factory=factory,  # type: ignore[arg-type]
+            current_taskgroup_id=tge_id,
+            publisher=publisher,  # type: ignore[arg-type]
+            workflow_id="wf-test",
+            stages=PIPELINE_STAGES,
+            stage_completion_keys=STAGE_COMPLETION_KEYS,
+        )
+
+        assert isinstance(result, RecreationResult)
+
+        # Verify checkpoint data merged into seed
+        new_session = await svc.get_session(
+            app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=result.new_session_id
+        )
+        assert new_session is not None
+        assert new_session.state["loaded_skill_names"] == ["skill_x"]
+        assert new_session.state["completed_stages"] == ["skill_loader", "planner", "coder"]
+        assert new_session.state["accumulated_cost"] == 7.89
+        assert new_session.state["deliverable_statuses"] == {"d1": "COMPLETED", "d2": "FAILED"}
+        assert new_session.state["workflow_id"] == "wf-test"
+
+        # Events published
+        assert len(publisher.events) == 2
+        assert publisher.events[0][2] is not None
+        assert publisher.events[0][2]["recreation"] == "started"
+        assert publisher.events[1][2] is not None
+        assert publisher.events[1][2]["recreation"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_no_checkpoint_data_falls_through(self, engine: object) -> None:
+        """When TaskGroup has no checkpoint, recreation uses only old session state."""
+        factory = _make_session_factory(engine)
+        wf_id = await _create_workflow(factory)
+        se_id = await _create_stage_execution(factory, wf_id)
+        tge_id = await _create_taskgroup_execution(factory, se_id, checkpoint_data=None)
+
+        svc = FakeSessionService()
+        old_session = FakeSession(
+            id="old-sess",
+            state={
+                "workflow_id": "wf-1",
+                "pm:batch_position": 5,
+            },
+        )
+
+        result = await recreate_context_at_taskgroup(
+            session_service=svc,  # type: ignore[arg-type]
+            old_session=old_session,  # type: ignore[arg-type]
+            app_name=APP_NAME,
+            user_id=SYSTEM_USER_ID,
+            db_session_factory=factory,  # type: ignore[arg-type]
+            current_taskgroup_id=tge_id,
+            stages=PIPELINE_STAGES,
+        )
+
+        new_session = await svc.get_session(
+            app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=result.new_session_id
+        )
+        assert new_session is not None
+        assert new_session.state["workflow_id"] == "wf-1"
+        assert new_session.state["pm:batch_position"] == 5

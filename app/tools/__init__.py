@@ -1,4 +1,4 @@
-"""Tool layer — 42 FunctionTools + GlobalToolset for role-based vending."""
+"""Tool layer — 47 FunctionTools + GlobalToolset for role-based vending."""
 
 from app.tools._toolset import (
     AGENT_ROLE_MAP,
@@ -32,6 +32,9 @@ from app.tools.git import (
     git_worktree,
 )
 from app.tools.management import (
+    check_resources,
+    create_project,
+    delegate_to_pm,
     escalate_to_ceo,
     escalate_to_director,
     get_project_context,
@@ -41,9 +44,11 @@ from app.tools.management import (
     query_deliverables,
     query_dependency_graph,
     query_project_status,
+    reconfigure_stage,
     reorder_deliverables,
     select_ready_batch,
     update_deliverable,
+    validate_brief,
 )
 from app.tools.task import (
     task_create,
@@ -61,7 +66,10 @@ __all__ = [
     "GlobalToolset",
     "ROLE_PERMISSIONS",
     "bash_exec",
+    "check_resources",
     "code_symbols",
+    "create_project",
+    "delegate_to_pm",
     "directory_list",
     "escalate_to_ceo",
     "escalate_to_director",
@@ -90,6 +98,7 @@ __all__ = [
     "query_deliverables",
     "query_dependency_graph",
     "query_project_status",
+    "reconfigure_stage",
     "reorder_deliverables",
     "resolve_role",
     "run_diagnostics",
@@ -101,6 +110,7 @@ __all__ = [
     "todo_read",
     "todo_write",
     "update_deliverable",
+    "validate_brief",
     "web_fetch",
     "web_search",
 ]

@@ -27,13 +27,17 @@
 
 ## Workspace Commands
 ```bash
-# Gateway + Workers
-uv run uvicorn app.gateway.main:app --reload  # Dev server
+# Full stack (Docker — gateway hot-reloads on app/ changes)
+docker compose up -d                  # All services: postgres, redis, gateway, worker
+docker compose run --rm migrate       # Apply migrations (first time / schema changes)
+
+# Development (local gateway + worker, Docker infra)
+docker compose up -d postgres redis   # Infrastructure only
+uv run uvicorn app.gateway.main:app --reload  # Dev server (hot-reload)
 uv run arq app.workers.settings.WorkerSettings  # ARQ worker
-redis-server                          # Redis (must be running)
 
 # Database
-uv run alembic upgrade head           # Apply migrations
+uv run alembic upgrade head           # Apply migrations (local dev)
 uv run alembic revision --autogenerate -m "description"  # New migration
 
 # Testing & Quality
