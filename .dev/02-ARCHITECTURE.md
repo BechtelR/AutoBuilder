@@ -139,7 +139,7 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 
 | PRD ID | Requirement (short) | Architecture Domain(s) |
 |--------|---------------------|------------------------|
-| PR-1 | Brief definition & validation | [agents.md](./architecture/agents.md) §Director Agent, [execution.md](./architecture/execution.md) §Director-Level Loop |
+| PR-1 | Brief definition & validation | [agents.md](./architecture/agents.md) §Director Agent, [execution.md](./architecture/execution.md) §Director Execution Turn |
 | PR-2 | Project status tracking | [data.md](./architecture/data.md) §1, [gateway.md](./architecture/gateway.md) §Route Structure |
 | PR-3 | Pause / resume / abort | [execution.md](./architecture/execution.md) §PM-Level Loop, [state.md](./architecture/state.md) §1 |
 | PR-4 | Workflows are plugins | [workflows.md](./architecture/workflows.md) §Workflow Manifest, §Stage Schema |
@@ -149,7 +149,7 @@ Every PRD requirement maps to at least one architecture domain. Gaps in this tab
 | PR-5c | 3-scope agent definition cascade | [agents.md](./architecture/agents.md) §Definition Cascade |
 | PR-6 | Default workflow plugins | [workflows.md](./architecture/workflows.md) §auto-code: The First Workflow |
 | PR-7 | Project conventions override | [workflows.md](./architecture/workflows.md) §Workflow Manifest, [state.md](./architecture/state.md) §1.2 |
-| PR-8 | Resource pre-flight validation | [execution.md](./architecture/execution.md) §Director-Level Loop, [workflows.md](./architecture/workflows.md) §Workflow Manifest (resources) |
+| PR-8 | Resource pre-flight validation | [execution.md](./architecture/execution.md) §Director Execution Turn, [workflows.md](./architecture/workflows.md) §Workflow Manifest (resources) |
 | PR-9 | Observable async work queues | [workers.md](./architecture/workers.md) §ARQ Workers, [events.md](./architecture/events.md) §Redis Streams |
 | PR-10 | PM execution loop | [execution.md](./architecture/execution.md) §PM-Level Loop, [agents.md](./architecture/agents.md) §PM Agent |
 | PR-11 | Validator pipeline | [workflows.md](./architecture/workflows.md) §Validators & Quality Gates |

@@ -89,7 +89,7 @@ The `edit_operations` field is a Tier 3 (comprehensive) manifest field -- option
 
 | ID | Component | Type | Phase | Source |
 |----|-----------|------|-------|--------|
-| X27 | Project edit request flow (Director receives edit -> creates new TaskGroup in existing project) | workflow | 8a | execution.md Director loop |
+| X27 | Project edit request flow (Director receives edit -> creates new TaskGroup in existing project) | workflow | 8a | execution.md §Director Execution Turn |
 
 **Impact on Phase 7:** NONE. X27 is pure runtime behavior. No Phase 7 artifact references it.
 

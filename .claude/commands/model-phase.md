@@ -29,8 +29,10 @@ Bootstrap (parallel reads):
 
 Selective deep-reads — derive from BOM, never hardcode:
 1. From the BOM rows for this phase, collect the unique values in the **Source** column (e.g., `agents.md §Agent Hierarchy` → file `.dev/architecture/agents.md`)
-2. Deep-read ONLY those architecture files, focused on the referenced sections
+2. Deep-read those architecture files IN FULL (not just referenced sections — type definitions, decision numbers, and cross-references can appear anywhere in the file)
 3. On-demand only (pull in during research steps if a gap requires it): `.decision-log.md`, `04-TECH_STACK.md`
+
+**CRITICAL**: BOM Source column refs can be stale. Never copy a BOM ref into `architecture_ref` without verifying the section heading exists in the target file.
 
 If frd.md doesn't exist: stop and tell user to run `/shape-phase {N}` first.
 If model.md exists: ask user — overwrite or skip?
@@ -40,7 +42,7 @@ If model.md exists: ask user — overwrite or skip?
 Design context — read @.claude/agents/architect.md before design steps. Internalize its principles and checklist.
 
 Use subagents to preserve context window:
-- `Explore` — codebase research, understand existing patterns in target modules
+- `Explore` — parallel codebase research, understand existing patterns in target modules
 - `subtask` — parallel research into specific technical areas, local or external (when reference needed)
 - `reviewer` — final document verification (Step 4)
 </delegation>
@@ -62,22 +64,36 @@ Steps 1-4 sequential. Announce each step.
 STEP 1 — RESEARCH
 
 A. **Read FRD** — extract capabilities (CAP-{n}), consumer roles, functional requirements, rabbit holes. Understand what this phase must do and for whom.
-B. **Read BOM + architecture** — for each component in scope, identify its architecture layer and the L2 section that defines its design contract. Flag components that don't fit cleanly — these are architecture gaps requiring resolution.
-C. **Survey existing code** — if prerequisite phases have been built, understand established patterns, interfaces, and conventions. Use `Explore` for substantial codebases.
+B. **Build heading index** — for each L2 file identified from the BOM, extract all `##` and `###` headings. These are the ONLY valid values for `architecture_ref`. Never paraphrase or write section names from memory — use the exact heading text.
+C. **Verify BOM refs** — for each BOM component's Source column value, confirm the referenced section exists in the heading index. IF a BOM ref points to a nonexistent section, flag it as a gap (stale BOM ref), identify the correct L2 section or flag as an L2 gap, AND add it to the *architect work list* for step G.
+D. **Catalog existing L2 decisions** — grep all L2 files for `Decision D` to build a list of already-decided architectural choices. These must NOT be restated as model design decisions.
+E. **Verify L2 type definitions** — for types that will appear in the model (from BOM dependencies, FRD requirements, or interface contracts), check if the L2 docs already define their fields. Use the L2 definition verbatim. If new field names are needed, add it to the *architect work list* for step G.
+F. **Survey existing code** — if prerequisite phases have been built, understand established patterns, interfaces, and conventions. Use `Explore` agents for substantial codebases.
+G. **Architect Work** — if architecture updates are required from current research, do NOT proceed.
+Verify the gaps or discrepencies -> stop and notify the user -> use the AskUserQuestion tool to get confirmation to proceed with the corrective architecture work. Do not proceed until the user confirms.
+Invoke one or multiple *architect agents* with the full context (including PRD and FRD) to implement a complete and accurate architecture resolution. Backpropogate new work to other related documents as needed.
+WAIT for the agent(s) to confirm completion before proceeding.
 
 STEP 2 — DESIGN
 
 For each component group (by architecture layer):
 
 A. **Define component responsibilities** — one sentence each. What it does, not how.
-B. **Define interfaces** — at non-trivial component boundaries, specify what's exchanged (typed inputs/outputs) and any important behavioral expectations (idempotency, error propagation, etc.).
-C. **Trace data flows** — for non-trivial paths, show how data transforms across component boundaries. Name the types at each step.
-D. **Record design decisions** — where the L2 architecture leaves options open for this phase, decide. Record the decision, alternatives considered, and rationale.
-E. **Flag gaps** — components that lack L2 guidance, patterns that conflict, open questions for the user.
+B. **Define interfaces** — at non-trivial component boundaries, specify what's exchanged (typed inputs/outputs) and any important behavioral expectations (idempotency, error propagation, etc.). Every type named in an interface MUST appear in Key Types (defined here or identified as existing from prior phases).
+C. **Trace data flows** — for non-trivial paths, show how data transforms across component boundaries. Name the types at each step. Check the FRD for the authoritative flow description — don't invent steps that contradict FRD requirements.
+D. **Record design decisions** — ONLY where the L2 architecture leaves options open. Cross-check against the L2 decision catalog from Step 1D. If a decision is already made in L2, reference it in an "Already decided in L2" list — don't re-record it.
+E. **Audit terminology** — check that component names and lifecycle terms accurately describe the architectural behavior (e.g., "loop" implies continuous iteration, "turn" implies triggered single-pass; "resume" implies continuing from state, "start" implies fresh beginning). Flag terms that mislead.
+F. **Flag gaps** — components that lack L2 guidance, patterns that conflict, open questions for the user. BOM refs to nonexistent L2 sections are gaps — report them to the user and repeat step 1-G above.
 
 STEP 3 — WRITE model.md
 
-Before writing, estimate total lines: count BOM components × format cost (1 line for flow-style, 8 for multi-line) + ~150 lines for remaining sections. If the estimate exceeds 400, use flow-style YAML for all structured blocks (components, interfaces, types, flows, integrations).
+**Pre-write gate** (verify before writing):
+- Every `architecture_ref` value exists in the heading index from Step 1B (exact match, not paraphrase)
+- Every type referenced in interfaces is either defined in Key Types or identified as existing
+- No design decision duplicates an L2 decision from the catalog in Step 1D
+- Every type's fields match the L2 definition (if one exists) — never invent field names
+
+Estimate total lines: count BOM components × format cost (1 line for flow-style, 8 for multi-line) + ~150 lines for remaining sections. If the estimate exceeds 400, use flow-style YAML for all structured blocks (components, interfaces, types, flows, integrations).
 
 Write using the structure defined in <output>. Verify:
 - Every FRD capability maps to at least one component

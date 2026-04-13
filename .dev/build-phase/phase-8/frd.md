@@ -1,9 +1,9 @@
-# Phase 8a FRD: Autonomous Execution Loop
+# Phase 8a FRD: Autonomous Execution Engine
 *Generated: 2026-04-12*
 
 ## Objective
 
-Phase 8a connects all prior infrastructure — workflow composition (Phase 7), supervision hierarchy (Phase 5b), toolset (Phase 4), and skills (Phase 6) — into a working autonomous execution loop. For the first time, a user can express project intent to the Director and receive verified deliverables without manual intervention during execution. This phase proves the core thesis: specification to verified output under hierarchical supervision. Derives from PR-1, PR-8, PR-10, PR-13, PR-14, PR-22.
+Phase 8a connects all prior infrastructure — workflow composition (Phase 7), supervision hierarchy (Phase 5b), toolset (Phase 4), and skills (Phase 6) — into a working autonomous execution loop. For the first time, a user can express project intent to the Director and receive verified deliverables without manual intervention during execution. This phase proves the core thesis: specification to verified output under hierarchical supervision. Derives from PR-1, PR-2, PR-3, PR-8, PR-10, PR-13, PR-14, PR-22.
 
 ## Consumer Roles
 
@@ -98,14 +98,14 @@ The CEO can list and resolve Director queue items. Escalation tools create real 
 
 ### CAP-5: Director Backlog Orchestration
 
-The Director execution loop triages the backlog: reads pending Director queue items, resolves items within its authority, and forwards items beyond its authority to the CEO queue. The Director monitors all active projects and can intervene at any point.
+The Director execution turn triages the backlog: reads pending Director queue items, resolves items within its authority, and forwards items beyond its authority to the CEO queue. The Director monitors all active projects and can intervene at any point.
 
 **Requirements:**
-- [ ] **FR-8a.38**: When the Director execution loop runs, it reads all pending `DirectorQueueItem` records, prioritized by escalation priority (CRITICAL > HIGH > NORMAL > LOW) then creation time.
+- [ ] **FR-8a.38**: When the Director execution turn runs, it reads all pending `DirectorQueueItem` records, prioritized by escalation priority (CRITICAL > HIGH > NORMAL > LOW) then creation time.
 - [ ] **FR-8a.39**: When the Director encounters an item within its decision scope (status reports, resource requests within its authority, pattern alerts with known resolution), it resolves the item autonomously and records the resolution.
 - [ ] **FR-8a.40**: When the Director encounters an item beyond its authority (CEO-level decisions, cost ceiling overrides, project abort requests), it forwards the item to the CEO queue with its assessment and recommended resolution options.
 - [ ] **FR-8a.41**: When the Director detects cross-project patterns (multiple projects escalating similar failures, systemic resource issues), it surfaces a pattern alert to the CEO queue with aggregated evidence.
-- [ ] **FR-8a.42**: When the Director backlog loop completes with no pending items, the loop yields until new items arrive via the existing `process_director_queue` cron mechanism.
+- [ ] **FR-8a.42**: When the Director backlog turn completes with no pending items, the loop yields until new items arrive via the existing `process_director_queue` cron mechanism.
 
 ---
 
@@ -233,25 +233,25 @@ Each workflow defines permitted edit operations. Edits are a continuous, any-tim
 - [ ] **FR-8a.93**: Edit operations follow the same execution loop (Stage → TaskGroup → Batch → Deliverable) with the same validation, checkpointing, and completion reporting as initial project execution. The project's accumulated context (conventions, architectural decisions, resolved escalations) carries forward into edit work.
 ---
 
-### CAP-15: Work Layer Pause & Start Lifecycle
+### CAP-15: Work Layer Pause & Resume Lifecycle
 
-Every work layer — individual project, all projects, and the Director — supports explicit Pause and Start operations. Pause saves state, logs the action, and stops work cleanly. Start loads resources, rebuilds context, and resumes work from where it left off. This is a first-class lifecycle, not an edge case.
+Every work layer — individual project, all projects, and the Director — supports explicit Pause and Resume operations. Pause saves state, logs the action, and stops work cleanly. Resume loads resources, rebuilds context, and continues work from where it left off. This is a first-class lifecycle, not an edge case.
 
 **Requirements:**
 
 **Project-level:**
 - [ ] **FR-8a.94**: When the CEO pauses a project, the PM completes the current deliverable (if in progress), saves all critical state at the next checkpoint boundary, logs the pause reason, and stops execution. No work is left in an inconsistent state.
-- [ ] **FR-8a.95**: When the CEO starts a paused project, the system loads the project's persisted state, rebuilds the PM's execution context (skills, instruction fragments, stage configuration), and resumes the batch loop from the checkpointed position. Verified deliverables are never re-executed.
+- [ ] **FR-8a.95**: When the CEO resumes a paused project, the system loads the project's persisted state, rebuilds the PM's execution context (skills, instruction fragments, stage configuration), and resumes the batch loop from the checkpointed position. Verified deliverables are never re-executed.
 - [ ] **FR-8a.96**: When the CEO aborts a project, the system terminates execution, preserves all completed work and events, records the abort reason, and transitions the project to ABORTED status.
 
 **All-projects (system-wide):**
 - [ ] **FR-8a.97**: When the CEO pauses all projects, the system pauses every active project individually using the same project-level pause mechanism. Each project reaches its own safe checkpoint independently.
-- [ ] **FR-8a.98**: When the CEO starts all paused projects, the system starts each project individually using the same project-level start mechanism. Projects resume independently and do not block each other.
+- [ ] **FR-8a.98**: When the CEO resumes all paused projects, the system resumes each project individually using the same project-level resume mechanism. Projects resume independently and do not block each other.
 
 **Director work layer:**
 - [ ] **FR-8a.99**: When the CEO pauses the Director, the Director stops processing the backlog queue, stops accepting new project creation requests, and logs the pause. Active project PMs continue executing until they reach their next checkpoint, then pause.
-- [ ] **FR-8a.100**: When the CEO starts the Director, the Director rebuilds its context, loads pending queue state, and resumes backlog processing. Projects paused by the Director pause are started in priority order.
-- [ ] **FR-8a.101**: Pause and start at any layer publish lifecycle events with the layer scope (project, all-projects, director), the actor (CEO), the timestamp, and the reason.
+- [ ] **FR-8a.100**: When the CEO resumes the Director, the Director rebuilds its context, loads pending queue state, and resumes backlog processing. Projects paused by the Director pause are resumed in priority order.
+- [ ] **FR-8a.101**: Pause and resume at any layer publish lifecycle events with the layer scope (project, all-projects, director), the actor (CEO), the timestamp, and the reason.
 
 ---
 
@@ -353,7 +353,7 @@ Adding `edit_operations` to WORKFLOW.yaml extends the manifest schema. The schem
 | 3 | Projects are first-order DB entities tracking workflow type, status, stage, deliverables, escalations, and cost | CAP-10: FR-8a.73–76 |
 | 4 | Management tools (all PM, Director, and shared tools) write to and read from the database — no placeholder strings remain | CAP-3: FR-8a.14–27 |
 | 5 | `escalate_to_director` writes real `DirectorQueueItem` rows; `escalate_to_ceo` writes real `CeoQueueItem` rows; Director queue gateway routes operational | CAP-4: FR-8a.33–37, CAP-3: FR-8a.20–21 |
-| 6 | Director execution loop processes backlog: reads Director queue, triages items within authority, forwards unresolvable items to CEO queue | CAP-5: FR-8a.38–42 |
+| 6 | Director execution turn processes backlog: reads Director queue, triages items within authority, forwards unresolvable items to CEO queue | CAP-5: FR-8a.38–42 |
 | 7 | PM drives sequential execution through Stage → TaskGroup → Batch → Deliverable hierarchy: creates TaskGroups, selects dependency-ordered batches, executes one batch at a time, stage transitions gated by `verify_stage_completion` | CAP-6: FR-8a.43–54 |
 | 8 | Loop continues autonomously until all stages complete or work escalated | CAP-6: FR-8a.52 |
 | 9 | Failed deliverables don't block independent work — PM skips/reorders around failures | CAP-7: FR-8a.55–61 |
@@ -363,4 +363,4 @@ Adding `edit_operations` to WORKFLOW.yaml extends the manifest schema. The schem
 | 13 | Deliverable outputs and completion reports stored as persistent, retrievable artifacts | CAP-13: FR-8a.86–89 |
 | 14 | Projects support workflow-defined edit operations at any time regardless of project state — single and batch edits queue as new TaskGroups | CAP-14: FR-8a.90–93, FR-8a.92a–92b |
 | 15 | Deliverable and workflow status query routes operational; Director queue, PM queue, and system observability accessible via API | CAP-11: FR-8a.77–81 |
-| 16 | Every work layer (project, all-projects, Director) supports explicit Pause (save state, log, stop) and Start (load resources, rebuild context, resume) lifecycle operations | CAP-15: FR-8a.94–101 |
+| 16 | Every work layer (project, all-projects, Director) supports explicit Pause (save state, log, stop) and Resume (load resources, rebuild context, continue) lifecycle operations | CAP-15: FR-8a.94–101 |

@@ -34,7 +34,7 @@ Domain-specific L2 deep dives linked from `02-ARCHITECTURE.md` §4. Each is self
 | `data.md` | Data layer & infrastructure | What tables exist? How do Redis and PostgreSQL divide concerns? |
 | `engine.md` | ADK engine internals | How do ADK primitives map to AutoBuilder? Session types? |
 | `events.md` | Event system (Redis Streams) | How are events published, consumed, and replayed? SSE reconnection? |
-| `execution.md` | Autonomous execution loop | How do Director and PM loops run? Multi-session architecture? |
+| `execution.md` | Autonomous execution engine | How do Director turns and PM loops run? Multi-session architecture? |
 | `gateway.md` | Gateway layer (FastAPI) | Route structure? Anti-corruption pattern? Auth and middleware? |
 | `observability.md` | Tracing, logging, monitoring | OpenTelemetry + Langfuse phased rollout? Event stream visibility? |
 | `skills.md` | Skills system | Skill file format? Trigger matching? Three-tier library model? |

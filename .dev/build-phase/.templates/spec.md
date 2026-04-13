@@ -79,3 +79,7 @@ A **Capability (CAP-{n})** is a named consumer-facing behavior group — the con
 ## Research Notes
 
 {Key findings from research phase: verified API patterns, import paths, configuration details, gotchas discovered. Use code blocks for API signatures and examples. This section is reference material for the implementer.}
+
+<!-- SPLIT MODE: If spec exceeds 600 lines, delete the Research Notes section above and replace with:
+## Research & Extended Design → [spec-research.md](spec-research.md)
+See spec-phase.md Step 9 for full split procedure. -->

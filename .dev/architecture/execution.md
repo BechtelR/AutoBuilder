@@ -2,7 +2,7 @@
 
 # The Autonomous Execution Engine
 
-The execution loop operates at two levels within the hierarchy, across multiple sessions in three categories (settings, chat, and work):
+The execution engine operates at two levels within the hierarchy, across multiple sessions in three categories (settings, chat, and work):
 
 ## Multi-Session Architecture
 
@@ -57,7 +57,7 @@ Entry modes are workflow-agnostic. The Director determines the appropriate mode 
 
 Modes 3, 4, and 7 operate on living projects (see [workflows.md](./workflows.md#living-projects)). Mode 6 bypasses the shaping stage when the Brief is already complete.
 
-## Director-Level Loop
+## Director Execution Turn
 
 ```
 1. CEO submits request (chat, CLI, or dashboard)
@@ -143,17 +143,43 @@ Context recreation saves and restores at TaskGroup boundaries -- not at stage (t
 
 This enables crash recovery, pause/resume, and long-running project continuation across worker restarts.
 
-### Pause/Start Lifecycle (Decision D11)
+### Pause/Resume Lifecycle (Decision D11)
 
-Three layers of pause/start control:
+Three layers of pause/resume control:
 
-| Layer | Pause | Start |
-|-------|-------|-------|
+| Layer | Pause | Resume |
+|-------|-------|--------|
 | **Project-level** | Save state at TaskGroup checkpoint, log reason, stop PM execution | Load resources, rebuild context from checkpoint, resume PM loop |
 | **All-projects** | System-wide pause cascading to all active projects | System-wide resume cascading to all paused projects |
 | **Director layer** | Stop backlog processing, cascade pause to all active projects | Rebuild Director context, resume CEO queue processing |
 
-Pause is always safe -- it waits for the current deliverable to reach a safe point (batch boundary or TaskGroup boundary), then saves state. Start rebuilds context from the last checkpoint and resumes. Paused projects retain their state indefinitely.
+Pause is always safe -- it waits for the current deliverable to reach a safe point (batch boundary or TaskGroup boundary), then saves state. Resume rebuilds context from the last checkpoint and continues execution. Paused projects retain their state indefinitely.
+
+---
+
+## Artifact Storage
+
+Deliverable pipelines and completion reporting produce persistent artifacts during execution. Artifacts associate with specific database records and support arbitrary file types.
+
+### Production Points
+
+| Producer | Artifact Type | Associated Record |
+|----------|--------------|-------------------|
+| Deliverable pipeline (coder, reviewer, tester) | Code files, test results, review reports, build outputs | `deliverables.id` |
+| TaskGroup completion gate | TaskGroup completion report | `taskgroup_executions.id` |
+| Stage completion gate | Stage completion report | `stage_executions.id` |
+
+### Storage Model
+
+Artifacts use a **filesystem + DB metadata** pattern:
+
+- **DB record** (`artifacts` table): `id`, `entity_type`, `entity_id`, `path`, `content_type`, `size_bytes`, `created_at`. Foreign key polymorphic via `entity_type` + `entity_id` (deliverable, taskgroup_execution, or stage_execution).
+- **Filesystem**: Actual content stored at `path`. Organized by project and entity for predictable layout.
+- **Query inclusion**: API responses for deliverables and execution records include artifact references (id, content_type, size, path) — not inline content.
+
+### Relationship to ADK Artifacts
+
+The ADK `save_artifact`/`load_artifact` API (see [context.md](./context.md) Layer 5) operates within a single agent session. The artifact storage described here is the **persistent, cross-session** layer — workers call `save_artifact` during execution, and a post-pipeline step copies session artifacts to the persistent store with proper DB association.
 
 ---
 

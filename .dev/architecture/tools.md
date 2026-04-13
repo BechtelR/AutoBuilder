@@ -261,7 +261,14 @@ def manage_dependencies(action: DependencyAction, source_id: str, target_id: str
     """Add, remove, or query deliverable dependency relationships."""
 ```
 
-**Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment. `checkpoint_project` is an `after_agent_callback` on DeliverablePipeline that fires after each deliverable completes, persisting state via `CallbackContext`. `run_regression_tests` is a `RegressionTestAgent` (CustomAgent) wired into the pipeline after each batch -- it reads the PM's regression policy from session state, runs tests when the policy says to, and no-ops otherwise. Always present in the pipeline, policy-aware. See [Agents](./agents.md) for details.
+**Note:** `checkpoint_project` and `run_regression_tests` are **not FunctionTools** -- they must not be skippable by LLM judgment.
+
+**Two-tier checkpointing** (Phase 8a Decision D3):
+
+- **Tier 1 — Per-deliverable (automatic):** An `after_agent_callback` on DeliverablePipeline fires after each deliverable completes, persisting lightweight state (deliverable status, result data) to the DB via `CallbackContext`. This provides crash safety -- a checkpointed deliverable never re-executes after a system crash (FR-8a.48).
+- **Tier 2 — Per-TaskGroup (PM-triggered):** The PM calls `checkpoint_project` explicitly at TaskGroup boundaries to persist a full `CriticalStateSnapshot` (deliverable statuses, batch position, stage progress, accumulated cost, hard limits, loaded skill names, project config, workflow ID, completed stages). This snapshot is what context recreation (Decision D4) uses to rebuild state after budget threshold or crash. The PM drives the outer loop and knows when TaskGroups complete, so explicit invocation is simpler than a callback.
+
+`run_regression_tests` is a `RegressionTestAgent` (CustomAgent) wired into the pipeline after each batch -- it reads the PM's regression policy from session state, runs tests when the policy says to, and no-ops otherwise. Always present in the pipeline, policy-aware. See [Agents](./agents.md) for details.
 
 ### 3.8 Director Management Tools (10 tools)
 
@@ -515,7 +522,7 @@ Within each tier, individual agents have scoping based on their role. The table 
 - **`reviewer`** (worker): `file_read`, `file_glob`, `file_grep`, `directory_list`, `code_symbols`, `run_diagnostics`, `git_status`, `git_diff`, `git_log`, `git_show`, `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
 - **`fixer`** (worker): Full filesystem (all 10), full code intelligence (2), `bash_exec` (no `http_request`), read-only git (`git_status`, `git_diff`, `git_log`, `git_show` -- no `git_commit`, `git_branch`, `git_worktree`, `git_apply`; `coder` handles commits), `web_search`, `web_fetch`, `todo_read`, `todo_write`, `todo_list`
 - **PM**: `select_ready_batch`, `escalate_to_director`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`. Note: `checkpoint_project` (`after_agent_callback` on DeliverablePipeline) and `run_regression_tests` (`RegressionTestAgent`, CustomAgent in pipeline) are not tools -- they are not LLM-discretionary.
-- **Director**: `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`
+- **Director**: `create_project`, `validate_brief`, `check_resources`, `delegate_to_pm`, `escalate_to_ceo`, `list_projects`, `query_project_status`, `override_pm`, `get_project_context`, `query_dependency_graph`, `task_create`, `task_update`, `task_query`, `todo_read`, `todo_write`, `todo_list`
 
 `GlobalToolset.get_tools()` enforces this scoping at agent construction time, not through directory placement.
 

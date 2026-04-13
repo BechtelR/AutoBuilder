@@ -128,6 +128,9 @@ Direct `ctx.session.state["key"] = val` does NOT persist. Only `state_delta` on 
 ## ADK Session State: External Mutation (CRITICAL)
 `session.state` from `get_session()` is a snapshot — mutation doesn't persist. Delete + `create_session()` with merged state.
 
+## Phantom Architecture Section References
+`architecture_ref` and cross-doc section refs MUST be verified against actual L2 headings. Never write from memory.
+
 ## Skill/Doc State Key Drift
 SKILL.md and code examples MUST reference exact state keys from validator/agent implementations. Never write from memory.
 - ❌ `linter_result`, `tester_result` (guessed names)

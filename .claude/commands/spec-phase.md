@@ -6,6 +6,11 @@ argument-hint: <phase-number> [--research-only | --resume]
 <objective>
 Produce a buildable specification for Phase {$ARGUMENTS}. Output: `spec.md` in `.dev/build-phase/phase-{N}/`.
 
+LINE BUDGET: spec.md MUST be ≤600 lines. When legitimate content exceeds 600 lines, split into two files:
+- `spec.md` (≤600 lines) — Overview, Prerequisites, Design Decisions, Deliverables, Build Order, Traceability
+- `spec-research.md` — Research Notes and any overflow Design Decisions (referenced from spec.md)
+The split sheds Research Notes first, then verbose Design Decisions. NEVER truncate deliverable requirements, BOM component lists, or traceability to meet the budget — these are builder-critical.
+
 CRITICAL: NOT done until spec.md is written AND every FRD requirement traces to a deliverable (if FRD exists) AND every BOM component maps to a deliverable AND every roadmap contract item traces to a deliverable. Do not stop early. On blockers, ask the user.
 </objective>
 
@@ -76,7 +81,7 @@ Use `Explore`/`subtask` agents for parallel research.
 STEP 5 — DELIVERABLE DECOMPOSITION
 Map BOM components to deliverables. Each deliverable may implement 1+ BOM components. Every BOM component for this phase MUST appear in at least one deliverable.
 
-Per deliverable: ID (`P{N}.D{n}`), title (imperative), BOM components (list IDs, e.g., `G10, G11, A70`), description (what not how, 2-4 sentences), files (exact paths from `03-STRUCTURE.md`), dependencies (by ID), requirements (what must be true when complete — concrete, measurable), validation command.
+Per deliverable: ID (`P{N}.D{n}`), title (imperative), BOM components (list IDs, e.g., `G10, G11, A70`), description (what not how, 2-3 sentences), files (exact paths from `03-STRUCTURE.md`), dependencies (by ID), requirements (concrete, measurable — as many as the builder needs), validation command.
 
 Rules: single-session completable, max 3-4 files, DAG deps, every contract item mapped, every BOM component covered, add implied deliverables.
 
@@ -94,19 +99,22 @@ STEP 8 — BUILD ORDER
 Topological sort into parallel batches respecting deps.
 
 STEP 9 — WRITE OUTPUT
-Write spec.md per output section.
+Write spec.md per output section. Run `wc -l` after writing. If >600 lines, split into `spec.md` + `spec-research.md` (same directory, bidirectional links). Shed Research Notes first, then verbose Design Decisions (keep 1-sentence summaries in spec.md). Deliverable sections are never reduced to meet the budget.
 
 STEP 10 — REVIEWER VERIFICATION
-Spawn a `reviewer` agent. Provide: spec.md path, the verification checklist (from <verification> section), and references to source documents (FRD, BOM, roadmap contract). Reviewer verifies and fixes issues directly. If reviewer flags items needing design decisions, resolve them and re-run reviewer.
+Spawn a `reviewer` agent. Provide: spec.md path (and spec-research.md if it exists), the verification checklist (from <verification> section), and references to source documents (FRD, BOM, roadmap contract). Reviewer verifies and fixes issues directly. If reviewer flags items needing design decisions, resolve them and re-run reviewer.
 </process>
 
 <output>
-One file: `.dev/build-phase/phase-{N}/spec.md`
+Primary: `.dev/build-phase/phase-{N}/spec.md` (≤600 lines)
+Overflow: `.dev/build-phase/phase-{N}/spec-research.md` (only when spec.md would exceed 600 lines)
 
 Follow template at `.dev/build-phase/.templates/spec.md` — fill all `{placeholders}`, keep all sections.
 
+Writing discipline: Be concise in prose sections (Overview, Design Decisions, Research Notes). Never reduce deliverable requirements or traceability to save lines — split instead.
+
 Requirements:
-- Standalone (fresh session needs only this + referenced docs)
+- Standalone (fresh session needs only spec.md + spec-research.md + referenced docs)
 - Requirements per deliverable state what must be true when complete
 - FRD Coverage maps every FR-{N}.{nn} to deliverable(s) (if FRD exists, zero uncovered)
 - Completion Contract Traceability covers ALL roadmap contract items
@@ -116,19 +124,23 @@ Requirements:
 
 <verification>
 Re-read spec.md and check:
-1. Has: Overview, Prerequisites, Design Decisions, Deliverables (ID/BOM Components/Files/Depends/Description/Requirements/Validation), Build Order, Traceability (FRD + BOM + Contract coverage), Research Notes
-2. Every FRD requirement (FR-{N}.{nn}) maps to a deliverable (if FRD exists)
-3. Every BOM component for this phase maps to a deliverable (zero unmapped)
-4. Roadmap contract item count matches traceability matrix count
-5. All requirements concrete (no "works correctly")
-6. All file paths valid per `03-STRUCTURE.md`
-7. Valid DAG build order with no circular dependencies
+1. **Line count**: `wc -l` on spec.md — MUST be ≤600 lines. If over, apply Step 9 split rules before continuing.
+2. Has: Overview, Prerequisites, Design Decisions, Deliverables (ID/BOM Components/Files/Depends/Description/Requirements/Validation), Build Order, Traceability (FRD + BOM + Contract coverage). Research Notes in spec.md OR spec-research.md.
+3. Every FRD requirement (FR-{N}.{nn}) maps to a deliverable (if FRD exists)
+4. Every BOM component for this phase maps to a deliverable (zero unmapped)
+5. Roadmap contract item count matches traceability matrix count
+6. All requirements concrete (no "works correctly")
+7. All file paths valid per `03-STRUCTURE.md`
+8. Valid DAG build order with no circular dependencies
+9. **No truncated deliverables**: Requirements lists and BOM component lists were not reduced to meet the line budget — if the file was split, verify deliverable sections are intact and complete
+10. If spec-research.md exists: cross-references are bidirectional (spec.md links to it, it links back)
 
 Fix failures before returning.
 </verification>
 
 <success_criteria>
-- spec.md written to disk
+- spec.md written to disk, ≤600 lines
+- If split: spec-research.md written with bidirectional cross-references
 - Every FRD requirement → deliverable (if FRD exists, zero unmapped)
 - Every BOM component for this phase → deliverable (zero unmapped)
 - Every roadmap contract item → deliverable (traceability)

@@ -31,6 +31,7 @@ No separate dashboard database. No separate session database. One schema, one mi
 | `chats` | Chat sessions — Settings (formation/evolution), Director conversations, and project-scoped chats (session_id, type, status, title) |
 | `chat_messages` | Individual messages within a chat session (role: USER or DIRECTOR, content) |
 | `ceo_queue` | Unified queue: notifications, approvals, escalations, tasks (type + priority + structured metadata) |
+| `director_queue` | Director-internal escalation queue: items from PM agents awaiting Director review (type: ESCALATION, STATUS_REPORT, RESOURCE_REQUEST, PATTERN_ALERT; priority; status: PENDING, IN_PROGRESS, RESOLVED, FORWARDED_TO_CEO; source_project; source_agent; metadata JSONB). See events.md §Director Queue |
 | `events` | Audit log (subset of events written by audit consumer) |
 | `webhook_listeners` | Registered webhook endpoints and filters |
 | `skills` | Skill index and metadata |

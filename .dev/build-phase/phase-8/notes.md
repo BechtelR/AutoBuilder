@@ -52,7 +52,7 @@ Claimed scope:
 | **Concurrency limits** (max parallel pipelines, cascaded) | Deferred from Phase 5b; no phase owns it yet |
 | **Autonomous failure handling** (retry/skip/reorder/escalate heuristics) | PM reasoning pattern exists; specific failure strategies don't |
 | **Human-in-the-loop intervention API** (`POST /workflows/{id}/intervene`) | New gateway route + batch-boundary pause |
-| **Director execution loop** (cross-project orchestration) | Director's batch-of-PMs management |
+| **Director execution turn** (cross-project orchestration) | Director's batch-of-PMs management |
 | **Batch failure threshold** (consecutive failures → Director suspension) | Safety mechanism, no prior implementation |
 | **Deliverable DB entities expansion** (status lifecycle, dependency graph) | Phase 7 added StageExecution/TaskGroupExecution/ValidatorResult tables; deliverables table exists but management tools are all placeholders |
 | **Backlog queue orchestration** | CEO submits brief → Director triages → PM executes. DB tables exist (Phase 5b) but the entire orchestration layer is unbuilt |
@@ -72,10 +72,10 @@ Phase 5b built the **communication channels** (CEO queue gateway routes, Directo
 | `ceo_queue` table + CRUD routes | `POST /specs` — no way to submit work |
 | `director_queue` table + `DirectorQueueItem` model | No Director queue gateway routes (no CRUD) |
 | `process_director_queue` ARQ cron (scans pending items) | `escalate_to_director` tool is placeholder string |
-| CEO queue approval → session state writeback | No Director execution loop (X03) to process escalations |
+| CEO queue approval → session state writeback | No Director execution turn (X03) to process escalations |
 | `run_work_session` ARQ job | No project backlog model (brief → triage → delegation) |
 
-The Director execution loop described in `architecture/execution.md` §Director loop — CEO submits spec → Gateway enqueues decomposition → Director assigns PM → PM drives batch loop — requires Phase 8 to actually connect these pieces.
+The Director execution turn described in `architecture/execution.md` §Director Execution Turn — CEO submits spec → Gateway enqueues decomposition → Director assigns PM → PM drives batch loop — requires Phase 8 to actually connect these pieces.
 
 Additionally, the codebase audit reveals **10+ management tools in `app/tools/management.py` are placeholder strings** returning hardcoded text with no DB access:
 - `select_ready_batch`, `update_deliverable`, `query_deliverables`, `reorder_deliverables`, `manage_dependencies`, `query_dependency_graph` (PM tools)
@@ -421,7 +421,7 @@ Stage → TaskGroup(s) → Batch(es) → Deliverable(s). TaskGroup ≠ Batch. A 
 - **CAP-12**: Context Recreation & TaskGroup Resume
 - **CAP-13**: Artifact Storage
 - **CAP-14**: Project Continuity & Workflow-Defined Edit Operations
-- **CAP-15**: Work Layer Pause & Start Lifecycle
+- **CAP-15**: Work Layer Pause & Resume Lifecycle
 
 ### D9: Scope Hierarchy
 

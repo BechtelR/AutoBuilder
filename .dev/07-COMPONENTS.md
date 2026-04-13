@@ -1,5 +1,5 @@
 # AutoBuilder Component Registry (BOM)
-*Version: 2.4.0*
+*Version: 2.4.1*
 
 **Single source of truth for all buildable components.** Every item in this registry is derived from the architecture domain files (`architecture/*.md`). Every item maps to exactly one roadmap phase. An unassigned item (`—`) is a gap.
 
@@ -566,9 +566,9 @@ Source: `architecture/execution.md`
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| X01 | Director-mediated project entry (seven entry modes: new, new-with-materials, extend, edit, re-run, direct execution, workstream) + brief validation + project creation + PM delegation | mechanism | 8a | execution.md §Director loop | Director agent, WorkflowRegistry, X20, X21-X24 |
+| X01 | Director-mediated project entry (seven entry modes: new, new-with-materials, extend, edit, re-run, direct execution, workstream) + brief validation + project creation + PM delegation | mechanism | 8a | execution.md §Director Execution Turn | Director agent, WorkflowRegistry, X20, X21-X24 |
 | X02 | Deliverable status tracking (lifecycle management via management tools) | mechanism | 8a | execution.md §PM loop | `deliverables` table |
-| X03 | Director execution loop (backlog processing, PM delegation, escalation forwarding) | workflow | 8a | execution.md §Director loop | Director agent, PM agents, V23, X13, CEO queue |
+| X03 | Director execution turn (backlog processing, PM delegation, escalation forwarding) | workflow | 8a | execution.md §Director Execution Turn | Director agent, PM agents, V23, X13, CEO queue |
 | X04 | PM batch loop (autonomous, stage-driven, sequential) | workflow | 8a | execution.md §PM loop | PM agent, `select_ready_batch`, F25, F26, F27 |
 | X12 | Management tool DB wiring (replace placeholder strings with real persistence) | mechanism | 8a | tools.md §3.7, §3.8 | DB session, `deliverables`/`director_queue`/`ceo_queue` tables |
 | X13 | `escalate_to_director` real implementation (write to `director_queue` table) | mechanism | 8a | tools.md §3.7 | V23, T31 |
@@ -576,11 +576,11 @@ Source: `architecture/execution.md`
 | X19 | Pre-execution resource validation (credentials, services, knowledge) | mechanism | 8a | workflows.md §Resources | F43, CEO queue |
 | G28 | `GET /director/queue` (list Director queue items) | route | 8a | events.md §Director Queue | V23 |
 | G29 | `PATCH /director/queue/{id}` (resolve/forward Director queue item) | route | 8a | events.md §Director Queue | V23, CEO queue |
-| X20 | `projects` table (first-order entity: workflow_type, status, stage, deliverables, escalations, cost) | db | 8a | execution.md §Director loop, PRD PR-2 | Alembic migration, `workflows`/`deliverables` tables |
-| X21 | Director `create_project` tool (create project entity in DB) | tool | 8a | execution.md §Director loop | X20 (`projects` table) |
+| X20 | `projects` table (first-order entity: workflow_type, status, stage, deliverables, escalations, cost) | db | 8a | data.md §Data Layer, Key Tables, execution.md §Director Execution Turn | Alembic migration, `workflows`/`deliverables` tables |
+| X21 | Director `create_project` tool (create project entity in DB) | tool | 8a | execution.md §Director Execution Turn | X20 (`projects` table) |
 | X22 | Director `validate_brief` tool (validate brief against workflow `brief_template`) | tool | 8a | workflows.md §Workflow Manifest | F19 (BriefTemplateDef), WorkflowRegistry |
 | X23 | Director `check_resources` tool (verify credentials, services, knowledge) | tool | 8a | workflows.md §Resources | F43 (ResourcesDef), CEO queue |
-| X24 | Director `delegate_to_pm` tool (enqueue PM work session for project) | tool | 8a | execution.md §Director loop | X20, ARQ `run_work_session` |
+| X24 | Director `delegate_to_pm` tool (enqueue PM work session for project) | tool | 8a | execution.md §Director Execution Turn | X20, ARQ `run_work_session` |
 | X25 | PM `checkpoint_project` tool (save critical state at TaskGroup boundary) | tool | 8a | execution.md §PM loop | X20, session state |
 | CT04b | Context recreation resume at TaskGroup boundary (save state, fresh session, resume) | mechanism | 8a | context.md §Context Recreation | CT03 (artifacts), session service |
 
@@ -612,19 +612,19 @@ Source: `architecture/execution.md`
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
 | X26 | Workflow-defined edit operations manifest field (`edit_operations` in WORKFLOW.yaml) | config | 8a | workflows.md §Workflow Manifest | WorkflowManifest model |
-| X27 | Project edit request flow (Director receives edit → creates new TaskGroup in existing project) | workflow | 8a | execution.md §Director loop | X20, X21, CAP-6 batch loop |
+| X27 | Project edit request flow (Director receives edit → creates new TaskGroup in existing project) | workflow | 8a | execution.md §Director Execution Turn | X20, X21, CAP-6 batch loop |
 
-### 14.5 Pause & Start Lifecycle
+### 14.5 Pause & Resume Lifecycle
 
 | # | Component | Type | Phase | Source | Dependencies |
 |---|-----------|------|-------|--------|--------------|
-| X28 | Project-level pause/start mechanism (finish current deliverable, checkpoint, stop / load state, rebuild context, resume) | mechanism | 8a | execution.md §Pause & Start | X25 (checkpoint), CT04b (context recreation) |
-| X29 | Director work layer pause/start mechanism (stop/resume backlog processing, cascade to active PMs) | mechanism | 8a | execution.md §Pause & Start | X03 (Director loop), X28 |
-| X30 | System-wide pause/start (iterate project-level pause/start for all active projects) | mechanism | 8a | execution.md §Pause & Start | X28 |
-| G30 | `POST /projects/{id}/pause` | route | 8a | execution.md §Pause & Start | X28 |
-| G31 | `POST /projects/{id}/start` | route | 8a | execution.md §Pause & Start | X28 |
-| G32 | `POST /director/pause` | route | 8a | execution.md §Pause & Start | X29 |
-| G33 | `POST /director/start` | route | 8a | execution.md §Pause & Start | X29 |
+| X28 | Project-level pause/resume mechanism (finish current deliverable, checkpoint, stop / load state, rebuild context, resume) | mechanism | 8a | execution.md §Pause & Resume | X25 (checkpoint), CT04b (context recreation) |
+| X29 | Director work layer pause/resume mechanism (stop/resume backlog processing, cascade to active PMs) | mechanism | 8a | execution.md §Pause & Resume | X03 (Director turn), X28 |
+| X30 | System-wide pause/resume (iterate project-level pause/resume for all active projects) | mechanism | 8a | execution.md §Pause & Resume | X28 |
+| G30 | `POST /projects/{id}/pause` | route | 8a | execution.md §Pause & Resume | X28 |
+| G31 | `POST /projects/{id}/resume` | route | 8a | execution.md §Pause & Resume | X28 |
+| G32 | `POST /director/pause` | route | 8a | execution.md §Pause & Resume | X29 |
+| G33 | `POST /director/resume` | route | 8a | execution.md §Pause & Resume | X29 |
 
 ### 14.6 Artifact Storage
 
@@ -692,26 +692,22 @@ See component entries above for current counts. Use `grep -c '| [0-9]' 07-COMPON
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 2.4.0 | 2026-04-12 | Phase 8a FRD back-propagation: X01 updated (Director-mediated entry with seven entry modes); X28-X30 added (three-layer pause/start lifecycle: project, Director, system-wide); G30-G33 added (pause/start gateway routes); X31-X32 added (artifact storage association per deliverable and per execution record); Section 14.5 (Pause & Start Lifecycle) and 14.6 (Artifact Storage) added. No "API consumer" role references found (already clean). 9 new components |
-| 2.3.0 | 2026-04-12 | Phase 8a shaping: added X20-X27, CT04b for project entity, Director creation tools, context recreation resume, project continuity. Section 14.4 added (Project Continuity). Total components includes 9 new entries |
-| 2.1.0 | 2026-04-12 | Phase 8 split into 8a (Autonomous Execution Engine) + 8b (Parallel Execution & Isolation): Section 14 reorganized into phase-aligned subsections (14.1-14.2 = 8a, 14.3 = 8b); G02/G03/G04/G07/G08/V19/A63/CT03 → 8a; G06/A62 → 8b; 9 new components (X12-X16, X18-X19, G28-G29); management tool DB wiring (X12) and backlog orchestration (X03/X13) identified as critical gaps |
-| 2.0.0 | 2026-03-12 | Phase 7 expansion (Decisions #70-77): 44 new workflow components (F19-F57, S37-S41); Phase 7b added (Director authoring); statistics updated (Total 331→375, Active 329→373, Phase 7 21→48, Phase 7b 17) |
-| 1.9.0 | 2026-03-11 | Phase 6 FRD back-propagation: S16-S17 added (supervision-tier resolution, skill validation); S33-S36 added (4 authoring skills); S32 moved 13+→6 (Director/PM role-bound skills); S12 updated (adds `applies_to` filtering); statistics updated (Total 325→331, Active 323→329, Phase 6 24→31, Phase 13+/14 6→5) |
-| 1.8.1 | 2026-03-10 | Fix Phase 3 count 36→37 (A72 move was not reflected in statistics) |
-| 1.8.0 | 2026-03-10 | Phase 5b FRD decisions: A16 added (Director queue consumption, 5b); X11 added (batch failure threshold, 8); A72 moved 5b→3 (cross-session bridge already operational via state scopes + Redis Streams); statistics updated (Total 323→325, Active 321→323, Phase 0-2 19→20, Phase 8 20→21) |
-| 1.7.0 | 2026-03-10 | Phase 5 split into 5a (Agent Definitions & Pipeline) and 5b (Supervision & Integration); A78 split into A78a (type validation, 5a) and A78b (tool_role ceiling, 7); M15 moved from Phase 9 to 5a (degraded mode with InMemoryMemoryService); A37 added for MemoryLoaderAgent agent entry |
-| 1.6.0 | 2026-03-10 | New §12 Context section (CT01-CT07) sourced from context.md; O04-O06 migrated to CT01-CT03; A42 absorbed into CT04; sections renumbered (Observability→13, Spec Pipeline→14, CLI→15, Dashboard→16) |
-| 1.5.0 | 2026-03-10 | Add 7 missing agent components: DiagnosticsAgent (A36), SAFETY fragment (A75), InstructionContext (A76), partial override (A77), project-scope security (A78), state key authorization (A79), resolution auditability (A80); update A57 fragment types; fix v1.4.0 cascade scope count (4→3) |
-| 1.4.0 | 2026-03-09 | Agent definitions → declarative markdown files with 3-scope cascade (Decision #54); AgentDef dataclass removed |
-| 1.3.0 | 2026-03-07 | Add InstructionAssembler, AgentDef, AgentRegistry, context recreation, system reminders (Decisions #50-53) |
-| 1.2.3 | 2026-02-27 | Fix: all source references updated from ordinal §N to named section headings across gateway, workers, events, agents, skills, workflows, execution, clients domain files |
-| 1.2.2 | 2026-02-18 | Fix: drop duplicate V16 entry (`escalate_to_ceo` counted twice); canonical entry is T17 in Section 7.1; update statistics (Total 306→305, Dropped 2→3, Active 304→302, Phase 4 63→62) |
-| 1.2.1 | 2026-02-18 | Fix: section ref mismatches (T06-T17), ID collisions (Tool Modules → TM##, Toolset → TS##), add missing fixer scoping (TS07), correct statistics, fix dashboard phase comment in 03-STRUCTURE.md |
-| 1.2.0 | 2026-02-18 | Phase 4 toolset expansion: 42 tools, Director queue enums, management.py module + new code.py |
+| 2.4.0 | 2026-04-12 | Phase 8a FRD back-propagation: X01 updated (Director-mediated entry, seven entry modes); X28-X30 added (three-layer pause/resume lifecycle); G30-G33 added (pause/resume routes); X31-X32 added (artifact storage); Sections 14.5 and 14.6 added. 9 new components |
+| 2.3.0 | 2026-04-12 | Phase 8a shaping: X20-X27 and CT04b added (project entity, Director creation tools, context recreation resume, project continuity); Section 14.4 added |
+| 2.1.0 | 2026-04-12 | Phase 8 split into 8a + 8b: Section 14 reorganized into phase-aligned subsections; 9 new components (X12-X16, X18-X19, G28-G29) |
+| 2.0.0 | 2026-03-12 | Phase 7 expansion (Decisions #70-77): 44 new workflow components (F19-F57, S37-S41); Phase 7b added (Director authoring) |
+| 1.9.0 | 2026-03-11 | Phase 6 FRD back-propagation: S16-S17, S33-S36 added; S32 moved to Phase 6; S12 updated |
+| 1.8.0 | 2026-03-10 | Phase 5b FRD decisions: A16 and X11 added; A72 moved to Phase 3 |
+| 1.7.0 | 2026-03-10 | Phase 5 split into 5a and 5b; A78 split into A78a/A78b; M15 moved to 5a; A37 added |
+| 1.6.0 | 2026-03-10 | New §12 Context section (CT01-CT07) sourced from context.md; sections renumbered |
+| 1.5.0 | 2026-03-10 | Added 7 missing agent components: A36, A75-A80 (DiagnosticsAgent, SAFETY fragment, InstructionContext, partial override, security, state auth, auditability) |
+| 1.4.0 | 2026-03-09 | Agent definitions → declarative markdown files with 3-scope cascade (Decision #54) |
+| 1.3.0 | 2026-03-07 | Added InstructionAssembler, AgentDef, AgentRegistry, context recreation, system reminders (Decisions #50-53) |
+| 1.2.0 | 2026-02-18 | Phase 4 toolset expansion: 42 tools, Director queue enums, management.py module |
 | 1.1.0 | 2026-02-17 | All 55 gaps resolved: 53 assigned to phases, 2 dropped (D09, V17) |
 | 1.0.0 | 2026-02-17 | Initial BOM — exhaustive extraction from 13 architecture domain files |
 
 ---
 
-*Document Version: 2.4.0*
+*Document Version: 2.4.2*
 *Last Updated: 2026-04-12*
